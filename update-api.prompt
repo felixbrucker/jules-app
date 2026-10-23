@@ -1,0 +1,129 @@
+# Jules API Update & Sync Prompt
+
+> **MANDATORY RULE:** Whenever any API models, endpoints, filters, or adapters are added, changed, or refactored in the codebase, this `update-api.prompt` file MUST be updated simultaneously to reflect the latest state.
+
+You are an expert Android Kotlin developer tasked with keeping the local Google Jules REST API client implementation up to date with the latest official Google Jules specifications and SDK changes.
+
+## Objective
+Check for updates in both the official Google Jules API reference pages and the Jules SDK repository, and update the Kotlin API classes in package `com.felixbrucker.jules.network.api` accordingly.
+
+> **MANDATORY THOROUGHNESS RULE:** Any agent running this prompt **MUST ALWAYS** check **ALL** listed files in the SDK and **ALL** official API reference pages (`types`, `sessions`, `activities`, `sources`). Skipping any reference pages or SDK files is strictly prohibited.
+
+## File Location & Navigation Strategies (CRITICAL)
+When searching for files in the local repository or the remote SDK (`google-labs-code/jules-sdk`), future agents must follow these rules:
+1. **Local Project Search**: NEVER use shell commands (`find`, `ls`, `grep`) to search files. ALWAYS use built-in IDE tools:
+   - `find_files` (to locate files by name/glob)
+   - `grep` (to search text patterns)
+   - `find_declaration` / `find_usages` (for semantic symbols)
+2. **Remote SDK Inspection (`google-labs-code/jules-sdk`)**:
+   - DO NOT guess file paths or use trial-and-error fetching.
+   - ALWAYS query the GitHub REST API repository tree endpoint first to discover exact paths: `https://api.github.com/repos/google-labs-code/jules-sdk/git/trees/main?recursive=1` using `read_url`.
+   - Once exact paths are identified, fetch them using raw GitHub URLs (e.g. `https://raw.githubusercontent.com/google-labs-code/jules-sdk/main/packages/core/src/...`).
+   - Note key file names in `google-labs-code/jules-sdk`: `mappers.ts` (**plural**, NOT singular `mapper.ts`), `types.ts`, `sources.ts`, `session.ts`, `client.ts`, `api.ts`, `artifacts.ts`.
+
+## Reference Sources
+1. Official Jules API Reference: https://jules.google/docs/api/reference/
+   - Types Reference: https://jules.google/docs/api/reference/types
+   - Sessions Reference: https://jules.google/docs/api/reference/sessions
+   - Activities Reference: https://jules.google/docs/api/reference/activities
+   - Sources Reference: https://jules.google/docs/api/reference/sources
+2. Jules SDK GitHub Repository: https://github.com/google-labs-code/jules-sdk
+   - `packages/core/src/types.ts`
+   - `packages/core/src/client.ts`
+   - `packages/core/src/session.ts`
+   - `packages/core/src/sources.ts`
+   - `packages/core/src/api.ts`
+   - `packages/core/src/query/schema.ts`
+   - `packages/core/src/activities/summary.ts`
+   - `packages/core/src/artifacts.ts`
+   - `packages/core/src/mappers.ts`
+
+## Target Codebase
+Inspect the existing Kotlin implementation under:
+- `app/src/main/java/com/felixbrucker/jules/network/api/JulesApi.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/JulesApiService.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/model/Source.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/model/Session.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/model/Activity.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/adapter/ActivityAdapter.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/adapter/InstantAdapter.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/filter/Filter.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/filter/SourceFilter.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/filter/SessionFilter.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/filter/ActivityFilter.kt`
+- `app/src/main/java/com/felixbrucker/jules/network/api/util/UnidiffParser.kt`
+- `app/src/test/java/com/felixbrucker/jules/network/api/JulesApiTest.kt`
+
+## Architectural Guidelines & Mandatory Rules
+1. **Fully Typed Models & Strict Enums**:
+   - Plain `String` representations for enumerations are strictly prohibited.
+   - All API enumerations (`SessionState`, `AutomationMode`, `SessionOutputType`, `Originator`, `ArtifactType`, `SourceType`) MUST be implemented as Kotlin `enum class`es annotated with `@Json(name = "...")`.
+   - Every `enum class` MUST be registered in Moshi with `EnumJsonAdapter.create(...).withUnknownFallback(...)` for safe forward compatibility.
+   - `Originator` unknown fallback MUST be `Originator.SYSTEM` (matching `mappers.ts`).
+
+2. **Timestamps as `java.time.Instant`**:
+   - All ISO-8601 / RFC 3339 timestamp string fields (`createTime`, `updateTime`) MUST be typed as `java.time.Instant` and parsed via `InstantAdapter`.
+
+3. **Generic & Sealed Endpoint Filters**:
+   - `JulesApi` methods MUST NOT accept generic string filters (`filter: String`) or direct filter string parameters.
+   - Filtering MUST use the generic `Filter<out T>` interface where endpoint filter classes implement `Filter<T>` directly (e.g. `sealed class SourceFilter : Filter<SourceFilter>`), supporting type-safe composition (`Filter.And`, `Filter.Or`, `and`, `or` infix functions without enclosing parentheses) and eliminating method overloads.
+   - Specific filter classes under `com.felixbrucker.jules.network.api.filter`:
+     - `SourceFilter` (e.g. `ByName(val name: String)`)
+     - `SessionFilter` (e.g. `ByArchived(val isArchived: Boolean)`)
+     - `ActivityFilter` (e.g. `CreatedAfter(val createdAfter: Instant)`)
+   - Maintain the `getArchivedSessions()` convenience method on `JulesApi`.
+
+4. **Pagination & Range Validation**:
+   - List methods taking `pageSize` MUST validate range `1..100` inclusive (`require(pageSize in 1..100)`).
+
+5. **Computed Fields & Diff Parsing**:
+   - **`Session`**: Must maintain non-nullable `id`, `prompt`, `sourceContext`, `createTime`, optional `archived`, and computed fields (`duration`, `pullRequests`, `changeSets`).
+   - **`SessionOutput`**: Must support `pullRequest` and `changeSet`.
+   - **`PullRequest`**: Must maintain non-nullable `url`, `title`, `description`, and optional `baseRef`, `headRef`.
+   - **`Activity`**: Must be modeled as a strongly typed sealed interface (`Activity.AgentMessaged`, `Activity.UserMessaged`, `Activity.PlanGenerated`, `Activity.PlanApproved`, `Activity.ProgressUpdated`, `Activity.SessionCompleted`, `Activity.SessionFailed`) with computed `summary` (following logic in `activities/summary.ts`).
+   - **`ActivityAdapter`**: Uses intermediate `RestActivity` DTO to deserialize raw REST JSON and map it via `.toActivity()`.
+   - **`ParsedFile` & `FileChangeType`**: Local domain models produced by `UnidiffParser` (without Moshi annotations or default parameter values).
+   - **`Artifact`**: Must support polymorphic payloads (`changeSet`, `media` with `mimeType` and `data`), and computed `type`. (`bashOutput` is absent as it was removed from the API/SDK).
+   - **`ChangeSet`**: Must maintain `parsedFiles` (using `UnidiffParser`) and `summary` (`totalFiles`, `created`, `modified`, `deleted`, `totalAdditions`, `totalDeletions`).
+   - **`Source`**: Must maintain `displayName` (`owner/repo` or `id`) and computed `type` (`SourceType.GITHUB_REPO` or `SourceType.UNSPECIFIED`). Note that raw REST response JSON for `Source` contains `name`, `id`, `githubRepo` (without a `type` JSON property).
+
+6. **Mutation Endpoints & Request Bodies**:
+   - Mutation endpoints (`sendMessage`, `approvePlan`, `archiveSession`, `unarchiveSession`) return `Unit` (empty response on success).
+   - Empty body requests (`approvePlan`, `archiveSession`, `unarchiveSession`) MUST use typed empty request classes (`ApprovePlanRequest`, `ArchiveSessionRequest`, `UnarchiveSessionRequest`) to serialize as `{}`.
+
+7. **Instantiation & Client Design**:
+   - `JulesApi` MUST be instantiated via constructor `JulesApi(apiKey = "...")`.
+   - Companion factory methods or test-only parameters MUST NOT be present in main source set classes. Testing helpers MUST reside in `src/test` (e.g., `createForTesting`).
+
+## Instructions & Sync Protocol
+1. **Fetch and Check ALL Reference Sources (MANDATORY)**:
+   - Use `read_url` to inspect **EVERY SINGLE** official API reference page (`https://jules.google/docs/api/reference/`, `/types`, `/sessions`, `/activities`, `/sources`) AND **EVERY SINGLE** file in the Jules SDK GitHub repository (`types.ts`, `client.ts`, `session.ts`, `sources.ts`, `api.ts`, `query/schema.ts`, `activities/summary.ts`, `artifacts.ts`, `mappers.ts`). Skipping any file or reference page is strictly forbidden.
+
+2. **Diff Against Local Kotlin Implementation**:
+   - Compare endpoints, HTTP methods, path format, and query parameters in `JulesApiService.kt` with the remote references.
+   - Compare model fields, data structures, and enum values in `model/*.kt`.
+   - Check if any new endpoints (e.g., streaming, session management, activity events, or source filters) have been introduced.
+
+3. **Check-First & No-Op Rule (including `update-api.prompt`)**:
+   - If no changes or updates are detected between the remote API reference/SDK and the local codebase, **stop immediately** and make zero file edits (`no-op`), including making no edits to `update-api.prompt`. Only edit files (including `update-api.prompt`) when concrete updates or discrepancies are found.
+
+4. **Apply Code Updates**:
+   - Update `JulesApiService.kt`, `JulesApi.kt`, `filter/*.kt`, and `model/*.kt` using `replace_file_content` or `multi_replace_file_content`.
+   - Ensure all new data classes use `@JsonClass(generateAdapter = true)` and `@Json(name = "...")` Moshi annotations.
+   - Strictly follow project guidelines in `AGENTS.md` (named boolean arguments, Kotlin standards, etc.).
+
+5. **Update Unit Tests & Verify**:
+   - Add unit tests in `JulesApiTest.kt` covering any new endpoints, filters, or modified response fields.
+   - Run `./gradlew test` using `gradle_build("test")` to verify that everything compiles and passes.
+
+6. **Record Agent Learnings (MANDATORY WHEN NOTABLE)**:
+   - If you encounter subtle schema distinctions, input-only vs. response property differences, or corrections during execution, you MUST update the **Agent Learnings & Historical Notes** section at the bottom of this file so future agents can learn from them.
+
+## Agent Learnings & Historical Notes
+When agents encounter domain nuances, schema distinctions, or feedback during execution, they must record their learnings here.
+
+### Recorded Learnings & Insights:
+- **Input-Only vs. Response Resource Properties**: `requirePlanApproval` and `automationMode` are input-only parameters for session creation (`CreateSessionRequest`), NOT response properties on the `Session` resource returned by GET endpoints.
+- **Child-Mapped / Nested Data**: Source references and generated files are mapped from child objects/outputs or nested context structures rather than direct top-level fields on response models unless explicitly defined in the REST schema.
+- **Fetching API Reference Docs (`read_url`)**: When using `read_url` on official documentation pages (`https://jules.google/docs/api/reference/...`), always provide explicit extraction instructions (e.g., `"Extract all text content from the HTML page"`) to ensure the tool parses and returns readable text/HTML content rather than raw binary payloads.
+
