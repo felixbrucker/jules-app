@@ -13,11 +13,12 @@ import com.felixbrucker.jules.network.api.model.UnarchiveSessionRequest
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-internal interface JulesApiService {
+interface JulesApiService {
 
     @GET("sources")
     suspend fun getSources(
@@ -43,6 +44,9 @@ internal interface JulesApiService {
         @Query("pageToken") pageToken: String? = null,
         @Query("filter") filter: String? = null
     ): SessionsListResponse
+
+    @GET("sessions")
+    suspend fun validateApiKey(@Header("X-Goog-Api-Key") apiKey: String, @Query("pageSize") pageSize: Int = 1): SessionsListResponse
 
     @GET("sessions/{sessionId}")
     suspend fun getSession(

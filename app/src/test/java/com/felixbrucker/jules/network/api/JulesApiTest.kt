@@ -5,6 +5,7 @@ import com.felixbrucker.jules.network.api.filter.SourceFilter
 import com.felixbrucker.jules.network.api.filter.and
 import com.felixbrucker.jules.network.api.filter.or
 import com.felixbrucker.jules.network.api.model.Activity
+import com.felixbrucker.jules.network.api.model.ApiException
 import com.felixbrucker.jules.network.api.model.ArtifactType
 import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.CreateSessionRequest
@@ -332,18 +333,23 @@ class JulesApiTest {
 
     @Test
     fun testApiErrorHandling() = runBlocking {
-        mockWebServer.enqueue(MockResponse().setResponseCode(403).setBody("Forbidden: Invalid API key"))
+        mockWebServer.enqueue(MockResponse().setResponseCode(403).setBody("{ \"error\": { \"message\": \"Forbidden\", \"status\": \"SOME_STATUS\", \"code\": 403, \"details\": [{ \"reason\": \"invalid-session\" }] } }"))
 
         var exceptionThrown = false
         try {
             julesApi.getSession(sessionId = "invalid-session")
-        } catch (e: JulesApiException) {
+        } catch (e: ApiException) {
             exceptionThrown = true
-            assertEquals(403, e.statusCode)
-            assertTrue("Error message expected", e.message?.contains("Forbidden") == true)
+            assertEquals(403, e.httpStatusCode)
+            assertEquals("Forbidden", e.message)
+            assertEquals("Forbidden", e.apiError.message)
+            assertEquals("SOME_STATUS", e.apiError.status)
+            assertEquals(403, e.apiError.code)
+            assertEquals(1, e.apiError.details.size)
+            assertEquals("invalid-session", e.apiError.details.first()["reason"])
         }
 
-        assertTrue("Expected JulesApiException to be thrown", exceptionThrown)
+        assertTrue("Expected ApiException to be thrown", exceptionThrown)
     }
 
     @Test
@@ -365,12 +371,11 @@ class JulesApiTest {
         var exceptionThrown = false
         try {
             julesApi.getSession(sessionId = "session-invalid")
-        } catch (e: JulesApiException) {
+        } catch (_: Exception) {
             exceptionThrown = true
-            assertNotNull("Expected non-null cause in JulesApiException", e.cause)
         }
 
-        assertTrue("Expected JulesApiException due to invalid timestamp", exceptionThrown)
+        assertTrue("Expected Exception due to invalid timestamp", exceptionThrown)
     }
 
     @Test

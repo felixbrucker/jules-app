@@ -1,5 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -61,12 +64,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
-kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xannotation-default-target=param-property")
-    }
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -80,7 +85,39 @@ dependencies {
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
     implementation(libs.moshi.adapters)
+
+    // Compose
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Hilt
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
+    // DataStore & WorkManager & Timber & Coroutines
+    implementation(libs.datastore.preferences)
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.timber)
+    implementation(libs.kotlinx.coroutines.android)
+
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
     testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

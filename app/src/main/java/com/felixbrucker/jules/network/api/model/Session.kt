@@ -5,16 +5,16 @@ import com.squareup.moshi.JsonClass
 import java.time.Duration
 import java.time.Instant
 
-enum class SessionState {
-    @Json(name = "UNSPECIFIED") UNSPECIFIED,
-    @Json(name = "QUEUED") QUEUED,
-    @Json(name = "PLANNING") PLANNING,
-    @Json(name = "AWAITING_PLAN_APPROVAL") AWAITING_PLAN_APPROVAL,
-    @Json(name = "AWAITING_USER_FEEDBACK") AWAITING_USER_FEEDBACK,
-    @Json(name = "IN_PROGRESS") IN_PROGRESS,
-    @Json(name = "PAUSED") PAUSED,
-    @Json(name = "FAILED") FAILED,
-    @Json(name = "COMPLETED") COMPLETED
+enum class SessionState(val label: String) {
+    @Json(name = "UNSPECIFIED") UNSPECIFIED("Unspecified"),
+    @Json(name = "QUEUED") QUEUED("Queued"),
+    @Json(name = "PLANNING") PLANNING("Planning"),
+    @Json(name = "AWAITING_PLAN_APPROVAL") AWAITING_PLAN_APPROVAL("Awaiting Plan Approval"),
+    @Json(name = "AWAITING_USER_FEEDBACK") AWAITING_USER_FEEDBACK("Awaiting User Feedback"),
+    @Json(name = "IN_PROGRESS") IN_PROGRESS("In Progress"),
+    @Json(name = "PAUSED") PAUSED("Paused"),
+    @Json(name = "FAILED") FAILED("Failed"),
+    @Json(name = "COMPLETED") COMPLETED("Completed")
 }
 
 enum class AutomationMode {
@@ -33,11 +33,30 @@ data class GitHubRepoContext(
     @Json(name = "startingBranch") val startingBranch: String
 )
 
+data class Repo(
+    val host: String,
+    val owner: String,
+    val name: String,
+) {
+    val label: String get() = "$owner/$name"
+    val isGithub: Boolean get() = (host == "github")
+}
+
 @JsonClass(generateAdapter = true)
 data class SourceContext(
     @Json(name = "source") val source: String,
     @Json(name = "githubRepoContext") val githubRepoContext: GitHubRepoContext? = null
-)
+) {
+    val repo: Repo? get() {
+        val sourceString = source.removePrefix("sources/")
+        val parts = sourceString.split("/")
+        if (parts.size != 3) {
+            return null
+        }
+
+        return Repo(host = parts[0], owner = parts[1], name = parts[2])
+    }
+}
 
 @JsonClass(generateAdapter = true)
 data class PullRequest(

@@ -1,0 +1,136 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "7c847bef0c6076194d899e2e7f8c8977",
+    "entities": [
+      {
+        "tableName": "sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `title` TEXT, `prompt` TEXT NOT NULL, `state` TEXT NOT NULL, `isArchived` INTEGER NOT NULL, `createTime` INTEGER NOT NULL, `updateTime` INTEGER, `url` TEXT, `repo_host` TEXT, `repo_owner` TEXT, `repo_name` TEXT, `pull_request_url` TEXT, `pull_request_title` TEXT, `pull_request_description` TEXT, `pull_request_baseRef` TEXT, `pull_request_headRef` TEXT, `change_set_source` TEXT, `change_set_unidiffPatch` TEXT, `change_set_totalAdditions` INTEGER, `change_set_totalDeletions` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "prompt",
+            "columnName": "prompt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createTime",
+            "columnName": "createTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updateTime",
+            "columnName": "updateTime",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repo.host",
+            "columnName": "repo_host",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repo.owner",
+            "columnName": "repo_owner",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repo.name",
+            "columnName": "repo_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pullRequest.url",
+            "columnName": "pull_request_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pullRequest.title",
+            "columnName": "pull_request_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pullRequest.description",
+            "columnName": "pull_request_description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pullRequest.baseRef",
+            "columnName": "pull_request_baseRef",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pullRequest.headRef",
+            "columnName": "pull_request_headRef",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "changeSet.source",
+            "columnName": "change_set_source",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "changeSet.unidiffPatch",
+            "columnName": "change_set_unidiffPatch",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "changeSet.totalAdditions",
+            "columnName": "change_set_totalAdditions",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "changeSet.totalDeletions",
+            "columnName": "change_set_totalDeletions",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7c847bef0c6076194d899e2e7f8c8977')"
+    ]
+  }
+}
