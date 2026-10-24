@@ -1,6 +1,6 @@
 package com.felixbrucker.jules.di
 
-import com.felixbrucker.jules.network.api.AuthInterceptor
+import com.felixbrucker.jules.network.api.JulesAuthInterceptor
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.GitHubAuthInterceptor
 import com.felixbrucker.jules.network.api.UserAgentInterceptor
@@ -66,12 +66,12 @@ object NetworkModule {
     @Singleton
     @JulesClient
     fun provideJulesOkHttpClient(
-        authInterceptor: AuthInterceptor,
+        julesAuthInterceptor: JulesAuthInterceptor,
         userAgentInterceptor: UserAgentInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(userAgentInterceptor)
-            .addInterceptor(authInterceptor)
+            .addInterceptor(julesAuthInterceptor)
             .build()
     }
 

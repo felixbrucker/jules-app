@@ -13,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AuthInterceptor @Inject constructor(
+class JulesAuthInterceptor @Inject constructor(
     appSettingsRepository: AppSettingsRepository
 ) : Interceptor {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
