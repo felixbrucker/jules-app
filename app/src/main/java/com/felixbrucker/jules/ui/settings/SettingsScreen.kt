@@ -12,8 +12,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.OutlinedButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -56,7 +58,8 @@ import com.felixbrucker.jules.ui.components.ObfuscatedTextField
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onViewLogsClick: () -> Unit
 ) {
     val context = LocalContext.current
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
@@ -105,7 +108,8 @@ fun SettingsScreen(
             smartSyncEnabled = smartSyncEnabled,
             feedbackNotificationsEnabled = feedbackNotificationsEnabled,
             completionNotificationsEnabled = completionNotificationsEnabled,
-            selectedPlan = selectedPlan
+            selectedPlan = selectedPlan,
+            onViewLogsClick = onViewLogsClick
         )
     }
 }
@@ -147,7 +151,8 @@ private fun SettingsContent(
     smartSyncEnabled: Boolean,
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
-    selectedPlan: JulesPlan
+    selectedPlan: JulesPlan,
+    onViewLogsClick: () -> Unit
 ) {
     Column(
         modifier = modifier
@@ -178,6 +183,54 @@ private fun SettingsContent(
             onToggleCompletionNotifications = { viewModel.setCompletionNotificationsEnabled(it) },
             onForceSync = { viewModel.forceSync() }
         )
+        Spacer(modifier = Modifier.height(16.dp))
+        DiagnosticsCard(onViewLogsClick = onViewLogsClick)
+    }
+}
+
+@Composable
+private fun DiagnosticsCard(
+    onViewLogsClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.BugReport,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.padding(start = 8.dp))
+                Text(
+                    text = "Debug & Diagnostics",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "App Logs", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = "View and filter real-time and historical application logs",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                OutlinedButton(onClick = onViewLogsClick) {
+                    Text("View Logs")
+                }
+            }
+        }
     }
 }
 

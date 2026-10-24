@@ -12,6 +12,8 @@ import com.felixbrucker.jules.ui.login.LoginScreen
 import com.felixbrucker.jules.ui.login.LoginViewModel
 import com.felixbrucker.jules.ui.sessions.SessionListScreen
 import com.felixbrucker.jules.ui.sessions.SessionListViewModel
+import com.felixbrucker.jules.ui.logging.LogViewerScreen
+import com.felixbrucker.jules.ui.logging.LogViewerViewModel
 import com.felixbrucker.jules.ui.settings.SettingsScreen
 import com.felixbrucker.jules.ui.settings.SettingsViewModel
 
@@ -19,6 +21,7 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     object SessionList : Screen("session_list")
     object Settings : Screen("settings")
+    object LogViewer : Screen("log_viewer")
 }
 
 @Composable
@@ -55,6 +58,18 @@ fun JulesNavGraph(
             SettingsScreen(
                 viewModel = viewModel,
                 onBackClick = {
+                    navController.popBackStackSafely()
+                },
+                onViewLogsClick = {
+                    navController.navigate(Screen.LogViewer.route)
+                }
+            )
+        }
+        composable(Screen.LogViewer.route) {
+            val viewModel: LogViewerViewModel = hiltViewModel()
+            LogViewerScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
                     navController.popBackStackSafely()
                 }
             )

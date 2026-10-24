@@ -110,7 +110,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.sync()
             } catch (e: Exception) {
-                Timber.e(e, "Failed to sync sessions and pull requests")
+                Timber.tag(TAG).e(e, "Failed to sync sessions and pull requests")
             } finally {
                 isRefreshing = false
             }
@@ -122,7 +122,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.deleteSession(sessionId)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to delete session $sessionId")
+                Timber.tag(TAG).e(e, "Failed to delete session $sessionId")
             }
         }
     }
@@ -132,7 +132,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.archiveSession(sessionId)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to archive session $sessionId")
+                Timber.tag(TAG).e(e, "Failed to archive session $sessionId")
             }
         }
     }
@@ -142,9 +142,13 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.unarchiveSession(sessionId)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to unarchive session $sessionId")
+                Timber.tag(TAG).e(e, "Failed to unarchive session $sessionId")
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "SessionListViewModel"
     }
 }
 

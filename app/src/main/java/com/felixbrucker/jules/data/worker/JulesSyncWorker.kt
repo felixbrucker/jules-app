@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.felixbrucker.jules.data.repository.LogRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -22,11 +23,18 @@ class JulesSyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val julesRepository: JulesRepository,
-    private val appSettingsRepository: AppSettingsRepository
+    private val appSettingsRepository: AppSettingsRepository,
+    private val logRepository: LogRepository
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         return try {
+            try {
+                logRepository.pruneOldLogs(daysToKeep = 7)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to prune logs in JulesSyncWorker")
+            }
+
             val apiKey = appSettingsRepository.apiKeyFlow.first()
             if (apiKey.isNullOrBlank()) {
                 return Result.success()
@@ -36,12 +44,13 @@ class JulesSyncWorker @AssistedInject constructor(
 
             Result.success()
         } catch (e: Exception) {
-            Timber.e(e, "JulesSyncWorker failed")
+            Timber.tag(TAG).e(e, "JulesSyncWorker failed")
             Result.retry()
         }
     }
 
     companion object {
+        private const val TAG = "JulesSyncWorker"
         const val PERIODIC_WORK_NAME = "jules_periodic_sync"
 
         fun enqueuePeriodicSync(context: Context, intervalMinutes: Long) {

@@ -244,10 +244,14 @@ class SettingsViewModel @Inject constructor(
             try {
                 julesRepository.sync(force = true)
             } catch (e: Exception) {
-                Timber.e(e, "Force sync failed")
+                Timber.tag(TAG).e(e, "Force sync failed")
             } finally {
                 isForceSyncing = false
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "SettingsViewModel"
     }
 }

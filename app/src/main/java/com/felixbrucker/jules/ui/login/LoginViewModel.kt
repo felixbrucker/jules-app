@@ -10,6 +10,7 @@ import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -48,6 +49,7 @@ class LoginViewModel @Inject constructor(
             try {
                 julesRepository.validateApiKey(apiKey.trim())
             } catch (e: JulesApiException) {
+                Timber.tag(TAG).w(e, "API key validation failed with status ${e.httpStatusCode}")
                 apiKeyValidationErrorMessage = if (e.httpStatusCode == 401) {
                     "Invalid API key"
                 } else {
@@ -55,12 +57,18 @@ class LoginViewModel @Inject constructor(
                 }
                 return@launch
             } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "API key validation encountered error")
                 apiKeyValidationErrorMessage = e.message ?: "Unknown error"
                 return@launch
             } finally {
                 isValidatingApiKey = false
             }
             appSettingsRepository.saveApiKey(apiKey.trim())
+            Timber.tag(TAG).i("API key successfully validated and saved")
         }
+    }
+
+    companion object {
+        private const val TAG = "LoginViewModel"
     }
 }
