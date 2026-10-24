@@ -5,11 +5,21 @@
 # ----------------------------------------------------------------------------------------
 # Preserve Moshi JSON models and generated adapters
 -keep @com.squareup.moshi.JsonClass class * { *; }
+-keep class *JsonAdapter {
+    public <init>(...);
+}
+-keep class **.*JsonAdapter {
+    public <init>(...);
+}
 -keepclassmembers class * {
     @com.squareup.moshi.Json <fields>;
 }
+-keepclassmembers class * {
+    synthetic kotlin.jvm.internal.DefaultConstructorMarker;
+}
 -keep class com.felixbrucker.jules.network.api.model.** { *; }
 -keep class com.felixbrucker.jules.network.api.JulesApiService { *; }
+-keep class com.felixbrucker.jules.network.api.GitHubApiService { *; }
 
 # ----------------------------------------------------------------------------------------
 # Retrofit & OkHttp
