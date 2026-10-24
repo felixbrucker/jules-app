@@ -5,6 +5,8 @@ import com.felixbrucker.jules.data.database.LogEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -62,17 +64,18 @@ class LogRepositoryTest {
     }
 
     @Test
-    fun testGetCountsReturnsFilteredAndTotal() = runBlocking {
-        coEvery { logDao.getTotalCount() } returns 10
-        coEvery { logDao.getFilteredCount(any(), any(), any()) } returns 5
+    fun testGetCountsFlowReturnsFilteredAndTotal() = runBlocking {
+        coEvery { logDao.getTotalCountFlow() } returns flowOf(10)
+        coEvery { logDao.getFilteredCountFlow(any(), any(), any()) } returns flowOf(5)
 
-        val (filtered, total) = repository.getCounts(setOf(3, 4), "search")
+        val total = repository.getTotalCountFlow().first()
+        val filtered = repository.getFilteredCountFlow(setOf(3, 4), "search").first()
 
         assertEquals(5, filtered)
         assertEquals(10, total)
         coVerify {
-            logDao.getTotalCount()
-            logDao.getFilteredCount(
+            logDao.getTotalCountFlow()
+            logDao.getFilteredCountFlow(
                 prioritiesEmpty = false,
                 priorities = listOf(3, 4),
                 searchQuery = "search"

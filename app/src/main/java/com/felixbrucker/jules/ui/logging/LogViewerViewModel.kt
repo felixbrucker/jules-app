@@ -10,10 +10,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -29,18 +31,33 @@ class LogViewerViewModel @Inject constructor(
     private val _selectedPriority = MutableStateFlow(-1)
     val selectedPriority: StateFlow<Int> = _selectedPriority.asStateFlow()
 
-    private val _totalCount = MutableStateFlow(0)
-    val totalCount: StateFlow<Int> = _totalCount.asStateFlow()
+    val totalCount: StateFlow<Int> = logRepository.getTotalCountFlow()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
 
-    private val _filteredCount = MutableStateFlow(0)
-    val filteredCount: StateFlow<Int> = _filteredCount.asStateFlow()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val filteredCount: StateFlow<Int> = combine(
+        selectedPriority,
+        searchQuery
+    ) { priority, query ->
+        val priorities = if (priority == -1) emptySet() else setOf(priority)
+        priorities to query
+    }.flatMapLatest { (priorities, query) ->
+        logRepository.getFilteredCountFlow(priorities = priorities, searchQuery = query)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val logsPaged: Flow<PagingData<LogEntity>> = combine(
         selectedPriority,
         searchQuery
     ) { priority, query ->
-        refreshCounts(priority, query)
         val priorities = if (priority == -1) emptySet() else setOf(priority)
         priorities to query
     }.flatMapLatest { (priorities, query) ->
@@ -59,22 +76,8 @@ class LogViewerViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 logRepository.clearLogs()
-                refreshCounts(selectedPriority.value, searchQuery.value)
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Failed to clear logs")
-            }
-        }
-    }
-
-    private fun refreshCounts(priority: Int, query: String) {
-        viewModelScope.launch {
-            try {
-                val priorities = if (priority == -1) emptySet() else setOf(priority)
-                val (filtered, total) = logRepository.getCounts(priorities, query)
-                _filteredCount.value = filtered
-                _totalCount.value = total
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to refresh log counts")
             }
         }
     }

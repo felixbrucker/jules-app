@@ -37,17 +37,16 @@ class LogRepository @Inject constructor(
         ).flow
     }
 
-    suspend fun getCounts(priorities: Set<Int>, searchQuery: String): Pair<Int, Int> =
-        withContext(Dispatchers.IO) {
-            val priorityList = priorities.toList()
-            val total = logDao.getTotalCount()
-            val filtered = logDao.getFilteredCount(
-                prioritiesEmpty = priorityList.isEmpty(),
-                priorities = priorityList,
-                searchQuery = searchQuery.trim()
-            )
-            Pair(filtered, total)
-        }
+    fun getTotalCountFlow(): Flow<Int> = logDao.getTotalCountFlow()
+
+    fun getFilteredCountFlow(priorities: Set<Int>, searchQuery: String): Flow<Int> {
+        val priorityList = priorities.toList()
+        return logDao.getFilteredCountFlow(
+            prioritiesEmpty = priorityList.isEmpty(),
+            priorities = priorityList,
+            searchQuery = searchQuery.trim()
+        )
+    }
 
     suspend fun insertLog(entry: LogEntity) = withContext(Dispatchers.IO) {
         logDao.insertLog(entry)

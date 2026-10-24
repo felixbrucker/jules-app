@@ -6,6 +6,7 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -26,7 +27,8 @@ class LogViewerViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         logRepository = mockk(relaxed = true)
-        coEvery { logRepository.getCounts(any(), any()) } returns Pair(0, 0)
+        coEvery { logRepository.getTotalCountFlow() } returns flowOf(0)
+        coEvery { logRepository.getFilteredCountFlow(any(), any()) } returns flowOf(0)
         viewModel = LogViewerViewModel(logRepository)
     }
 

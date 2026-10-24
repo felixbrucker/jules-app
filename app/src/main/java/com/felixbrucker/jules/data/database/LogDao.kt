@@ -5,6 +5,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface LogDao {
@@ -35,7 +36,7 @@ interface LogDao {
     ): PagingSource<Int, LogEntity>
 
     @Query("SELECT COUNT(*) FROM logs")
-    suspend fun getTotalCount(): Int
+    fun getTotalCountFlow(): Flow<Int>
 
     @Query(
         """
@@ -49,11 +50,11 @@ interface LogDao {
           )
         """
     )
-    suspend fun getFilteredCount(
+    fun getFilteredCountFlow(
         prioritiesEmpty: Boolean,
         priorities: List<Int>,
         searchQuery: String?
-    ): Int
+    ): Flow<Int>
 
     @Query("DELETE FROM logs")
     suspend fun clearAllLogs()
