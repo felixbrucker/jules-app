@@ -281,7 +281,6 @@ private fun TopBarSearchFieldContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionListContent(
     modifier: Modifier = Modifier,
