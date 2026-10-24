@@ -8,8 +8,8 @@ data class SessionWithPullRequest(
     @Embedded
     val session: SessionEntity,
     @Relation(
-        parentColumn = "pull_request_url",
-        entityColumn = "url"
+        parentColumn = "id",
+        entityColumn = "sessionId"
     )
     val pullRequestEntity: PullRequestEntity?
 ) {

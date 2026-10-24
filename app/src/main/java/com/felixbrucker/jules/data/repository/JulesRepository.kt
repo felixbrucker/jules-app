@@ -233,17 +233,21 @@ class JulesRepository @Inject constructor(
             val githubToken = appSettingsRepository.githubAuthTokenFlow.first()
             val includePrivate = !githubToken.isNullOrBlank()
             val activeSessions = sessionDao.getActiveSessionsWithPullRequests(includePrivate = includePrivate)
-            val prUrls = activeSessions.mapNotNull { it.pullRequest?.url }.distinct()
 
-            if (prUrls.isEmpty()) return@withContext
+            val sessionPrTuples = activeSessions.mapNotNull { session ->
+                val prUrl = session.pullRequest?.url ?: return@mapNotNull null
+                session.id to prUrl
+            }
+
+            if (sessionPrTuples.isEmpty()) return@withContext
 
             val semaphore = Semaphore(4)
-            val prEntities = prUrls.map { prUrl ->
+            val prEntities = sessionPrTuples.map { (sessionId, prUrl) ->
                 async {
                     semaphore.withPermit {
                         try {
                             val state = gitHubApi.getPullRequestState(prUrl)
-                            PullRequestEntity(url = prUrl, state = state)
+                            PullRequestEntity(url = prUrl, sessionId = sessionId, state = state)
                         } catch (e: Exception) {
                             Timber.tag(TAG).e(e, "Failed to sync pull request state for $prUrl")
                             null

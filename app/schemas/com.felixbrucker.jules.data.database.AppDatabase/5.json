@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "363e439dfcb6e11a5a34924c03c77382",
+    "identityHash": "e139d00562301faf220e0592475f54db",
     "entities": [
       {
         "tableName": "sessions",
@@ -167,13 +167,20 @@
       },
       {
         "tableName": "pull_requests",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`url` TEXT NOT NULL, `state` TEXT NOT NULL, PRIMARY KEY(`url`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`url` TEXT NOT NULL, `sessionId` TEXT NOT NULL DEFAULT '', `state` TEXT NOT NULL, PRIMARY KEY(`url`), FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "url",
             "columnName": "url",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "state",
@@ -190,13 +197,26 @@
         },
         "indices": [
           {
-            "name": "index_pull_requests_url",
+            "name": "index_pull_requests_sessionId",
             "unique": false,
             "columnNames": [
-              "url"
+              "sessionId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_pull_requests_url` ON `${TABLE_NAME}` (`url`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pull_requests_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
           }
         ]
       },
@@ -298,7 +318,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '363e439dfcb6e11a5a34924c03c77382')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e139d00562301faf220e0592475f54db')"
     ]
   }
 }

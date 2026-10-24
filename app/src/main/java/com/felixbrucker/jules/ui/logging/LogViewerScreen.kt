@@ -19,9 +19,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -421,6 +429,55 @@ fun LogEmptyView(isLogsEmpty: Boolean) {
 }
 
 @Composable
+fun StreamingDot(alpha: Float) {
+    Box(
+        modifier = Modifier
+            .size(6.dp)
+            .clip(CircleShape)
+            .background(LogColors.PurpleLight.copy(alpha = alpha))
+    )
+}
+
+@Composable
+fun StreamingDotsAnimation(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "streaming_dots")
+    val alpha1 by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(600, 0, LinearEasing), RepeatMode.Reverse),
+        label = "dot1"
+    )
+    val alpha2 by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(600, 200, LinearEasing), RepeatMode.Reverse),
+        label = "dot2"
+    )
+    val alpha3 by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(600, 400, LinearEasing), RepeatMode.Reverse),
+        label = "dot3"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StreamingDot(alpha = alpha1)
+            StreamingDot(alpha = alpha2)
+            StreamingDot(alpha = alpha3)
+        }
+    }
+}
+
+@Composable
 fun LogViewerList(
     pagedLogs: LazyPagingItems<LogEntity>,
     listState: LazyListState,
@@ -432,6 +489,9 @@ fun LogViewerList(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.testTag("log_entries_list")
     ) {
+        item(key = "streaming_dots") {
+            StreamingDotsAnimation()
+        }
         items(
             count = pagedLogs.itemCount,
             key = pagedLogs.itemKey { entry -> entry.id }
