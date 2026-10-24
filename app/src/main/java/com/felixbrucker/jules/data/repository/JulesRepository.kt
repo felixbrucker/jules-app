@@ -46,6 +46,10 @@ class JulesRepository @Inject constructor(
         julesApi.validateApiKey(apiKey = apiKey)
     }
 
+    suspend fun validateGithubAuthToken(token: String) = withContext(Dispatchers.IO) {
+        gitHubApi.validateAuthToken(token)
+    }
+
     suspend fun sync() = withContext(Dispatchers.IO) {
         syncSessions()
         syncPullRequests()
@@ -115,9 +119,7 @@ class JulesRepository @Inject constructor(
                     semaphore.withPermit {
                         try {
                             val state = gitHubApi.getPullRequestState(prUrl)
-                            if (state != null) {
-                                PullRequestEntity(url = prUrl, state = state)
-                            } else null
+                            PullRequestEntity(url = prUrl, state = state)
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to sync pull request state for $prUrl")
                             null

@@ -2,6 +2,7 @@ package com.felixbrucker.jules.di
 
 import com.felixbrucker.jules.network.api.AuthInterceptor
 import com.felixbrucker.jules.network.api.GitHubApi
+import com.felixbrucker.jules.network.api.GitHubAuthInterceptor
 import com.felixbrucker.jules.network.api.UserAgentInterceptor
 import com.felixbrucker.jules.network.api.GitHubApiService
 import com.felixbrucker.jules.network.api.JulesApi
@@ -28,7 +29,7 @@ import javax.inject.Singleton
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class BaseUrl
+annotation class JulesBaseUrl
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -78,10 +79,12 @@ object NetworkModule {
     @Singleton
     @GitHubClient
     fun provideGitHubOkHttpClient(
+        gitHubAuthInterceptor: GitHubAuthInterceptor,
         userAgentInterceptor: UserAgentInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(userAgentInterceptor)
+            .addInterceptor(gitHubAuthInterceptor)
             .build()
     }
 
@@ -90,7 +93,7 @@ object NetworkModule {
     fun provideJulesApiService(
         @JulesClient okHttpClient: OkHttpClient,
         moshi: Moshi,
-        @BaseUrl baseUrl: String
+        @JulesBaseUrl baseUrl: String
     ): JulesApiService {
         return Retrofit.Builder()
             .baseUrl(baseUrl)
@@ -102,8 +105,8 @@ object NetworkModule {
 
     @Suppress("SameReturnValue")
     @Provides
-    @BaseUrl
-    fun provideBaseUrl(): String {
+    @JulesBaseUrl
+    fun provideJulesBaseUrl(): String {
         return JulesApi.DEFAULT_BASE_URL
     }
 

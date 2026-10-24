@@ -43,10 +43,10 @@ data class GitHubApiError(
 )
 
 class GitHubApiException(
-    val apiError: GitHubApiError?,
+    val apiError: GitHubApiError,
     val httpStatusCode: Int,
     cause: Throwable? = null
-) : Exception(apiError?.message ?: "GitHub API error $httpStatusCode", cause)
+) : Exception(apiError.message, cause)
 
 fun HttpException.parseGitHubError(moshi: Moshi): GitHubApiError? {
     val errorBody = response()?.errorBody() ?: return null

@@ -720,10 +720,12 @@ private fun PullRequestChip(
         PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
     }
 
+    val prNumberText = pr.number?.let { " (#$it)" } ?: ""
+
     AssistChip(
         modifier = Modifier.height(28.dp),
         onClick = { onPrClick(pr.url) },
-        label = { Text("View PR", style = MaterialTheme.typography.labelSmall) },
+        label = { Text("View PR$prNumberText", style = MaterialTheme.typography.labelSmall) },
         leadingIcon = {
             Icon(
                 painter = painterResource(id = iconRes),

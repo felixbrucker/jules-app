@@ -27,6 +27,7 @@ class AppSettingsRepository @Inject constructor(
 ) {
     private object PreferencesKeys {
         val API_KEY = stringPreferencesKey("api_key")
+        val GITHUB_AUTH_TOKEN = stringPreferencesKey("github_auth_token")
         val PERIODIC_SYNC_ENABLED = booleanPreferencesKey("periodic_sync_enabled")
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
         val ARCHIVED_SYNC_ENABLED = booleanPreferencesKey("archived_sync_enabled")
@@ -45,6 +46,9 @@ class AppSettingsRepository @Inject constructor(
     val apiKeyFlow: Flow<String?> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.API_KEY] }
 
+    val githubAuthTokenFlow: Flow<String?> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.GITHUB_AUTH_TOKEN] }
+
     val periodicSyncEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.PERIODIC_SYNC_ENABLED] ?: false }
 
@@ -57,6 +61,16 @@ class AppSettingsRepository @Inject constructor(
     suspend fun saveApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.API_KEY] = apiKey
+        }
+    }
+
+    suspend fun saveGithubAuthToken(token: String) {
+        context.dataStore.edit { preferences ->
+            if (token.isBlank()) {
+                preferences.remove(PreferencesKeys.GITHUB_AUTH_TOKEN)
+            } else {
+                preferences[PreferencesKeys.GITHUB_AUTH_TOKEN] = token
+            }
         }
     }
 

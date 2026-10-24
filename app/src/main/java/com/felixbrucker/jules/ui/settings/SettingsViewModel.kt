@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.felixbrucker.jules.network.api.model.GitHubApiException
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +37,21 @@ class SettingsViewModel @Inject constructor(
 
     private var isApiKeySavedSuccessfully by mutableStateOf(false)
 
+    var githubAuthToken by mutableStateOf("")
+        private set
+
+    var isValidatingGithubAuthToken by mutableStateOf(false)
+        private set
+
+    var githubAuthTokenValidationErrorMessage by mutableStateOf<String?>(null)
+        private set
+
+    val applyGithubAuthTokenLabel by derivedStateOf {
+        if (isGithubAuthTokenSavedSuccessfully) "Saved" else "Apply"
+    }
+
+    private var isGithubAuthTokenSavedSuccessfully by mutableStateOf(false)
+
     val periodicSyncEnabled = appSettingsRepository.periodicSyncEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
@@ -48,6 +64,9 @@ class SettingsViewModel @Inject constructor(
     var persistedApiKey by mutableStateOf<String?>(null)
         private set
 
+    var persistedGithubAuthToken by mutableStateOf<String?>(null)
+        private set
+
     init {
         viewModelScope.launch {
             appSettingsRepository.apiKeyFlow.collect { key ->
@@ -57,12 +76,26 @@ class SettingsViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            appSettingsRepository.githubAuthTokenFlow.collect { token ->
+                persistedGithubAuthToken = token
+                if (token != null && githubAuthToken.isBlank()) {
+                    githubAuthToken = token
+                }
+            }
+        }
     }
 
     fun onApiKeyChanged(newKey: String) {
         apiKey = newKey
         apiKeyValidationErrorMessage = null
         isApiKeySavedSuccessfully = false
+    }
+
+    fun onGithubAuthTokenChanged(newToken: String) {
+        githubAuthToken = newToken
+        githubAuthTokenValidationErrorMessage = null
+        isGithubAuthTokenSavedSuccessfully = false
     }
 
     fun validateAndApplyApiKey() {
@@ -94,6 +127,42 @@ class SettingsViewModel @Inject constructor(
 
             appSettingsRepository.saveApiKey(apiKey.trim())
             isApiKeySavedSuccessfully = true
+        }
+    }
+
+    fun validateAndApplyGithubAuthToken() {
+        if (githubAuthToken.isBlank()) {
+            viewModelScope.launch {
+                appSettingsRepository.saveGithubAuthToken("")
+                isGithubAuthTokenSavedSuccessfully = true
+                githubAuthTokenValidationErrorMessage = null
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            isValidatingGithubAuthToken = true
+            githubAuthTokenValidationErrorMessage = null
+            isGithubAuthTokenSavedSuccessfully = false
+
+            try {
+                julesRepository.validateGithubAuthToken(githubAuthToken.trim())
+            } catch (e: GitHubApiException) {
+                githubAuthTokenValidationErrorMessage = if (e.httpStatusCode == 401) {
+                    "Invalid GitHub Auth Token"
+                } else {
+                    e.message ?: "Invalid GitHub Auth Token"
+                }
+                return@launch
+            } catch (e: Exception) {
+                githubAuthTokenValidationErrorMessage = e.message ?: "Unknown error"
+                return@launch
+            } finally {
+                isValidatingGithubAuthToken = false
+            }
+
+            appSettingsRepository.saveGithubAuthToken(githubAuthToken.trim())
+            isGithubAuthTokenSavedSuccessfully = true
         }
     }
 

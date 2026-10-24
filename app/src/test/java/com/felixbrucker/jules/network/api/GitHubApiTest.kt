@@ -11,6 +11,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -56,6 +57,15 @@ class GitHubApiTest {
 
         val invalidUrl = "https://github.com/octocat/Hello-World"
         assertNull(GitHubPullRequestUrl.parse(invalidUrl))
+    }
+
+    @Test
+    fun testGetPullRequestStateInvalidUrlThrowsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                gitHubApi.getPullRequestState("https://github.com/octocat/Hello-World")
+            }
+        }
     }
 
     @Test
@@ -115,6 +125,17 @@ class GitHubApiTest {
     }
 
     @Test
+    fun testValidateAuthToken() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("""{"login": "octocat"}"""))
+
+        gitHubApi.validateAuthToken("ghp_test123")
+
+        val recordedRequest = mockWebServer.takeRequest()
+        assertEquals("/user", recordedRequest.path)
+        assertEquals("Bearer ghp_test123", recordedRequest.getHeader("Authorization"))
+    }
+
+    @Test
     fun testGitHubApiExceptionHandling() = runBlocking {
         val errorBody = """
             {
@@ -131,8 +152,8 @@ class GitHubApiTest {
         } catch (e: GitHubApiException) {
             exceptionThrown = true
             assertEquals(404, e.httpStatusCode)
-            assertEquals("Not Found", e.apiError?.message)
-            assertEquals("https://docs.github.com/rest", e.apiError?.documentationUrl)
+            assertEquals("Not Found", e.apiError.message)
+            assertEquals("https://docs.github.com/rest", e.apiError.documentationUrl)
         }
 
         assertTrue("Expected GitHubApiException", exceptionThrown)

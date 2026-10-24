@@ -6,12 +6,12 @@ import com.squareup.moshi.JsonClass
 @JsonClass(generateAdapter = true)
 data class GitHubPullRequestResponse(
     @Json(name = "state") val state: String,
-    @Json(name = "merged") val merged: Boolean? = false
+    @Json(name = "merged") val merged: Boolean
 ) {
     val pullRequestState: PullRequestState
         get() = when {
-            merged == true -> PullRequestState.MERGED
-            state.equals("closed", ignoreCase = true) -> PullRequestState.CLOSED
+            merged -> PullRequestState.MERGED
+            state == "closed" -> PullRequestState.CLOSED
             else -> PullRequestState.OPEN
         }
 }

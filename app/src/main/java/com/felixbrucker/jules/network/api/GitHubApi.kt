@@ -46,8 +46,10 @@ class GitHubApi @Inject constructor(
         return response.pullRequestState
     }
 
-    suspend fun getPullRequestState(url: String): PullRequestState? {
-        val parsedUrl = GitHubPullRequestUrl.parse(url) ?: return null
+    suspend fun getPullRequestState(url: String): PullRequestState {
+        val parsedUrl = requireNotNull(GitHubPullRequestUrl.parse(url)) {
+            "Invalid GitHub PR URL: $url"
+        }
         return getPullRequestState(
             owner = parsedUrl.owner,
             repo = parsedUrl.repo,
@@ -55,11 +57,23 @@ class GitHubApi @Inject constructor(
         )
     }
 
+    suspend fun validateAuthToken() {
+        executeApiCall {
+            apiService.getUser()
+        }
+    }
+
+    suspend fun validateAuthToken(token: String) {
+        executeApiCall {
+            apiService.getUser("Bearer $token")
+        }
+    }
+
     private inline fun <T> executeApiCall(block: () -> T): T {
         return try {
             block()
         } catch (e: HttpException) {
-            val error = e.parseGitHubError(moshi = moshi)
+            val error = e.parseGitHubError(moshi = moshi) ?: throw e
             throw GitHubApiException(
                 apiError = error,
                 httpStatusCode = e.code(),
