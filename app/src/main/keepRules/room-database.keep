@@ -3,4 +3,8 @@
 -keep @androidx.room.Entity class * { *; }
 -keep @androidx.room.Dao class * { *; }
 -keep class com.felixbrucker.jules.data.database.** { *; }
+-keepclassmembers class com.felixbrucker.jules.data.database.Converters { *; }
+-keepclassmembers class * {
+    @androidx.room.TypeConverter <methods>;
+}
 -dontwarn androidx.room.paging.**

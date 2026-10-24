@@ -7,10 +7,11 @@ import com.felixbrucker.jules.network.api.model.SessionState
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.time.Instant
 
 class Converters {
-    private val moshi = Moshi.Builder().build()
+    private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
     private val branchListType = Types.newParameterizedType(List::class.java, GitHubBranch::class.java)
     private val branchListAdapter: JsonAdapter<List<GitHubBranch>> = moshi.adapter(branchListType)
     @TypeConverter
