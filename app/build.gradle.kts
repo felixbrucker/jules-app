@@ -53,10 +53,6 @@ android {
             optimization {
                 enable = true
             }
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                *fileTree("src/main/keepRules") { include("*.keep") }.toList().toTypedArray()
-            )
             signingConfig = signingConfigs.getByName("release")
         }
     }
