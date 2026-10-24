@@ -13,9 +13,6 @@ interface LogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(log: LogEntity): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertLogs(logs: List<LogEntity>)
-
     @Query(
         """
         SELECT * FROM logs
