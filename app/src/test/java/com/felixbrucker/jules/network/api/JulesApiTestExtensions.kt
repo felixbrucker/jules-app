@@ -14,7 +14,8 @@ fun JulesApi.Companion.createForTesting(
     every { mockAppSettingsRepository.apiKeyFlow } returns flowOf(apiKey)
 
     val authInterceptor = AuthInterceptor(mockAppSettingsRepository)
-    val okHttpClient = NetworkModule.provideOkHttpClient(authInterceptor)
+    val userAgentInterceptor = UserAgentInterceptor()
+    val okHttpClient = NetworkModule.provideJulesOkHttpClient(authInterceptor, userAgentInterceptor)
     val moshi = NetworkModule.provideMoshi()
     val apiService = NetworkModule.provideJulesApiService(
         okHttpClient = okHttpClient,

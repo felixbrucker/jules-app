@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.felixbrucker.jules.data.repository.JulesRepository
-import com.felixbrucker.jules.data.database.SessionEntity
+import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.SessionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,7 +37,7 @@ class SessionListViewModel @Inject constructor(
         private set
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val sessions: StateFlow<List<SessionEntity>> = combine(
+    val sessions: StateFlow<List<SessionWithPullRequest>> = combine(
         searchQuery,
         selectedStates,
         includeArchived,
@@ -81,9 +81,9 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             isRefreshing = true
             try {
-                julesRepository.syncSessions()
+                julesRepository.sync()
             } catch (e: Exception) {
-                Timber.e(e, "Failed to sync sessions")
+                Timber.e(e, "Failed to sync sessions and pull requests")
             } finally {
                 isRefreshing = false
             }

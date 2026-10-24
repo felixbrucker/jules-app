@@ -5,7 +5,7 @@ import com.felixbrucker.jules.network.api.filter.SourceFilter
 import com.felixbrucker.jules.network.api.filter.and
 import com.felixbrucker.jules.network.api.filter.or
 import com.felixbrucker.jules.network.api.model.Activity
-import com.felixbrucker.jules.network.api.model.ApiException
+import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.ArtifactType
 import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.CreateSessionRequest
@@ -338,7 +338,7 @@ class JulesApiTest {
         var exceptionThrown = false
         try {
             julesApi.getSession(sessionId = "invalid-session")
-        } catch (e: ApiException) {
+        } catch (e: JulesApiException) {
             exceptionThrown = true
             assertEquals(403, e.httpStatusCode)
             assertEquals("Forbidden", e.message)
@@ -349,7 +349,7 @@ class JulesApiTest {
             assertEquals("invalid-session", e.apiError.details.first()["reason"])
         }
 
-        assertTrue("Expected ApiException to be thrown", exceptionThrown)
+        assertTrue("Expected JulesApiException to be thrown", exceptionThrown)
     }
 
     @Test

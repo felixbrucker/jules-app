@@ -1,6 +1,9 @@
 package com.felixbrucker.jules.di
 
 import com.felixbrucker.jules.network.api.AuthInterceptor
+import com.felixbrucker.jules.network.api.GitHubApi
+import com.felixbrucker.jules.network.api.UserAgentInterceptor
+import com.felixbrucker.jules.network.api.GitHubApiService
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.JulesApiService
 import com.felixbrucker.jules.network.api.adapter.ActivityAdapter
@@ -27,6 +30,18 @@ import javax.inject.Singleton
 @Retention(AnnotationRetention.BINARY)
 annotation class BaseUrl
 
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class GitHubBaseUrl
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class JulesClient
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class GitHubClient
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -48,16 +63,32 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+    @JulesClient
+    fun provideJulesOkHttpClient(
+        authInterceptor: AuthInterceptor,
+        userAgentInterceptor: UserAgentInterceptor
+    ): OkHttpClient {
         return OkHttpClient.Builder()
+            .addInterceptor(userAgentInterceptor)
             .addInterceptor(authInterceptor)
             .build()
     }
 
     @Provides
     @Singleton
+    @GitHubClient
+    fun provideGitHubOkHttpClient(
+        userAgentInterceptor: UserAgentInterceptor
+    ): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(userAgentInterceptor)
+            .build()
+    }
+
+    @Provides
+    @Singleton
     fun provideJulesApiService(
-        okHttpClient: OkHttpClient,
+        @JulesClient okHttpClient: OkHttpClient,
         moshi: Moshi,
         @BaseUrl baseUrl: String
     ): JulesApiService {
@@ -74,5 +105,27 @@ object NetworkModule {
     @BaseUrl
     fun provideBaseUrl(): String {
         return JulesApi.DEFAULT_BASE_URL
+    }
+
+    @Provides
+    @Singleton
+    fun provideGitHubApiService(
+        @GitHubClient okHttpClient: OkHttpClient,
+        moshi: Moshi,
+        @GitHubBaseUrl baseUrl: String
+    ): GitHubApiService {
+        return Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(GitHubApiService::class.java)
+    }
+
+    @Suppress("SameReturnValue")
+    @Provides
+    @GitHubBaseUrl
+    fun provideGitHubBaseUrl(): String {
+        return GitHubApi.DEFAULT_BASE_URL
     }
 }

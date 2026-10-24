@@ -8,7 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
-import com.felixbrucker.jules.network.api.model.ApiException
+import com.felixbrucker.jules.network.api.model.JulesApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -78,7 +78,7 @@ class SettingsViewModel @Inject constructor(
 
             try {
                 julesRepository.validateApiKey(apiKey.trim())
-            } catch (e: ApiException) {
+            } catch (e: JulesApiException) {
                 apiKeyValidationErrorMessage = if (e.httpStatusCode == 401) {
                     "Invalid API key"
                 } else {

@@ -87,7 +87,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.felixbrucker.jules.R
 import com.felixbrucker.jules.data.database.EmbeddedChangeSet
+import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.SessionEntity
+import com.felixbrucker.jules.data.database.SessionWithPullRequest
+import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
 import kotlin.math.roundToInt
 import androidx.core.net.toUri
@@ -287,7 +290,7 @@ private fun SessionListContent(
     viewModel: SessionListViewModel,
     selectedStates: Set<SessionState>,
     includeArchived: Boolean,
-    sessions: List<SessionEntity>
+    sessions: List<SessionWithPullRequest>
 ) {
     val listState = rememberLazyListState()
     var filterBarHeightPx by remember { mutableFloatStateOf(0f) }
@@ -414,7 +417,7 @@ private fun FilterChipsRow(
 @Composable
 private fun SessionLazyColumn(
     listState: LazyListState,
-    sessions: List<SessionEntity>,
+    sessions: List<SessionWithPullRequest>,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit
@@ -428,10 +431,10 @@ private fun SessionLazyColumn(
     ) {
         items(
             items = sessions,
-            key = { it.id }
-        ) { session ->
+            key = { it.session.id }
+        ) { item ->
             SessionCard(
-                session = session,
+                sessionWithPullRequest = item,
                 onDelete = onDelete,
                 onArchive = onArchive,
                 onUnarchive = onUnarchive
@@ -442,11 +445,12 @@ private fun SessionLazyColumn(
 
 @Composable
 private fun SessionCard(
-    session: SessionEntity,
+    sessionWithPullRequest: SessionWithPullRequest,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit
 ) {
+    val session = sessionWithPullRequest.session
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
@@ -475,7 +479,10 @@ private fun SessionCard(
                 onUnarchive = { onUnarchive(session.id) }
             )
             Spacer(modifier = Modifier.height(12.dp))
-            SessionCardFooter(session = session)
+            SessionCardFooter(
+                session = session,
+                pullRequestState = sessionWithPullRequest.pullRequestState
+            )
         }
     }
 }
@@ -645,7 +652,10 @@ private fun RoundedBadge(text: String, color: Color) {
 }
 
 @Composable
-private fun SessionCardFooter(session: SessionEntity) {
+private fun SessionCardFooter(
+    session: SessionEntity,
+    pullRequestState: PullRequestState?
+) {
     val context = LocalContext.current
     val timeToFormat = session.updateTime ?: session.createTime
     val relativeTime = DateUtils.getRelativeTimeSpanString(
@@ -688,22 +698,41 @@ private fun SessionCardFooter(session: SessionEntity) {
         ) {
             Text(text = "Duration: $durationStr", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             session.pullRequest?.let { pr ->
-                AssistChip(
-                    modifier = Modifier.height(28.dp),
-                    onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, pr.url.toUri())) },
-                    label = { Text("View PR", style = MaterialTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_github_pr_open),
-                            contentDescription = "GitHub PR",
-                            modifier = Modifier.size(14.dp),
-                            tint = Color(0xFF3FB950)
-                        )
-                    }
+                PullRequestChip(
+                    pr = pr,
+                    pullRequestState = pullRequestState,
+                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
                 )
             }
         }
     }
+}
+
+@Composable
+private fun PullRequestChip(
+    pr: EmbeddedPullRequest,
+    pullRequestState: PullRequestState?,
+    onPrClick: (String) -> Unit
+) {
+    val (iconRes, iconColor) = when (pullRequestState) {
+        PullRequestState.MERGED -> R.drawable.ic_github_pr_merged to Color(0xFFA371F7)
+        PullRequestState.CLOSED -> R.drawable.ic_github_pr_closed to Color(0xFFF85149)
+        PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
+    }
+
+    AssistChip(
+        modifier = Modifier.height(28.dp),
+        onClick = { onPrClick(pr.url) },
+        label = { Text("View PR", style = MaterialTheme.typography.labelSmall) },
+        leadingIcon = {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = "GitHub PR",
+                modifier = Modifier.size(14.dp),
+                tint = iconColor
+            )
+        }
+    )
 }
 
 @Composable

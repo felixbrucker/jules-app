@@ -5,14 +5,14 @@ import com.felixbrucker.jules.network.api.filter.Filter
 import com.felixbrucker.jules.network.api.filter.SessionFilter
 import com.felixbrucker.jules.network.api.filter.SourceFilter
 import com.felixbrucker.jules.network.api.model.ActivitiesListResponse
-import com.felixbrucker.jules.network.api.model.ApiException
 import com.felixbrucker.jules.network.api.model.CreateSessionRequest
+import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.SendMessageRequest
 import com.felixbrucker.jules.network.api.model.Session
 import com.felixbrucker.jules.network.api.model.SessionsListResponse
 import com.felixbrucker.jules.network.api.model.Source
 import com.felixbrucker.jules.network.api.model.SourcesListResponse
-import com.felixbrucker.jules.network.api.model.parseError
+import com.felixbrucker.jules.network.api.model.parseJulesError
 import com.squareup.moshi.Moshi
 import retrofit2.HttpException
 import javax.inject.Inject
@@ -115,7 +115,7 @@ class JulesApi @Inject constructor(
     suspend fun deleteSession(sessionId: String) {
         try {
             executeApiCall { apiService.deleteSession(sessionId = sessionId) }
-        } catch (e: ApiException) {
+        } catch (e: JulesApiException) {
             // 404, already deleted, nothing to do
             if (e.httpStatusCode != 404) {
                 throw e
@@ -144,9 +144,9 @@ class JulesApi @Inject constructor(
         return try {
             block()
         } catch (e: HttpException) {
-            val errorEnvelope = e.parseError(moshi = moshi) ?: throw e
+            val errorEnvelope = e.parseJulesError(moshi = moshi) ?: throw e
 
-            throw ApiException(
+            throw JulesApiException(
                 apiError = errorEnvelope.error,
                 httpStatusCode = e.code(),
                 cause = e

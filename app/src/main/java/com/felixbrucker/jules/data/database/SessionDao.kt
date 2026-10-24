@@ -2,12 +2,14 @@ package com.felixbrucker.jules.data.database
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import com.felixbrucker.jules.network.api.model.SessionState
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SessionDao {
+    @Transaction
     @Query(
         """
         SELECT * FROM sessions 
@@ -22,13 +24,16 @@ interface SessionDao {
         states: List<SessionState>,
         statesIsEmpty: Boolean,
         includeArchived: Boolean
-    ): Flow<List<SessionEntity>>
+    ): Flow<List<SessionWithPullRequest>>
 
     @Query("SELECT id FROM sessions WHERE isArchived = 0")
     suspend fun getAllActiveSessionIds(): List<String>
 
     @Query("SELECT id FROM sessions WHERE isArchived = 1")
     suspend fun getAllArchivedSessionIds(): List<String>
+
+    @Query("SELECT * FROM sessions WHERE isArchived = 0 AND pull_request_url IS NOT NULL")
+    suspend fun getActiveSessionsWithPullRequests(): List<SessionEntity>
 
     @Upsert
     suspend fun upsertSessions(sessions: List<SessionEntity>)
