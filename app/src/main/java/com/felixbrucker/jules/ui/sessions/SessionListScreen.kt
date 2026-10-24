@@ -799,8 +799,14 @@ fun AnimatedMovingDotsIcon(
         initialValue = 0.3f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = keyframes {
+                durationMillis = 1200
+                0.3f at 0
+                1.0f at 200
+                0.3f at 600
+                0.3f at 1200
+            },
+            repeatMode = RepeatMode.Restart
         ),
         label = "Dot1Alpha"
     )
@@ -811,8 +817,10 @@ fun AnimatedMovingDotsIcon(
             animation = keyframes {
                 durationMillis = 1200
                 0.3f at 0
-                1.0f at 400
-                0.3f at 800
+                0.3f at 300
+                1.0f at 500
+                0.3f at 900
+                0.3f at 1200
             },
             repeatMode = RepeatMode.Restart
         ),
@@ -825,8 +833,9 @@ fun AnimatedMovingDotsIcon(
             animation = keyframes {
                 durationMillis = 1200
                 0.3f at 0
-                0.3f at 400
+                0.3f at 600
                 1.0f at 800
+                0.3f at 1200
             },
             repeatMode = RepeatMode.Restart
         ),

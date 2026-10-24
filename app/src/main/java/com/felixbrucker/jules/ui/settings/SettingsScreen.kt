@@ -58,12 +58,28 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
     val syncIntervalMinutes by viewModel.syncIntervalMinutes.collectAsState()
     val smartSyncEnabled by viewModel.smartSyncEnabled.collectAsState()
     val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
     val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
     val selectedPlan by viewModel.selectedPlan.collectAsState()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -419,38 +435,6 @@ private fun TaskNotificationsSection(
     onToggleFeedbackNotifications: (Boolean) -> Unit,
     onToggleCompletionNotifications: (Boolean) -> Unit
 ) {
-    val context = LocalContext.current
-    var pendingToggleAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            pendingToggleAction?.invoke(true)
-        } else {
-            pendingToggleAction?.invoke(false)
-        }
-        pendingToggleAction = null
-    }
-
-    val requestPermissionAndToggle: (Boolean, (Boolean) -> Unit) -> Unit = { checked, toggleAction ->
-        if (checked) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                pendingToggleAction = toggleAction
-                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                toggleAction(true)
-            }
-        } else {
-            toggleAction(false)
-        }
-    }
-
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "Task Notifications",
@@ -463,9 +447,7 @@ private fun TaskNotificationsSection(
             description = "Notify when a task requires plan approval, feedback, or fails",
             checked = feedbackNotificationsEnabled && periodicSyncEnabled,
             enabled = periodicSyncEnabled,
-            onCheckedChange = { checked ->
-                requestPermissionAndToggle(checked, onToggleFeedbackNotifications)
-            }
+            onCheckedChange = onToggleFeedbackNotifications
         )
         Spacer(modifier = Modifier.height(8.dp))
         NotificationToggleRow(
@@ -473,9 +455,7 @@ private fun TaskNotificationsSection(
             description = "Notify when a task state changes to completed",
             checked = completionNotificationsEnabled && periodicSyncEnabled,
             enabled = periodicSyncEnabled,
-            onCheckedChange = { checked ->
-                requestPermissionAndToggle(checked, onToggleCompletionNotifications)
-            }
+            onCheckedChange = onToggleCompletionNotifications
         )
     }
 }
