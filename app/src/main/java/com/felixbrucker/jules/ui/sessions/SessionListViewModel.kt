@@ -25,7 +25,7 @@ import javax.inject.Inject
 enum class SessionFilterChip(val label: String) {
     AWAITING_FEEDBACK("Awaiting Feedback"),
     IN_PROGRESS("In Progress"),
-    FAILED_COMPLETED("Failed/Completed")
+    COMPLETED("Completed")
 }
 
 @HiltViewModel
@@ -60,11 +60,11 @@ class SessionListViewModel @Inject constructor(
             when (chip) {
                 SessionFilterChip.AWAITING_FEEDBACK -> listOf(
                     SessionState.AWAITING_PLAN_APPROVAL,
-                    SessionState.AWAITING_USER_FEEDBACK
+                    SessionState.AWAITING_USER_FEEDBACK,
+                    SessionState.FAILED
                 )
                 SessionFilterChip.IN_PROGRESS -> listOf(SessionState.IN_PROGRESS)
-                SessionFilterChip.FAILED_COMPLETED -> listOf(
-                    SessionState.FAILED,
+                SessionFilterChip.COMPLETED -> listOf(
                     SessionState.COMPLETED
                 )
             }

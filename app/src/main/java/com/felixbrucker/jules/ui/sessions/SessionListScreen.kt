@@ -41,13 +41,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.RateReview
@@ -521,13 +522,17 @@ private fun FilterChipsRow(
 @Composable
 private fun FilterChipLeadingIcon(chip: SessionFilterChip) {
     when (chip) {
-        SessionFilterChip.IN_PROGRESS -> AnimatedMovingDotsIcon(color = MaterialTheme.colorScheme.primary)
+        SessionFilterChip.IN_PROGRESS -> Icon(
+            imageVector = Icons.Default.HourglassTop,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp)
+        )
         SessionFilterChip.AWAITING_FEEDBACK -> Icon(
             imageVector = Icons.Default.RateReview,
             contentDescription = null,
             modifier = Modifier.size(16.dp)
         )
-        SessionFilterChip.FAILED_COMPLETED -> Icon(
+        SessionFilterChip.COMPLETED -> Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
             modifier = Modifier.size(16.dp)
@@ -779,7 +784,7 @@ private fun getSessionStateStyle(state: SessionState): StateBadgeStyle {
         else -> StateBadgeStyle(
             containerColor = Color(0xFF374151),
             contentColor = Color(0xFFD1D5DB),
-            icon = Icons.Default.Help
+            icon = Icons.AutoMirrored.Filled.Help
         )
     }
 }
