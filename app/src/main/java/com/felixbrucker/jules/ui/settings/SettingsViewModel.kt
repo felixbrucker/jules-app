@@ -72,6 +72,9 @@ class SettingsViewModel @Inject constructor(
     val syncIntervalMinutes = appSettingsRepository.syncIntervalMinutesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
 
+    val smartSyncEnabled = appSettingsRepository.smartSyncEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     val feedbackNotificationsEnabled = appSettingsRepository.feedbackNotificationsEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
@@ -202,6 +205,12 @@ class SettingsViewModel @Inject constructor(
     fun setSyncIntervalMinutes(interval: Int) {
         viewModelScope.launch {
             appSettingsRepository.setSyncIntervalMinutes(interval)
+        }
+    }
+
+    fun setSmartSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setSmartSyncEnabled(enabled)
         }
     }
 

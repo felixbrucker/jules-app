@@ -18,6 +18,7 @@ data class AppSettings(
     val apiKey: String?,
     val periodicSyncEnabled: Boolean,
     val syncIntervalMinutes: Int,
+    val smartSyncEnabled: Boolean,
     val dailySessionLimit: Int,
     val feedbackNotificationsEnabled: Boolean,
     val completionNotificationsEnabled: Boolean
@@ -32,6 +33,7 @@ class AppSettingsRepository @Inject constructor(
         val GITHUB_AUTH_TOKEN = stringPreferencesKey("github_auth_token")
         val PERIODIC_SYNC_ENABLED = booleanPreferencesKey("periodic_sync_enabled")
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
+        val SMART_SYNC_ENABLED = booleanPreferencesKey("smart_sync_enabled")
         val DAILY_SESSION_LIMIT = intPreferencesKey("daily_session_limit")
         val FEEDBACK_NOTIFICATIONS_ENABLED = booleanPreferencesKey("feedback_notifications_enabled")
         val COMPLETION_NOTIFICATIONS_ENABLED = booleanPreferencesKey("completion_notifications_enabled")
@@ -43,6 +45,7 @@ class AppSettingsRepository @Inject constructor(
                 apiKey = preferences[PreferencesKeys.API_KEY],
                 periodicSyncEnabled = preferences[PreferencesKeys.PERIODIC_SYNC_ENABLED] ?: false,
                 syncIntervalMinutes = preferences[PreferencesKeys.SYNC_INTERVAL_MINUTES] ?: 15,
+                smartSyncEnabled = preferences[PreferencesKeys.SMART_SYNC_ENABLED] ?: true,
                 dailySessionLimit = preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15,
                 feedbackNotificationsEnabled = preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] ?: true,
                 completionNotificationsEnabled = preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true
@@ -60,6 +63,9 @@ class AppSettingsRepository @Inject constructor(
 
     val syncIntervalMinutesFlow: Flow<Int> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.SYNC_INTERVAL_MINUTES] ?: 15 }
+
+    val smartSyncEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.SMART_SYNC_ENABLED] ?: true }
 
     val dailySessionLimitFlow: Flow<Int> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15 }
@@ -95,6 +101,12 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setSyncIntervalMinutes(interval: Int) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SYNC_INTERVAL_MINUTES] = interval
+        }
+    }
+
+    suspend fun setSmartSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SMART_SYNC_ENABLED] = enabled
         }
     }
 

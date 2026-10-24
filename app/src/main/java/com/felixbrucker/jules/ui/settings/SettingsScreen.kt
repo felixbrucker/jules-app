@@ -60,6 +60,7 @@ fun SettingsScreen(
 ) {
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
     val syncIntervalMinutes by viewModel.syncIntervalMinutes.collectAsState()
+    val smartSyncEnabled by viewModel.smartSyncEnabled.collectAsState()
     val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
     val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
     val selectedPlan by viewModel.selectedPlan.collectAsState()
@@ -85,6 +86,7 @@ fun SettingsScreen(
             viewModel = viewModel,
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
+            smartSyncEnabled = smartSyncEnabled,
             feedbackNotificationsEnabled = feedbackNotificationsEnabled,
             completionNotificationsEnabled = completionNotificationsEnabled,
             selectedPlan = selectedPlan
@@ -126,6 +128,7 @@ private fun SettingsContent(
     viewModel: SettingsViewModel,
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
+    smartSyncEnabled: Boolean,
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
     selectedPlan: JulesPlan
@@ -148,11 +151,13 @@ private fun SettingsContent(
         SyncSettingsCard(
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
+            smartSyncEnabled = smartSyncEnabled,
             feedbackNotificationsEnabled = feedbackNotificationsEnabled,
             completionNotificationsEnabled = completionNotificationsEnabled,
             isForceSyncing = viewModel.isForceSyncing,
             onTogglePeriodicSync = { viewModel.setPeriodicSyncEnabled(it) },
             onIntervalChange = { viewModel.setSyncIntervalMinutes(it) },
+            onToggleSmartSync = { viewModel.setSmartSyncEnabled(it) },
             onToggleFeedbackNotifications = { viewModel.setFeedbackNotificationsEnabled(it) },
             onToggleCompletionNotifications = { viewModel.setCompletionNotificationsEnabled(it) },
             onForceSync = { viewModel.forceSync() }
@@ -319,11 +324,13 @@ private fun GitHubAuthTokenCard(
 private fun SyncSettingsCard(
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
+    smartSyncEnabled: Boolean,
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
     isForceSyncing: Boolean,
     onTogglePeriodicSync: (Boolean) -> Unit,
     onIntervalChange: (Int) -> Unit,
+    onToggleSmartSync: (Boolean) -> Unit,
     onToggleFeedbackNotifications: (Boolean) -> Unit,
     onToggleCompletionNotifications: (Boolean) -> Unit,
     onForceSync: () -> Unit
@@ -341,6 +348,12 @@ private fun SyncSettingsCard(
             PeriodicSyncRow(
                 periodicSyncEnabled = periodicSyncEnabled,
                 onTogglePeriodicSync = onTogglePeriodicSync
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            SmartSyncRow(
+                smartSyncEnabled = smartSyncEnabled,
+                periodicSyncEnabled = periodicSyncEnabled,
+                onToggleSmartSync = onToggleSmartSync
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
@@ -369,6 +382,32 @@ private fun SyncSettingsCard(
                 onForceSync = onForceSync
             )
         }
+    }
+}
+
+@Composable
+private fun SmartSyncRow(
+    smartSyncEnabled: Boolean,
+    periodicSyncEnabled: Boolean,
+    onToggleSmartSync: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Smart Background Sync")
+            Text(
+                text = "Only run background sync when tasks are in progress",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = smartSyncEnabled && periodicSyncEnabled,
+            enabled = periodicSyncEnabled,
+            onCheckedChange = onToggleSmartSync
+        )
     }
 }
 

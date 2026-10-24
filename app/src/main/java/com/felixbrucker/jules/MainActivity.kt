@@ -13,8 +13,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.lifecycleScope
+import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.worker.JulesSyncWorker
+import kotlinx.coroutines.flow.combine
 import com.felixbrucker.jules.ui.navigation.JulesNavGraph
 import com.felixbrucker.jules.ui.navigation.Screen
 import com.felixbrucker.jules.ui.theme.JulesTheme
@@ -33,20 +35,36 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appSettingsRepository: AppSettingsRepository
 
+    @Inject
+    lateinit var sessionDao: SessionDao
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         lifecycleScope.launch {
-            appSettingsRepository.appSettingsFlow
-                .filter { it.periodicSyncEnabled && !it.apiKey.isNullOrBlank() }
-                .map { it.syncIntervalMinutes }
+            combine(
+                appSettingsRepository.appSettingsFlow,
+                sessionDao.hasActiveInProgressSessionsFlow()
+            ) { settings, hasInProgress ->
+                val isValid = settings.periodicSyncEnabled && !settings.apiKey.isNullOrBlank()
+                val shouldEnqueue = if (!isValid) {
+                    false
+                } else if (!settings.smartSyncEnabled) {
+                    true
+                } else {
+                    hasInProgress
+                }
+                WorkerScheduleDecision(shouldEnqueue, settings.syncIntervalMinutes.toLong())
+            }
                 .distinctUntilChanged()
-                .collect { JulesSyncWorker.enqueuePeriodicSync(applicationContext, it.toLong()) }
-            appSettingsRepository.periodicSyncEnabledFlow
-                .filter { !it }
-                .distinctUntilChanged()
-                .collect { JulesSyncWorker.cancelPeriodicSync(applicationContext) }
+                .collect { decision ->
+                    if (decision.shouldEnqueue) {
+                        JulesSyncWorker.enqueuePeriodicSync(applicationContext, decision.intervalMinutes)
+                    } else {
+                        JulesSyncWorker.cancelPeriodicSync(applicationContext)
+                    }
+                }
         }
 
         setContent {
@@ -67,6 +85,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private data class WorkerScheduleDecision(
+    val shouldEnqueue: Boolean,
+    val intervalMinutes: Long
+)
 
 data class AuthState(
     val isReady: Boolean,
