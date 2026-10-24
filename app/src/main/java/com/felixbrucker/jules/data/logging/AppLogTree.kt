@@ -20,7 +20,7 @@ class AppLogTree(
             priority = priority,
             tag = tag,
             message = message,
-            throwableStackTrace = if (stackTrace.isNull_or_blank_safe()) null else stackTrace
+            throwableStackTrace = if (stackTrace.isNullOrBlank()) null else stackTrace
         )
 
         externalScope.launch {
@@ -29,9 +29,5 @@ class AppLogTree(
             } catch (_: Exception) {
             }
         }
-    }
-
-    private fun String?.isNull_or_blank_safe(): Boolean {
-        return this == null || this.trim().isEmpty()
     }
 }
