@@ -189,6 +189,7 @@ private fun GitHubAuthTokenCard(
                     onValueChange = { viewModel.onGithubAuthTokenChanged(it) },
                     label = "GitHub Token",
                     errorMessage = viewModel.githubAuthTokenValidationErrorMessage,
+                    supportingText = "Optional. Increases API rate limits and enables PR state access for private repositories.",
                     onImeAction = { viewModel.validateAndApplyGithubAuthToken() }
                 )
                 LoadingStateButton(

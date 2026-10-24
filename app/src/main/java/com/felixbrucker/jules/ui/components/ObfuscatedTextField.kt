@@ -27,6 +27,7 @@ fun ObfuscatedTextField(
     onValueChange: (String) -> Unit,
     label: String,
     errorMessage: String?,
+    supportingText: String? = null,
     onImeAction: () -> Unit
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
@@ -40,6 +41,8 @@ fun ObfuscatedTextField(
         isError = errorMessage != null,
         supportingText = if (errorMessage != null) {
             { Text(errorMessage) }
+        } else if (supportingText != null) {
+            { Text(supportingText) }
         } else {
             null
         },
