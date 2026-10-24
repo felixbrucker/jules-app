@@ -4,11 +4,19 @@ import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +34,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -33,9 +42,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Unarchive
@@ -74,6 +89,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -144,19 +161,15 @@ private fun SessionTopBar(
     onSearchActiveChange: (Boolean) -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        SessionTopAppBar(
-            isSearchActive = isSearchActive,
-            searchQuery = searchQuery,
-            onSearchQueryChange = onSearchQueryChange,
-            onSearchActiveChange = onSearchActiveChange,
-            onSettingsClick = onSettingsClick
-        )
-        DailySessionLimitBar(
-            dailyCount = dailyCount,
-            dailyLimit = dailyLimit
-        )
-    }
+    SessionTopAppBar(
+        isSearchActive = isSearchActive,
+        searchQuery = searchQuery,
+        dailyCount = dailyCount,
+        dailyLimit = dailyLimit,
+        onSearchQueryChange = onSearchQueryChange,
+        onSearchActiveChange = onSearchActiveChange,
+        onSettingsClick = onSettingsClick
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -164,6 +177,8 @@ private fun SessionTopBar(
 private fun SessionTopAppBar(
     isSearchActive: Boolean,
     searchQuery: String,
+    dailyCount: Int,
+    dailyLimit: Int,
     onSearchQueryChange: (String) -> Unit,
     onSearchActiveChange: (Boolean) -> Unit,
     onSettingsClick: () -> Unit
@@ -179,6 +194,10 @@ private fun SessionTopAppBar(
         },
         actions = {
             if (!isSearchActive) {
+                DailySessionLimitIndicator(
+                    dailyCount = dailyCount,
+                    dailyLimit = dailyLimit
+                )
                 IconButton(onClick = { onSearchActiveChange(true) }) {
                     Icon(imageVector = Icons.Default.Search, contentDescription = "Search")
                 }
@@ -188,6 +207,36 @@ private fun SessionTopAppBar(
             }
         }
     )
+}
+
+@Composable
+private fun DailySessionLimitIndicator(
+    dailyCount: Int,
+    dailyLimit: Int
+) {
+    val progress = (dailyCount.toFloat() / dailyLimit.coerceAtLeast(1)).coerceIn(0f, 1f)
+    Column(
+        modifier = Modifier
+            .width(90.dp)
+            .padding(end = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "Limit ($dailyCount/$dailyLimit)",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable
@@ -234,32 +283,6 @@ private fun TopAppBarTitleContent(
     }
 }
 
-@Composable
-private fun DailySessionLimitBar(
-    dailyCount: Int,
-    dailyLimit: Int
-) {
-    val progress = (dailyCount.toFloat() / dailyLimit.coerceAtLeast(1)).coerceIn(0f, 1f)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-    ) {
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = "Daily session limit ($dailyCount/$dailyLimit)",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
 
 @Composable
 private fun TopBarSearchField(
@@ -474,16 +497,41 @@ private fun FilterChipsRow(
             FilterChip(
                 selected = selectedChips.contains(chip),
                 onClick = { onToggleChip(chip) },
-                label = { Text(chip.label) }
+                label = { Text(chip.label) },
+                leadingIcon = { FilterChipLeadingIcon(chip = chip) }
             )
         }
         item {
             FilterChip(
                 selected = includeArchived,
                 onClick = { onToggleArchived(!includeArchived) },
-                label = { Text("Archived") }
+                label = { Text("Archived") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Archive,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             )
         }
+    }
+}
+
+@Composable
+private fun FilterChipLeadingIcon(chip: SessionFilterChip) {
+    when (chip) {
+        SessionFilterChip.IN_PROGRESS -> AnimatedMovingDotsIcon(color = MaterialTheme.colorScheme.primary)
+        SessionFilterChip.AWAITING_FEEDBACK -> Icon(
+            imageVector = Icons.Default.RateReview,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp)
+        )
+        SessionFilterChip.FAILED_COMPLETED -> Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
@@ -613,9 +661,9 @@ private fun SessionCardHeader(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RoundedBadge(text = session.state.label, color = MaterialTheme.colorScheme.primaryContainer)
+            SessionStateBadge(state = session.state)
             if (session.isArchived) {
-                RoundedBadge(text = "Archived", color = MaterialTheme.colorScheme.secondaryContainer)
+                ArchivedBadge()
             }
             Text(
                 text = session.title ?: "Untitled Session",
@@ -627,6 +675,182 @@ private fun SessionCardHeader(
         session.changeSet?.let { cs ->
             DiffBadges(changeSet = cs)
         }
+    }
+}
+
+@Composable
+private fun SessionStateBadge(state: SessionState) {
+    val style = getSessionStateStyle(state)
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = style.containerColor
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (style.isAnimatedDots) {
+                AnimatedMovingDotsIcon(color = style.contentColor)
+            } else style.icon?.let { iconVec ->
+                Icon(
+                    imageVector = iconVec,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = style.contentColor
+                )
+            }
+            Text(
+                text = state.label,
+                color = style.contentColor,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ArchivedBadge() {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = Color(0xFF374151)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Archive,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = Color(0xFFD1D5DB)
+            )
+            Text(
+                text = "Archived",
+                color = Color(0xFFD1D5DB),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+data class StateBadgeStyle(
+    val containerColor: Color,
+    val contentColor: Color,
+    val icon: ImageVector? = null,
+    val isAnimatedDots: Boolean = false
+)
+
+private fun getSessionStateStyle(state: SessionState): StateBadgeStyle {
+    return when (state) {
+        SessionState.IN_PROGRESS -> StateBadgeStyle(
+            containerColor = Color(0xFF1E3A8A),
+            contentColor = Color(0xFF93C5FD),
+            isAnimatedDots = true
+        )
+        SessionState.AWAITING_PLAN_APPROVAL, SessionState.AWAITING_USER_FEEDBACK -> StateBadgeStyle(
+            containerColor = Color(0xFF78350F),
+            contentColor = Color(0xFFFDE68A),
+            icon = Icons.Default.RateReview
+        )
+        SessionState.COMPLETED -> StateBadgeStyle(
+            containerColor = Color(0xFF14532D),
+            contentColor = Color(0xFF86EFAC),
+            icon = Icons.Default.CheckCircle
+        )
+        SessionState.FAILED -> StateBadgeStyle(
+            containerColor = Color(0xFF7F1D1D),
+            contentColor = Color(0xFFFCA5A5),
+            icon = Icons.Default.Error
+        )
+        SessionState.QUEUED, SessionState.PLANNING -> StateBadgeStyle(
+            containerColor = Color(0xFF1E293B),
+            contentColor = Color(0xFF94A3B8),
+            icon = Icons.Default.HourglassEmpty
+        )
+        SessionState.PAUSED -> StateBadgeStyle(
+            containerColor = Color(0xFF374151),
+            contentColor = Color(0xFFD1D5DB),
+            icon = Icons.Default.PauseCircle
+        )
+        else -> StateBadgeStyle(
+            containerColor = Color(0xFF374151),
+            contentColor = Color(0xFFD1D5DB),
+            icon = Icons.Default.Help
+        )
+    }
+}
+
+@Composable
+fun AnimatedMovingDotsIcon(
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "DotsTransition")
+    val dot1Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "Dot1Alpha"
+    )
+    val dot2Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1200
+                0.3f at 0
+                1.0f at 400
+                0.3f at 800
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Dot2Alpha"
+    )
+    val dot3Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1200
+                0.3f at 0
+                0.3f at 400
+                1.0f at 800
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Dot3Alpha"
+    )
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(4.dp)
+                .graphicsLayer { alpha = dot1Alpha }
+                .background(color, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(4.dp)
+                .graphicsLayer { alpha = dot2Alpha }
+                .background(color, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(4.dp)
+                .graphicsLayer { alpha = dot3Alpha }
+                .background(color, CircleShape)
+        )
     }
 }
 

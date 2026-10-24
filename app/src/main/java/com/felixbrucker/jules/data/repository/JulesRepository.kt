@@ -13,15 +13,15 @@ import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.SessionState
+import com.felixbrucker.jules.util.periodicTickerFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -46,13 +46,6 @@ class JulesRepository @Inject constructor(
     fun getDailySessionCountFlow(): Flow<Int> {
         return periodicTickerFlow(10 * 60 * 1000L)
             .flatMapLatest { sessionDao.getDailySessionCountFlow() }
-    }
-
-    private fun periodicTickerFlow(periodMillis: Long): Flow<Unit> = flow {
-        while (true) {
-            emit(Unit)
-            delay(periodMillis)
-        }
     }
 
     fun getSessionsFlow(
@@ -80,19 +73,16 @@ class JulesRepository @Inject constructor(
     suspend fun sync(force: Boolean = false) = withContext(Dispatchers.IO) {
         syncSources(force = force)
         syncSessions()
+        syncArchivedSessions(force = force)
         syncPullRequests()
     }
 
     suspend fun syncSources(force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
             if (!force) {
-                val sourceCount = sourceDao.getSourceCount()
                 val lastSyncedAt = syncMetadataRepository.lastSourcesSyncedAtFlow.first()
-                if (sourceCount > 0 && lastSyncedAt != null) {
-                    val hoursSinceLastSync = Duration.between(lastSyncedAt, Instant.now()).toHours()
-                    if (hoursSinceLastSync < 24) {
-                        return@withContext
-                    }
+                if (lastSyncedAt != null && Duration.between(lastSyncedAt, Instant.now()).toHours() < 24) {
+                    return@withContext
                 }
             }
 
@@ -135,20 +125,31 @@ class JulesRepository @Inject constructor(
         }
     }
 
-    private suspend fun ensureSourcesExist(entities: List<SessionEntity>) {
+    private suspend fun ensureSourcesExist(entities: List<SessionEntity>) = coroutineScope {
         val requiredSourceIds = entities.mapNotNull { it.sourceId }.distinct()
-        if (requiredSourceIds.isEmpty()) return
+        if (requiredSourceIds.isEmpty()) return@coroutineScope
 
         val existingSourceIds = sourceDao.getAllSourceIds().toSet()
         val missingSourceIds = requiredSourceIds.filter { !existingSourceIds.contains(it) }
+        if (missingSourceIds.isEmpty()) return@coroutineScope
 
-        for (sourceId in missingSourceIds) {
-            try {
-                val source = julesApi.getSource(sourceId)
-                sourceDao.upsertSources(listOf(source.toEntity()))
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to retrieve missing source $sourceId")
+        val semaphore = Semaphore(4)
+        val fetchedSources = missingSourceIds.map { sourceId ->
+            async {
+                semaphore.withPermit {
+                    try {
+                        val source = julesApi.getSource(sourceId)
+                        source.toEntity()
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to retrieve missing source $sourceId")
+                        null
+                    }
+                }
             }
+        }.awaitAll().filterNotNull()
+
+        if (fetchedSources.isNotEmpty()) {
+            sourceDao.upsertSources(fetchedSources)
         }
     }
 
@@ -236,12 +237,19 @@ class JulesRepository @Inject constructor(
         }
     }
 
-    suspend fun syncArchivedSessions() = withContext(Dispatchers.IO) {
-        val fetchedArchivedIds = mutableSetOf<String>()
-        var pageToken: String? = null
-        val pageSize = 30
-
+    suspend fun syncArchivedSessions(force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
+            if (!force) {
+                val lastSyncedAt = syncMetadataRepository.lastArchivedSessionsSyncedAtFlow.first()
+                if (lastSyncedAt != null && Duration.between(lastSyncedAt, Instant.now()).toHours() < 24) {
+                    return@withContext
+                }
+            }
+
+            val fetchedArchivedIds = mutableSetOf<String>()
+            var pageToken: String? = null
+            val pageSize = 30
+
             do {
                 val response = julesApi.getArchivedSessions(
                     pageSize = pageSize,
@@ -273,6 +281,7 @@ class JulesRepository @Inject constructor(
                 }.awaitAll().filterNotNull()
                 saveSessions(entities)
             }
+            syncMetadataRepository.saveLastArchivedSessionsSyncedAt(Instant.now())
         } catch (e: Exception) {
             Timber.e(e, "Error syncing archived sessions")
             throw e

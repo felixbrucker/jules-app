@@ -14,11 +14,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -27,6 +32,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -46,7 +54,7 @@ fun SettingsScreen(
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
     val syncIntervalMinutes by viewModel.syncIntervalMinutes.collectAsState()
     val archivedSyncEnabled by viewModel.archivedSyncEnabled.collectAsState()
-    val dailySessionLimit by viewModel.dailySessionLimit.collectAsState()
+    val selectedPlan by viewModel.selectedPlan.collectAsState()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -70,7 +78,7 @@ fun SettingsScreen(
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
             archivedSyncEnabled = archivedSyncEnabled,
-            dailySessionLimit = dailySessionLimit
+            selectedPlan = selectedPlan
         )
     }
 }
@@ -82,7 +90,7 @@ private fun SettingsContent(
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
     archivedSyncEnabled: Boolean,
-    dailySessionLimit: Int
+    selectedPlan: JulesPlan
 ) {
     Column(
         modifier = modifier
@@ -94,9 +102,9 @@ private fun SettingsContent(
         Spacer(modifier = Modifier.height(16.dp))
         GitHubAuthTokenCard(viewModel = viewModel)
         Spacer(modifier = Modifier.height(16.dp))
-        SessionLimitCard(
-            dailySessionLimit = dailySessionLimit,
-            onDailySessionLimitChange = { viewModel.setDailySessionLimit(it) }
+        PlanSelectionCard(
+            currentPlan = selectedPlan,
+            onPlanSelected = { viewModel.selectPlan(it) }
         )
         Spacer(modifier = Modifier.height(16.dp))
         SyncSettingsCard(
@@ -112,11 +120,14 @@ private fun SettingsContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SessionLimitCard(
-    dailySessionLimit: Int,
-    onDailySessionLimitChange: (Int) -> Unit
+private fun PlanSelectionCard(
+    currentPlan: JulesPlan,
+    onPlanSelected: (JulesPlan) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -124,21 +135,39 @@ private fun SessionLimitCard(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Daily Session Limit",
+                text = "Jules Plan",
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Daily Limit: $dailySessionLimit sessions",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Slider(
-                modifier = Modifier.fillMaxWidth(),
-                value = dailySessionLimit.toFloat(),
-                onValueChange = { onDailySessionLimitChange(it.toInt()) },
-                valueRange = 1f..50f,
-                steps = 48
-            )
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = "${currentPlan.displayName} (${currentPlan.dailyLimit} sessions/day)",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Selected Plan") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    JulesPlan.entries.forEach { plan ->
+                        DropdownMenuItem(
+                            text = { Text("${plan.displayName} (${plan.dailyLimit} sessions/day)") },
+                            onClick = {
+                                expanded = false
+                                onPlanSelected(plan)
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }

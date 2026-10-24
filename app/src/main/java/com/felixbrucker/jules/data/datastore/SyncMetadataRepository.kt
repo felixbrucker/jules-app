@@ -19,6 +19,7 @@ class SyncMetadataRepository @Inject constructor(
 ) {
     private object PreferencesKeys {
         val LAST_SOURCES_SYNCED_AT = longPreferencesKey("last_sources_synced_at")
+        val LAST_ARCHIVED_SESSIONS_SYNCED_AT = longPreferencesKey("last_archived_sessions_synced_at")
     }
 
     val lastSourcesSyncedAtFlow: Flow<Instant?> = context.dataStore.data
@@ -26,9 +27,20 @@ class SyncMetadataRepository @Inject constructor(
             preferences[PreferencesKeys.LAST_SOURCES_SYNCED_AT]?.let { Instant.ofEpochMilli(it) }
         }
 
+    val lastArchivedSessionsSyncedAtFlow: Flow<Instant?> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.LAST_ARCHIVED_SESSIONS_SYNCED_AT]?.let { Instant.ofEpochMilli(it) }
+        }
+
     suspend fun saveLastSourcesSyncedAt(instant: Instant) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.LAST_SOURCES_SYNCED_AT] = instant.toEpochMilli()
+        }
+    }
+
+    suspend fun saveLastArchivedSessionsSyncedAt(instant: Instant) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_ARCHIVED_SESSIONS_SYNCED_AT] = instant.toEpochMilli()
         }
     }
 }

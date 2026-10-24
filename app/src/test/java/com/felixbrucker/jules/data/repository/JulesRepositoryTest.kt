@@ -51,6 +51,7 @@ class JulesRepositoryTest {
 
         coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf(null)
         coEvery { syncMetadataRepository.lastSourcesSyncedAtFlow } returns flowOf(null)
+        coEvery { syncMetadataRepository.lastArchivedSessionsSyncedAtFlow } returns flowOf(null)
 
         repository = JulesRepository(
             sessionDao = sessionDao,
@@ -123,7 +124,6 @@ class JulesRepositoryTest {
 
     @Test
     fun testSyncSourcesGatedWhenSyncedRecently() = runBlocking {
-        coEvery { sourceDao.getSourceCount() } returns 5
         coEvery { syncMetadataRepository.lastSourcesSyncedAtFlow } returns flowOf(Instant.now())
 
         repository.syncSources(force = false)
@@ -135,7 +135,6 @@ class JulesRepositoryTest {
 
     @Test
     fun testSyncSourcesRunsWhenForced() = runBlocking {
-        coEvery { sourceDao.getSourceCount() } returns 5
         coEvery { syncMetadataRepository.lastSourcesSyncedAtFlow } returns flowOf(Instant.now())
         coEvery { julesApi.getSources(pageSize = 100, pageToken = null) } returns SourcesListResponse(
             sources = listOf(

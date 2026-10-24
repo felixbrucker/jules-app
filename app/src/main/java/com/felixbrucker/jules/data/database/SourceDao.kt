@@ -19,9 +19,6 @@ interface SourceDao {
     @Query("SELECT id FROM sources")
     suspend fun getAllSourceIds(): List<String>
 
-    @Query("SELECT COUNT(*) FROM sources")
-    suspend fun getSourceCount(): Int
-
     @Query("DELETE FROM sources WHERE id NOT IN (:ids)")
     suspend fun deleteSourcesNotIn(ids: List<String>)
 
