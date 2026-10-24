@@ -1,0 +1,3 @@
+# Hilt / Dagger Dependency Injection
+-keep class * extends androidx.hilt.work.HiltWorker
+-keep class com.felixbrucker.jules.di.** { *; }
