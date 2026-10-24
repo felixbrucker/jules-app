@@ -14,6 +14,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Sync
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,7 +29,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -53,7 +60,9 @@ fun SettingsScreen(
 ) {
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
     val syncIntervalMinutes by viewModel.syncIntervalMinutes.collectAsState()
-    val archivedSyncEnabled by viewModel.archivedSyncEnabled.collectAsState()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
+    val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
+    val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
     val selectedPlan by viewModel.selectedPlan.collectAsState()
 
     Scaffold(
@@ -77,7 +86,9 @@ fun SettingsScreen(
             viewModel = viewModel,
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
-            archivedSyncEnabled = archivedSyncEnabled,
+            notificationsEnabled = notificationsEnabled,
+            feedbackNotificationsEnabled = feedbackNotificationsEnabled,
+            completionNotificationsEnabled = completionNotificationsEnabled,
             selectedPlan = selectedPlan
         )
     }
@@ -89,7 +100,9 @@ private fun SettingsContent(
     viewModel: SettingsViewModel,
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
-    archivedSyncEnabled: Boolean,
+    notificationsEnabled: Boolean,
+    feedbackNotificationsEnabled: Boolean,
+    completionNotificationsEnabled: Boolean,
     selectedPlan: JulesPlan
 ) {
     Column(
@@ -110,11 +123,15 @@ private fun SettingsContent(
         SyncSettingsCard(
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
-            archivedSyncEnabled = archivedSyncEnabled,
+            notificationsEnabled = notificationsEnabled,
+            feedbackNotificationsEnabled = feedbackNotificationsEnabled,
+            completionNotificationsEnabled = completionNotificationsEnabled,
             isForceSyncing = viewModel.isForceSyncing,
             onTogglePeriodicSync = { viewModel.setPeriodicSyncEnabled(it) },
             onIntervalChange = { viewModel.setSyncIntervalMinutes(it) },
-            onToggleArchivedSync = { viewModel.setArchivedSyncEnabled(it) },
+            onToggleNotifications = { viewModel.setNotificationsEnabled(it) },
+            onToggleFeedbackNotifications = { viewModel.setFeedbackNotificationsEnabled(it) },
+            onToggleCompletionNotifications = { viewModel.setCompletionNotificationsEnabled(it) },
             onForceSync = { viewModel.forceSync() }
         )
     }
@@ -150,7 +167,7 @@ private fun PlanSelectionCard(
                     label = { Text("Selected Plan") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
                         .fillMaxWidth()
                 )
                 ExposedDropdownMenu(
@@ -279,11 +296,15 @@ private fun GitHubAuthTokenCard(
 private fun SyncSettingsCard(
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
-    archivedSyncEnabled: Boolean,
+    notificationsEnabled: Boolean,
+    feedbackNotificationsEnabled: Boolean,
+    completionNotificationsEnabled: Boolean,
     isForceSyncing: Boolean,
     onTogglePeriodicSync: (Boolean) -> Unit,
     onIntervalChange: (Int) -> Unit,
-    onToggleArchivedSync: (Boolean) -> Unit,
+    onToggleNotifications: (Boolean) -> Unit,
+    onToggleFeedbackNotifications: (Boolean) -> Unit,
+    onToggleCompletionNotifications: (Boolean) -> Unit,
     onForceSync: () -> Unit
 ) {
     ElevatedCard(
@@ -314,10 +335,14 @@ private fun SyncSettingsCard(
                 enabled = periodicSyncEnabled
             )
             Spacer(modifier = Modifier.height(12.dp))
-            ArchivedSyncRow(
-                archivedSyncEnabled = archivedSyncEnabled,
+            TaskNotificationsRow(
+                notificationsEnabled = notificationsEnabled,
+                feedbackNotificationsEnabled = feedbackNotificationsEnabled,
+                completionNotificationsEnabled = completionNotificationsEnabled,
                 periodicSyncEnabled = periodicSyncEnabled,
-                onToggleArchivedSync = onToggleArchivedSync
+                onToggleNotifications = onToggleNotifications,
+                onToggleFeedbackNotifications = onToggleFeedbackNotifications,
+                onToggleCompletionNotifications = onToggleCompletionNotifications
             )
             Spacer(modifier = Modifier.height(16.dp))
             ForceSyncRow(
@@ -327,6 +352,112 @@ private fun SyncSettingsCard(
         }
     }
 }
+
+@Composable
+private fun TaskNotificationsRow(
+    notificationsEnabled: Boolean,
+    feedbackNotificationsEnabled: Boolean,
+    completionNotificationsEnabled: Boolean,
+    periodicSyncEnabled: Boolean,
+    onToggleNotifications: (Boolean) -> Unit,
+    onToggleFeedbackNotifications: (Boolean) -> Unit,
+    onToggleCompletionNotifications: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onToggleNotifications(true)
+        } else {
+            onToggleNotifications(false)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Task Notifications")
+                Text(
+                    text = "Notify when background sync detects task updates",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = notificationsEnabled && periodicSyncEnabled,
+                enabled = periodicSyncEnabled,
+                onCheckedChange = { checked ->
+                    if (checked) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            onToggleNotifications(true)
+                        }
+                    } else {
+                        onToggleNotifications(false)
+                    }
+                }
+            )
+        }
+
+        if (notificationsEnabled && periodicSyncEnabled) {
+            SubNotificationToggleRow(
+                title = "Feedback Required",
+                description = "Notify when task requires plan approval, feedback, or fails",
+                checked = feedbackNotificationsEnabled,
+                enabled = true,
+                onCheckedChange = onToggleFeedbackNotifications
+            )
+            SubNotificationToggleRow(
+                title = "Task Completed",
+                description = "Notify when task state changes to completed",
+                checked = completionNotificationsEnabled,
+                enabled = true,
+                onCheckedChange = onToggleCompletionNotifications
+            )
+        }
+    }
+}
+
+@Composable
+private fun SubNotificationToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked && enabled,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
 
 @Composable
 private fun SyncSettingsHeader() {
@@ -364,31 +495,6 @@ private fun PeriodicSyncRow(
     }
 }
 
-@Composable
-private fun ArchivedSyncRow(
-    archivedSyncEnabled: Boolean,
-    periodicSyncEnabled: Boolean,
-    onToggleArchivedSync: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = "Sync Archived Sessions")
-            Text(
-                text = "Include archived sessions in periodic sync",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = archivedSyncEnabled,
-            enabled = periodicSyncEnabled,
-            onCheckedChange = onToggleArchivedSync
-        )
-    }
-}
 
 @Composable
 private fun ForceSyncRow(

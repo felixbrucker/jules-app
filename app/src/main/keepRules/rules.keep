@@ -4,9 +4,14 @@
 # For more details, see
 #   https://d.android.com/r/tools/r8/keep-rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-keep @com.squareup.moshi.JsonClass class * { *; }
+-keep class com.felixbrucker.jules.network.api.model.** { *; }
+-keep class com.felixbrucker.jules.network.api.model.GitHubBranch { *; }
+-keep class com.felixbrucker.jules.network.api.model.GitHubRepo { *; }
+-keep class com.felixbrucker.jules.network.api.model.Source { *; }
+-keep class com.felixbrucker.jules.data.database.** { *; }
+-keep class com.felixbrucker.jules.data.datastore.** { *; }
+-keep class com.felixbrucker.jules.util.** { *; }
+-keep class com.felixbrucker.jules.notification.** { *; }
+-keep class com.felixbrucker.jules.ui.settings.JulesPlan { *; }
+-keep class com.felixbrucker.jules.ui.sessions.SessionFilterChip { *; }

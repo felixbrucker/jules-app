@@ -32,12 +32,7 @@ class JulesSyncWorker @AssistedInject constructor(
                 return Result.success()
             }
 
-            julesRepository.sync()
-
-            val archivedSyncEnabled = appSettingsRepository.archivedSyncEnabledFlow.first()
-            if (archivedSyncEnabled) {
-                julesRepository.syncArchivedSessions()
-            }
+            julesRepository.sync(isBackground = true)
 
             Result.success()
         } catch (e: Exception) {

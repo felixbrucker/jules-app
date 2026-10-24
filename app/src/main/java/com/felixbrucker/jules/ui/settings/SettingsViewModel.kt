@@ -72,8 +72,14 @@ class SettingsViewModel @Inject constructor(
     val syncIntervalMinutes = appSettingsRepository.syncIntervalMinutesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
 
-    val archivedSyncEnabled = appSettingsRepository.archivedSyncEnabledFlow
+    val notificationsEnabled = appSettingsRepository.notificationsEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val feedbackNotificationsEnabled = appSettingsRepository.feedbackNotificationsEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val dailySessionLimit = appSettingsRepository.dailySessionLimitFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
@@ -202,9 +208,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setArchivedSyncEnabled(enabled: Boolean) {
+    fun setNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            appSettingsRepository.setArchivedSyncEnabled(enabled)
+            appSettingsRepository.setNotificationsEnabled(enabled)
+        }
+    }
+
+    fun setFeedbackNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setFeedbackNotificationsEnabled(enabled)
+        }
+    }
+
+    fun setCompletionNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setCompletionNotificationsEnabled(enabled)
         }
     }
 

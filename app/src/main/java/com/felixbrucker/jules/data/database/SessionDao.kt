@@ -31,6 +31,9 @@ interface SessionDao {
     @Query("SELECT COUNT(*) FROM sessions WHERE createTime >= (CAST(strftime('%s', 'now') AS INTEGER) - 86400) * 1000")
     fun getDailySessionCountFlow(): Flow<Int>
 
+    @Query("SELECT * FROM sessions WHERE id IN (:ids)")
+    suspend fun getSessionsByIds(ids: List<String>): List<SessionEntity>
+
     @Query("SELECT id FROM sessions")
     suspend fun getAllSessionIds(): List<String>
 

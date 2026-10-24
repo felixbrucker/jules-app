@@ -9,6 +9,7 @@ import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.toEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
+import com.felixbrucker.jules.notification.JulesNotificationManager
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.JulesApiException
@@ -39,6 +40,7 @@ class JulesRepository @Inject constructor(
     private val sourceDao: SourceDao,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
+    private val notificationManager: JulesNotificationManager,
     private val julesApi: JulesApi,
     private val gitHubApi: GitHubApi
 ) {
@@ -71,10 +73,10 @@ class JulesRepository @Inject constructor(
         gitHubApi.validateAuthToken(token)
     }
 
-    suspend fun sync(force: Boolean = false) = withContext(Dispatchers.IO) {
+    suspend fun sync(isBackground: Boolean = false, force: Boolean = false) = withContext(Dispatchers.IO) {
         syncSources(force = force)
-        syncSessions()
-        syncArchivedSessions(force = force)
+        syncSessions(isBackground = isBackground)
+        syncArchivedSessions(isBackground = isBackground, force = force)
         syncPullRequests()
     }
 
@@ -112,9 +114,12 @@ class JulesRepository @Inject constructor(
         }
     }
 
-    private suspend fun saveSessions(entities: List<SessionEntity>) {
+    private suspend fun saveSessions(entities: List<SessionEntity>, isBackground: Boolean = false) {
         if (entities.isEmpty()) return
-        val existingSessionIds = sessionDao.getAllSessionIds().toSet()
+        val sessionIds = entities.map { it.id }
+        val previousSessionsMap = sessionDao.getSessionsByIds(sessionIds).associateBy { it.id }
+        val existingSessionIds = previousSessionsMap.keys
+
         val (toInsert, toUpdate) = entities.partition { !existingSessionIds.contains(it.id) }
 
         if (toInsert.isNotEmpty()) {
@@ -123,6 +128,28 @@ class JulesRepository @Inject constructor(
         }
         if (toUpdate.isNotEmpty()) {
             sessionDao.updateSessions(toUpdate)
+        }
+
+        if (isBackground) {
+            val periodicSyncEnabled = appSettingsRepository.periodicSyncEnabledFlow.first()
+            val notificationsEnabled = appSettingsRepository.notificationsEnabledFlow.first()
+            if (periodicSyncEnabled && notificationsEnabled) {
+                val feedbackNotificationsEnabled = appSettingsRepository.feedbackNotificationsEnabledFlow.first()
+                val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow.first()
+
+                for (newSession in entities) {
+                    val previousSession = previousSessionsMap[newSession.id]
+                    val stateChanged = (previousSession == null || previousSession.state != newSession.state)
+
+                    if (stateChanged) {
+                        if (feedbackNotificationsEnabled && newSession.state.requiresFeedback) {
+                            notificationManager.sendTaskFeedbackNotification(newSession)
+                        } else if (completionNotificationsEnabled && newSession.state == SessionState.COMPLETED) {
+                            notificationManager.sendTaskCompletedNotification(newSession)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -154,7 +181,7 @@ class JulesRepository @Inject constructor(
         }
     }
 
-    suspend fun syncSessions() = withContext(Dispatchers.IO) {
+    suspend fun syncSessions(isBackground: Boolean = false) = withContext(Dispatchers.IO) {
         val fetchedSessionIds = mutableSetOf<String>()
         var pageToken: String? = null
         val pageSize = 30
@@ -167,7 +194,7 @@ class JulesRepository @Inject constructor(
                     pageToken = pageToken
                 )
                 val entities = response.sessions.map { it.toEntity() }
-                saveSessions(entities)
+                saveSessions(entities, isBackground = isBackground)
                 response.sessions.forEach { fetchedSessionIds.add(it.id) }
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
@@ -197,7 +224,7 @@ class JulesRepository @Inject constructor(
                         }
                     }
                 }.awaitAll().filterNotNull()
-                saveSessions(entities)
+                saveSessions(entities, isBackground = isBackground)
             }
         } catch (e: Exception) {
             Timber.e(e, "Error syncing sessions")
@@ -238,7 +265,7 @@ class JulesRepository @Inject constructor(
         }
     }
 
-    suspend fun syncArchivedSessions(force: Boolean = false) = withContext(Dispatchers.IO) {
+    suspend fun syncArchivedSessions(isBackground: Boolean = false, force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
             if (!force) {
                 val lastSyncedAt = syncMetadataRepository.lastArchivedSessionsSyncedAtFlow.first()
@@ -257,7 +284,7 @@ class JulesRepository @Inject constructor(
                     pageToken = pageToken
                 )
                 val entities = response.sessions.map { it.toEntity() }
-                saveSessions(entities)
+                saveSessions(entities, isBackground = isBackground)
                 response.sessions.forEach { fetchedArchivedIds.add(it.id) }
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
@@ -280,7 +307,7 @@ class JulesRepository @Inject constructor(
                         }
                     }
                 }.awaitAll().filterNotNull()
-                saveSessions(entities)
+                saveSessions(entities, isBackground = isBackground)
             }
             syncMetadataRepository.saveLastArchivedSessionsSyncedAt(Instant.now())
         } catch (e: Exception) {

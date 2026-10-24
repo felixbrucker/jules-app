@@ -8,6 +8,7 @@ import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
+import com.felixbrucker.jules.notification.JulesNotificationManager
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.GitHubRepo
@@ -35,6 +36,7 @@ class JulesRepositoryTest {
     private lateinit var sourceDao: SourceDao
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
+    private lateinit var notificationManager: JulesNotificationManager
     private lateinit var julesApi: JulesApi
     private lateinit var gitHubApi: GitHubApi
     private lateinit var repository: JulesRepository
@@ -46,10 +48,15 @@ class JulesRepositoryTest {
         sourceDao = mockk(relaxed = true)
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
+        notificationManager = mockk(relaxed = true)
         julesApi = mockk(relaxed = true)
         gitHubApi = mockk(relaxed = true)
 
         coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf(null)
+        coEvery { appSettingsRepository.periodicSyncEnabledFlow } returns flowOf(false)
+        coEvery { appSettingsRepository.notificationsEnabledFlow } returns flowOf(false)
+        coEvery { appSettingsRepository.feedbackNotificationsEnabledFlow } returns flowOf(true)
+        coEvery { appSettingsRepository.completionNotificationsEnabledFlow } returns flowOf(true)
         coEvery { syncMetadataRepository.lastSourcesSyncedAtFlow } returns flowOf(null)
         coEvery { syncMetadataRepository.lastArchivedSessionsSyncedAtFlow } returns flowOf(null)
 
@@ -59,6 +66,7 @@ class JulesRepositoryTest {
             sourceDao = sourceDao,
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,
+            notificationManager = notificationManager,
             julesApi = julesApi,
             gitHubApi = gitHubApi
         )
@@ -184,6 +192,45 @@ class JulesRepositoryTest {
             julesApi.getSource("github/owner/repo1")
             sourceDao.upsertSources(any())
             sessionDao.insertSessions(any())
+        }
+    }
+
+    @Test
+    fun testBackgroundSyncTriggersNotificationsWhenStateRequiresFeedbackOrCompleted() = runBlocking {
+        coEvery { appSettingsRepository.periodicSyncEnabledFlow } returns flowOf(true)
+        coEvery { appSettingsRepository.notificationsEnabledFlow } returns flowOf(true)
+        coEvery { appSettingsRepository.feedbackNotificationsEnabledFlow } returns flowOf(true)
+        coEvery { appSettingsRepository.completionNotificationsEnabledFlow } returns flowOf(true)
+
+        val session1 = Session(
+            name = "sessions/sess-1",
+            id = "sess-1",
+            prompt = "Prompt 1",
+            state = SessionState.AWAITING_USER_FEEDBACK,
+            createTime = Instant.now(),
+            sourceContext = SourceContext(source = "sources/github/owner/repo1")
+        )
+
+        val session2 = Session(
+            name = "sessions/sess-2",
+            id = "sess-2",
+            prompt = "Prompt 2",
+            state = SessionState.COMPLETED,
+            createTime = Instant.now(),
+            sourceContext = SourceContext(source = "sources/github/owner/repo2")
+        )
+
+        coEvery { julesApi.getSessions(pageSize = 30, pageToken = null) } returns SessionsListResponse(
+            sessions = listOf(session1, session2),
+            nextPageToken = null
+        )
+        coEvery { sessionDao.getSessionsByIds(listOf("sess-1", "sess-2")) } returns emptyList()
+
+        repository.syncSessions(isBackground = true)
+
+        coVerify {
+            notificationManager.sendTaskFeedbackNotification(any())
+            notificationManager.sendTaskCompletedNotification(any())
         }
     }
 }

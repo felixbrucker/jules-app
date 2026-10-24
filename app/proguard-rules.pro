@@ -36,6 +36,14 @@
 -keep class com.felixbrucker.jules.data.worker.** { *; }
 
 # ----------------------------------------------------------------------------------------
+# Application Utilities & UI Models
+# ----------------------------------------------------------------------------------------
+-keep class com.felixbrucker.jules.util.** { *; }
+-keep class com.felixbrucker.jules.notification.** { *; }
+-keep class com.felixbrucker.jules.ui.settings.JulesPlan { *; }
+-keep class com.felixbrucker.jules.ui.sessions.SessionFilterChip { *; }
+
+# ----------------------------------------------------------------------------------------
 # Hilt / Dagger Dependency Injection
 # ----------------------------------------------------------------------------------------
 -keep class * extends androidx.hilt.work.HiltWorker

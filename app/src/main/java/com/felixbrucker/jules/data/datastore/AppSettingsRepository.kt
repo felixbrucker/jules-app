@@ -18,8 +18,10 @@ data class AppSettings(
     val apiKey: String?,
     val periodicSyncEnabled: Boolean,
     val syncIntervalMinutes: Int,
-    val archivedSyncEnabled: Boolean,
-    val dailySessionLimit: Int
+    val dailySessionLimit: Int,
+    val notificationsEnabled: Boolean,
+    val feedbackNotificationsEnabled: Boolean,
+    val completionNotificationsEnabled: Boolean
 )
 
 @Singleton
@@ -31,8 +33,10 @@ class AppSettingsRepository @Inject constructor(
         val GITHUB_AUTH_TOKEN = stringPreferencesKey("github_auth_token")
         val PERIODIC_SYNC_ENABLED = booleanPreferencesKey("periodic_sync_enabled")
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
-        val ARCHIVED_SYNC_ENABLED = booleanPreferencesKey("archived_sync_enabled")
         val DAILY_SESSION_LIMIT = intPreferencesKey("daily_session_limit")
+        val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
+        val FEEDBACK_NOTIFICATIONS_ENABLED = booleanPreferencesKey("feedback_notifications_enabled")
+        val COMPLETION_NOTIFICATIONS_ENABLED = booleanPreferencesKey("completion_notifications_enabled")
     }
 
     val appSettingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -41,8 +45,10 @@ class AppSettingsRepository @Inject constructor(
                 apiKey = preferences[PreferencesKeys.API_KEY],
                 periodicSyncEnabled = preferences[PreferencesKeys.PERIODIC_SYNC_ENABLED] ?: false,
                 syncIntervalMinutes = preferences[PreferencesKeys.SYNC_INTERVAL_MINUTES] ?: 15,
-                archivedSyncEnabled = preferences[PreferencesKeys.ARCHIVED_SYNC_ENABLED] ?: false,
-                dailySessionLimit = preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15
+                dailySessionLimit = preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15,
+                notificationsEnabled = preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] ?: false,
+                feedbackNotificationsEnabled = preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] ?: true,
+                completionNotificationsEnabled = preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true
             )
         }
 
@@ -58,11 +64,17 @@ class AppSettingsRepository @Inject constructor(
     val syncIntervalMinutesFlow: Flow<Int> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.SYNC_INTERVAL_MINUTES] ?: 15 }
 
-    val archivedSyncEnabledFlow: Flow<Boolean> = context.dataStore.data
-        .map { preferences -> preferences[PreferencesKeys.ARCHIVED_SYNC_ENABLED] ?: false }
-
     val dailySessionLimitFlow: Flow<Int> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15 }
+
+    val notificationsEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] ?: false }
+
+    val feedbackNotificationsEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] ?: true }
+
+    val completionNotificationsEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true }
 
     suspend fun saveApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
@@ -92,15 +104,27 @@ class AppSettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun setArchivedSyncEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.ARCHIVED_SYNC_ENABLED] = enabled
-        }
-    }
-
     suspend fun setDailySessionLimit(limit: Int) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.DAILY_SESSION_LIMIT] = limit
+        }
+    }
+
+    suspend fun setNotificationsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setFeedbackNotificationsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setCompletionNotificationsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] = enabled
         }
     }
 }
