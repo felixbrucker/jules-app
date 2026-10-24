@@ -19,7 +19,6 @@ data class AppSettings(
     val periodicSyncEnabled: Boolean,
     val syncIntervalMinutes: Int,
     val dailySessionLimit: Int,
-    val notificationsEnabled: Boolean,
     val feedbackNotificationsEnabled: Boolean,
     val completionNotificationsEnabled: Boolean
 )
@@ -34,7 +33,6 @@ class AppSettingsRepository @Inject constructor(
         val PERIODIC_SYNC_ENABLED = booleanPreferencesKey("periodic_sync_enabled")
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
         val DAILY_SESSION_LIMIT = intPreferencesKey("daily_session_limit")
-        val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val FEEDBACK_NOTIFICATIONS_ENABLED = booleanPreferencesKey("feedback_notifications_enabled")
         val COMPLETION_NOTIFICATIONS_ENABLED = booleanPreferencesKey("completion_notifications_enabled")
     }
@@ -46,7 +44,6 @@ class AppSettingsRepository @Inject constructor(
                 periodicSyncEnabled = preferences[PreferencesKeys.PERIODIC_SYNC_ENABLED] ?: false,
                 syncIntervalMinutes = preferences[PreferencesKeys.SYNC_INTERVAL_MINUTES] ?: 15,
                 dailySessionLimit = preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15,
-                notificationsEnabled = preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] ?: false,
                 feedbackNotificationsEnabled = preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] ?: true,
                 completionNotificationsEnabled = preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true
             )
@@ -66,9 +63,6 @@ class AppSettingsRepository @Inject constructor(
 
     val dailySessionLimitFlow: Flow<Int> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15 }
-
-    val notificationsEnabledFlow: Flow<Boolean> = context.dataStore.data
-        .map { preferences -> preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] ?: false }
 
     val feedbackNotificationsEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] ?: true }
@@ -107,12 +101,6 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setDailySessionLimit(limit: Int) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.DAILY_SESSION_LIMIT] = limit
-        }
-    }
-
-    suspend fun setNotificationsEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] = enabled
         }
     }
 

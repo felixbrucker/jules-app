@@ -54,7 +54,6 @@ class JulesRepositoryTest {
 
         coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf(null)
         coEvery { appSettingsRepository.periodicSyncEnabledFlow } returns flowOf(false)
-        coEvery { appSettingsRepository.notificationsEnabledFlow } returns flowOf(false)
         coEvery { appSettingsRepository.feedbackNotificationsEnabledFlow } returns flowOf(true)
         coEvery { appSettingsRepository.completionNotificationsEnabledFlow } returns flowOf(true)
         coEvery { syncMetadataRepository.lastSourcesSyncedAtFlow } returns flowOf(null)
@@ -198,7 +197,6 @@ class JulesRepositoryTest {
     @Test
     fun testBackgroundSyncTriggersNotificationsWhenStateRequiresFeedbackOrCompleted() = runBlocking {
         coEvery { appSettingsRepository.periodicSyncEnabledFlow } returns flowOf(true)
-        coEvery { appSettingsRepository.notificationsEnabledFlow } returns flowOf(true)
         coEvery { appSettingsRepository.feedbackNotificationsEnabledFlow } returns flowOf(true)
         coEvery { appSettingsRepository.completionNotificationsEnabledFlow } returns flowOf(true)
 

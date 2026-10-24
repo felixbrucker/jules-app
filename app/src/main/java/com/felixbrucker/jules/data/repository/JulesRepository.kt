@@ -131,22 +131,18 @@ class JulesRepository @Inject constructor(
         }
 
         if (isBackground) {
-            val periodicSyncEnabled = appSettingsRepository.periodicSyncEnabledFlow.first()
-            val notificationsEnabled = appSettingsRepository.notificationsEnabledFlow.first()
-            if (periodicSyncEnabled && notificationsEnabled) {
-                val feedbackNotificationsEnabled = appSettingsRepository.feedbackNotificationsEnabledFlow.first()
-                val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow.first()
+            val feedbackNotificationsEnabled = appSettingsRepository.feedbackNotificationsEnabledFlow.first()
+            val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow.first()
 
-                for (newSession in entities) {
-                    val previousSession = previousSessionsMap[newSession.id]
-                    val stateChanged = (previousSession == null || previousSession.state != newSession.state)
+            for (newSession in entities) {
+                val previousSession = previousSessionsMap[newSession.id]
+                val stateChanged = (previousSession == null || previousSession.state != newSession.state)
 
-                    if (stateChanged) {
-                        if (feedbackNotificationsEnabled && newSession.state.requiresFeedback) {
-                            notificationManager.sendTaskFeedbackNotification(newSession)
-                        } else if (completionNotificationsEnabled && newSession.state == SessionState.COMPLETED) {
-                            notificationManager.sendTaskCompletedNotification(newSession)
-                        }
+                if (stateChanged) {
+                    if (feedbackNotificationsEnabled && newSession.state.requiresFeedback) {
+                        notificationManager.sendTaskFeedbackNotification(newSession)
+                    } else if (completionNotificationsEnabled && newSession.state == SessionState.COMPLETED) {
+                        notificationManager.sendTaskCompletedNotification(newSession)
                     }
                 }
             }

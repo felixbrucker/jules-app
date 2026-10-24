@@ -11,6 +11,7 @@ import com.felixbrucker.jules.MainActivity
 import com.felixbrucker.jules.R
 import com.felixbrucker.jules.data.database.SessionEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.zip.CRC32
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,20 +33,21 @@ class JulesNotificationManager @Inject constructor(
                 "Jules Task Notifications",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Notifications for task state changes requiring feedback"
+                description = "Notifications for task state updates"
             }
             notificationManager.createNotificationChannel(channel)
         }
     }
 
     fun sendTaskFeedbackNotification(session: SessionEntity) {
+        val notificationId = getNotificationId(session.id)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            session.id.hashCode(),
+            notificationId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -54,7 +56,7 @@ class JulesNotificationManager @Inject constructor(
         val body = "Task state updated: ${session.state.label}"
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_jules)
+            .setSmallIcon(R.drawable.ic_notification_feedback)
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -62,17 +64,18 @@ class JulesNotificationManager @Inject constructor(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(session.id.hashCode(), notification)
+        notificationManager.notify(notificationId, notification)
     }
 
     fun sendTaskCompletedNotification(session: SessionEntity) {
+        val notificationId = getNotificationId(session.id)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            session.id.hashCode(),
+            notificationId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -81,7 +84,7 @@ class JulesNotificationManager @Inject constructor(
         val body = "Task completed successfully"
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_jules)
+            .setSmallIcon(R.drawable.ic_notification_completed)
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -89,7 +92,13 @@ class JulesNotificationManager @Inject constructor(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(session.id.hashCode(), notification)
+        notificationManager.notify(notificationId, notification)
+    }
+
+    private fun getNotificationId(sessionId: String): Int {
+        val crc = CRC32()
+        crc.update(sessionId.toByteArray())
+        return (crc.value and 0x7FFFFFFF).toInt()
     }
 
     companion object {

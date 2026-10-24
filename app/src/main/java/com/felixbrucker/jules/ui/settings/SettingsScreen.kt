@@ -60,7 +60,6 @@ fun SettingsScreen(
 ) {
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
     val syncIntervalMinutes by viewModel.syncIntervalMinutes.collectAsState()
-    val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
     val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
     val selectedPlan by viewModel.selectedPlan.collectAsState()
@@ -86,10 +85,37 @@ fun SettingsScreen(
             viewModel = viewModel,
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
-            notificationsEnabled = notificationsEnabled,
             feedbackNotificationsEnabled = feedbackNotificationsEnabled,
             completionNotificationsEnabled = completionNotificationsEnabled,
             selectedPlan = selectedPlan
+        )
+    }
+}
+
+@Composable
+private fun NotificationToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked && enabled,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange
         )
     }
 }
@@ -100,7 +126,6 @@ private fun SettingsContent(
     viewModel: SettingsViewModel,
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
-    notificationsEnabled: Boolean,
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
     selectedPlan: JulesPlan
@@ -123,13 +148,11 @@ private fun SettingsContent(
         SyncSettingsCard(
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
-            notificationsEnabled = notificationsEnabled,
             feedbackNotificationsEnabled = feedbackNotificationsEnabled,
             completionNotificationsEnabled = completionNotificationsEnabled,
             isForceSyncing = viewModel.isForceSyncing,
             onTogglePeriodicSync = { viewModel.setPeriodicSyncEnabled(it) },
             onIntervalChange = { viewModel.setSyncIntervalMinutes(it) },
-            onToggleNotifications = { viewModel.setNotificationsEnabled(it) },
             onToggleFeedbackNotifications = { viewModel.setFeedbackNotificationsEnabled(it) },
             onToggleCompletionNotifications = { viewModel.setCompletionNotificationsEnabled(it) },
             onForceSync = { viewModel.forceSync() }
@@ -296,13 +319,11 @@ private fun GitHubAuthTokenCard(
 private fun SyncSettingsCard(
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
-    notificationsEnabled: Boolean,
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
     isForceSyncing: Boolean,
     onTogglePeriodicSync: (Boolean) -> Unit,
     onIntervalChange: (Int) -> Unit,
-    onToggleNotifications: (Boolean) -> Unit,
     onToggleFeedbackNotifications: (Boolean) -> Unit,
     onToggleCompletionNotifications: (Boolean) -> Unit,
     onForceSync: () -> Unit
@@ -335,12 +356,10 @@ private fun SyncSettingsCard(
                 enabled = periodicSyncEnabled
             )
             Spacer(modifier = Modifier.height(12.dp))
-            TaskNotificationsRow(
-                notificationsEnabled = notificationsEnabled,
+            TaskNotificationsSection(
                 feedbackNotificationsEnabled = feedbackNotificationsEnabled,
                 completionNotificationsEnabled = completionNotificationsEnabled,
                 periodicSyncEnabled = periodicSyncEnabled,
-                onToggleNotifications = onToggleNotifications,
                 onToggleFeedbackNotifications = onToggleFeedbackNotifications,
                 onToggleCompletionNotifications = onToggleCompletionNotifications
             )
@@ -354,77 +373,71 @@ private fun SyncSettingsCard(
 }
 
 @Composable
-private fun TaskNotificationsRow(
-    notificationsEnabled: Boolean,
+private fun TaskNotificationsSection(
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
     periodicSyncEnabled: Boolean,
-    onToggleNotifications: (Boolean) -> Unit,
     onToggleFeedbackNotifications: (Boolean) -> Unit,
     onToggleCompletionNotifications: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
+    var pendingToggleAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            onToggleNotifications(true)
+            pendingToggleAction?.invoke(true)
         } else {
-            onToggleNotifications(false)
+            pendingToggleAction?.invoke(false)
+        }
+        pendingToggleAction = null
+    }
+
+    val requestPermissionAndToggle: (Boolean, (Boolean) -> Unit) -> Unit = { checked, toggleAction ->
+        if (checked) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                pendingToggleAction = toggleAction
+                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                toggleAction(true)
+            }
+        } else {
+            toggleAction(false)
         }
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Task Notifications")
-                Text(
-                    text = "Notify when background sync detects task updates",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Text(
+            text = "Task Notifications",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        NotificationToggleRow(
+            title = "Task Feedback Required",
+            description = "Notify when a task requires plan approval, feedback, or fails",
+            checked = feedbackNotificationsEnabled && periodicSyncEnabled,
+            enabled = periodicSyncEnabled,
+            onCheckedChange = { checked ->
+                requestPermissionAndToggle(checked, onToggleFeedbackNotifications)
             }
-            Switch(
-                checked = notificationsEnabled && periodicSyncEnabled,
-                enabled = periodicSyncEnabled,
-                onCheckedChange = { checked ->
-                    if (checked) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                            ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.POST_NOTIFICATIONS
-                            ) != PackageManager.PERMISSION_GRANTED
-                        ) {
-                            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            onToggleNotifications(true)
-                        }
-                    } else {
-                        onToggleNotifications(false)
-                    }
-                }
-            )
-        }
-
-        if (notificationsEnabled && periodicSyncEnabled) {
-            SubNotificationToggleRow(
-                title = "Feedback Required",
-                description = "Notify when task requires plan approval, feedback, or fails",
-                checked = feedbackNotificationsEnabled,
-                enabled = true,
-                onCheckedChange = onToggleFeedbackNotifications
-            )
-            SubNotificationToggleRow(
-                title = "Task Completed",
-                description = "Notify when task state changes to completed",
-                checked = completionNotificationsEnabled,
-                enabled = true,
-                onCheckedChange = onToggleCompletionNotifications
-            )
-        }
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        NotificationToggleRow(
+            title = "Task Completed",
+            description = "Notify when a task state changes to completed",
+            checked = completionNotificationsEnabled && periodicSyncEnabled,
+            enabled = periodicSyncEnabled,
+            onCheckedChange = { checked ->
+                requestPermissionAndToggle(checked, onToggleCompletionNotifications)
+            }
+        )
     }
 }
 
