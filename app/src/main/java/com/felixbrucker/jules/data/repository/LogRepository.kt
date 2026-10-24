@@ -3,13 +3,10 @@ package com.felixbrucker.jules.data.repository
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import androidx.paging.map
 import com.felixbrucker.jules.data.database.LogDao
 import com.felixbrucker.jules.data.database.LogEntity
-import com.felixbrucker.jules.data.logging.LogEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -23,7 +20,7 @@ class LogRepository @Inject constructor(
         priorities: Set<Int>,
         searchQuery: String,
         pageSize: Int = 30
-    ): Flow<PagingData<LogEntry>> {
+    ): Flow<PagingData<LogEntity>> {
         val priorityList = priorities.toList()
         return Pager(
             config = PagingConfig(
@@ -37,9 +34,7 @@ class LogRepository @Inject constructor(
                     searchQuery = searchQuery.trim()
                 )
             }
-        ).flow.map { pagingData ->
-            pagingData.map { it.toDomainModel() }
-        }
+        ).flow
     }
 
     suspend fun getCounts(priorities: Set<Int>, searchQuery: String): Pair<Int, Int> =
@@ -54,8 +49,8 @@ class LogRepository @Inject constructor(
             Pair(filtered, total)
         }
 
-    suspend fun insertLog(entry: LogEntry) = withContext(Dispatchers.IO) {
-        logDao.insertLog(LogEntity.fromDomainModel(entry))
+    suspend fun insertLog(entry: LogEntity) = withContext(Dispatchers.IO) {
+        logDao.insertLog(entry)
     }
 
     suspend fun clearLogs() = withContext(Dispatchers.IO) {

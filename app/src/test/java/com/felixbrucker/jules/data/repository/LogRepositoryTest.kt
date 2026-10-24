@@ -2,7 +2,6 @@ package com.felixbrucker.jules.data.repository
 
 import com.felixbrucker.jules.data.database.LogDao
 import com.felixbrucker.jules.data.database.LogEntity
-import com.felixbrucker.jules.data.logging.LogEntry
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -24,11 +23,12 @@ class LogRepositoryTest {
 
     @Test
     fun testInsertLogDelegatesToDao() = runBlocking {
-        val entry = LogEntry(
+        val entry = LogEntity(
             timestamp = 1000L,
             priority = 3,
             tag = "TestTag",
-            message = "Test Message"
+            message = "Test Message",
+            throwableStackTrace = null
         )
 
         repository.insertLog(entry)

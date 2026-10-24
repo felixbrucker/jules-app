@@ -84,7 +84,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import com.felixbrucker.jules.data.logging.LogEntry
+import com.felixbrucker.jules.data.database.LogEntity
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -422,7 +422,7 @@ fun LogEmptyView(isLogsEmpty: Boolean) {
 
 @Composable
 fun LogViewerList(
-    pagedLogs: LazyPagingItems<LogEntry>,
+    pagedLogs: LazyPagingItems<LogEntity>,
     listState: LazyListState,
     modifier: Modifier = Modifier
 ) {
@@ -465,7 +465,7 @@ fun LogBadge(
 
 @Composable
 fun LogEntryHeader(
-    entry: LogEntry,
+    entry: LogEntity,
     formattedTime: String,
     badgeBg: Color,
     badgeFg: Color,
@@ -563,7 +563,7 @@ fun LogEntryStackTrace(
 }
 
 @Composable
-fun LogEntryCard(entry: LogEntry) {
+fun LogEntryCard(entry: LogEntity) {
     var isExpanded by remember { mutableStateOf(false) }
 
     val isMessageLong = remember(entry.message) {

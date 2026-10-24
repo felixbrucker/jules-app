@@ -1,8 +1,8 @@
 package com.felixbrucker.jules.data.database
 
+import android.util.Log
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.felixbrucker.jules.data.logging.LogEntry
 
 @Entity(tableName = "logs")
 data class LogEntity(
@@ -14,23 +14,13 @@ data class LogEntity(
     val message: String,
     val throwableStackTrace: String?
 ) {
-    fun toDomainModel(): LogEntry = LogEntry(
-        id = id,
-        timestamp = timestamp,
-        priority = priority,
-        tag = tag,
-        message = message,
-        throwableStackTrace = throwableStackTrace
-    )
-
-    companion object {
-        fun fromDomainModel(entry: LogEntry): LogEntity = LogEntity(
-            id = entry.id,
-            timestamp = entry.timestamp,
-            priority = entry.priority,
-            tag = entry.tag,
-            message = entry.message,
-            throwableStackTrace = entry.throwableStackTrace
-        )
+    fun priorityLabel(): String = when (priority) {
+        Log.VERBOSE -> "VERBOSE"
+        Log.DEBUG -> "DEBUG"
+        Log.INFO -> "INFO"
+        Log.WARN -> "WARN"
+        Log.ERROR -> "ERROR"
+        Log.ASSERT -> "ASSERT"
+        else -> "UNKNOWN"
     }
 }

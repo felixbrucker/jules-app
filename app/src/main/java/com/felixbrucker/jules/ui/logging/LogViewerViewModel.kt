@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.felixbrucker.jules.data.logging.LogEntry
+import com.felixbrucker.jules.data.database.LogEntity
 import com.felixbrucker.jules.data.repository.LogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +36,7 @@ class LogViewerViewModel @Inject constructor(
     val filteredCount: StateFlow<Int> = _filteredCount.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val logsPaged: kotlinx.coroutines.flow.Flow<PagingData<LogEntry>> = combine(
+    val logsPaged: Flow<PagingData<LogEntity>> = combine(
         selectedPriority,
         searchQuery
     ) { priority, query ->
