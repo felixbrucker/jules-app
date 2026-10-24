@@ -1,5 +1,6 @@
 package com.felixbrucker.jules.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -119,22 +120,28 @@ private fun ApiKeyCard(
                     style = MaterialTheme.typography.titleMedium
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            ApiKeyTextField(
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                apiKey = viewModel.apiKey,
-                onApiKeyChange = { viewModel.onApiKeyChanged(it) },
-                errorMessage = viewModel.apiKeyValidationErrorMessage,
-                onImeAction = { viewModel.validateAndApplyApiKey() }
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            LoadingStateButton(
-                label = viewModel.applyApiKeyLabel,
-                loadingLabel = "Validating...",
-                isLoading = viewModel.isValidatingApiKey,
-                enabled = viewModel.apiKey.isNotBlank() && viewModel.persistedApiKey != viewModel.apiKey,
-                onClick = { viewModel.validateAndApplyApiKey() }
-            )
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ApiKeyTextField(
+                    modifier = Modifier.weight(1f),
+                    apiKey = viewModel.apiKey,
+                    onApiKeyChange = { viewModel.onApiKeyChanged(it) },
+                    errorMessage = viewModel.apiKeyValidationErrorMessage,
+                    onImeAction = { viewModel.validateAndApplyApiKey() }
+                )
+                LoadingStateButton(
+                    modifier = Modifier.padding(top = 11.dp),
+                    label = viewModel.applyApiKeyLabel,
+                    loadingLabel = "Validating...",
+                    isLoading = viewModel.isValidatingApiKey,
+                    enabled = viewModel.apiKey.isNotBlank() && viewModel.persistedApiKey != viewModel.apiKey,
+                    onClick = { viewModel.validateAndApplyApiKey() }
+                )
+            }
         }
     }
 }

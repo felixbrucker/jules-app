@@ -10,10 +10,12 @@ import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.ApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -76,6 +78,7 @@ class SettingsViewModel @Inject constructor(
             apiKeyValidationErrorMessage = null
             isApiKeySavedSuccessfully = false
 
+            delay(1.seconds)
             try {
                 julesRepository.validateApiKey(apiKey.trim())
             } catch (e: ApiException) {

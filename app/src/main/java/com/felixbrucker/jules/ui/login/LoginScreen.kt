@@ -83,7 +83,6 @@ private fun LoginContent(
         )
         Spacer(modifier = Modifier.height(24.dp))
         LoadingStateButton(
-            modifier = Modifier.fillMaxWidth(),
             label = "Next",
             loadingLabel = "Validating...",
             isLoading = viewModel.isValidatingApiKey,
