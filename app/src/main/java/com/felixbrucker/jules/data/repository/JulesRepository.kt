@@ -1,10 +1,13 @@
 package com.felixbrucker.jules.data.repository
 
+import com.felixbrucker.jules.data.database.PullRequestDao
+import com.felixbrucker.jules.data.database.PullRequestEntity
 import com.felixbrucker.jules.data.database.SessionDao
-import com.felixbrucker.jules.data.database.SessionEntity
+import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.toEntity
+import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
-import com.felixbrucker.jules.network.api.model.ApiException
+import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.SessionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -20,14 +23,16 @@ import javax.inject.Singleton
 @Singleton
 class JulesRepository @Inject constructor(
     private val sessionDao: SessionDao,
-    private val julesApi: JulesApi
+    private val pullRequestDao: PullRequestDao,
+    private val julesApi: JulesApi,
+    private val gitHubApi: GitHubApi
 ) {
 
     fun getSessionsFlow(
         searchQuery: String,
         states: List<SessionState>,
         includeArchived: Boolean
-    ): Flow<List<SessionEntity>> {
+    ): Flow<List<SessionWithPullRequest>> {
         val formattedQuery = if (searchQuery.isBlank()) "%%" else "%${searchQuery.trim()}%"
         return sessionDao.getSessions(
             searchQuery = formattedQuery,
@@ -39,6 +44,15 @@ class JulesRepository @Inject constructor(
 
     suspend fun validateApiKey(apiKey: String) = withContext(Dispatchers.IO) {
         julesApi.validateApiKey(apiKey = apiKey)
+    }
+
+    suspend fun validateGithubAuthToken(token: String) = withContext(Dispatchers.IO) {
+        gitHubApi.validateAuthToken(token)
+    }
+
+    suspend fun sync() = withContext(Dispatchers.IO) {
+        syncSessions()
+        syncPullRequests()
     }
 
     suspend fun syncSessions() = withContext(Dispatchers.IO) {
@@ -72,7 +86,7 @@ class JulesRepository @Inject constructor(
                                 val session = julesApi.getSession(missingId)
 
                                 session.toEntity()
-                            } catch (e: ApiException) {
+                            } catch (e: JulesApiException) {
                                 // The session was deleted remotely, remove from local cache
                                 if (e.httpStatusCode == 404) {
                                     sessionDao.deleteSession(missingId)
@@ -88,6 +102,37 @@ class JulesRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "Error syncing sessions")
+            throw e
+        }
+    }
+
+    suspend fun syncPullRequests() = withContext(Dispatchers.IO) {
+        try {
+            val activeSessions = sessionDao.getActiveSessionsWithPullRequests()
+            val prUrls = activeSessions.mapNotNull { it.pullRequest?.url }.distinct()
+
+            if (prUrls.isEmpty()) return@withContext
+
+            val semaphore = Semaphore(4)
+            val prEntities = prUrls.map { prUrl ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            val state = gitHubApi.getPullRequestState(prUrl)
+                            PullRequestEntity(url = prUrl, state = state)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to sync pull request state for $prUrl")
+                            null
+                        }
+                    }
+                }
+            }.awaitAll().filterNotNull()
+
+            if (prEntities.isNotEmpty()) {
+                pullRequestDao.upsertPullRequests(prEntities)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing pull requests")
             throw e
         }
     }

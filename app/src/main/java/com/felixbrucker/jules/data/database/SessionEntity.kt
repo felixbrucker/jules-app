@@ -2,7 +2,9 @@ package com.felixbrucker.jules.data.database
 
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.felixbrucker.jules.network.api.GitHubPullRequestUrl
 import com.felixbrucker.jules.network.api.model.Repo
 import com.felixbrucker.jules.network.api.model.Session
 import com.felixbrucker.jules.network.api.model.SessionState
@@ -15,7 +17,11 @@ data class EmbeddedPullRequest(
     val description: String,
     val baseRef: String?,
     val headRef: String?
-)
+) {
+    val number: Long? by lazy {
+        GitHubPullRequestUrl.parse(url)?.pullNumber
+    }
+}
 
 data class EmbeddedChangeSet(
     val source: String,
@@ -24,7 +30,12 @@ data class EmbeddedChangeSet(
     val totalDeletions: Int
 )
 
-@Entity(tableName = "sessions")
+@Entity(
+    tableName = "sessions",
+    indices = [
+        Index(value = ["pull_request_url"], unique = true)
+    ]
+)
 data class SessionEntity(
     @PrimaryKey
     val id: String,

@@ -30,8 +30,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
+import com.felixbrucker.jules.R
 import com.felixbrucker.jules.ui.components.ApiKeyTextField
 import com.felixbrucker.jules.ui.components.LoadingStateButton
+import com.felixbrucker.jules.ui.components.ObfuscatedTextField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,6 +88,8 @@ private fun SettingsContent(
             .padding(16.dp)
     ) {
         ApiKeyCard(viewModel = viewModel)
+        Spacer(modifier = Modifier.height(16.dp))
+        GitHubAuthTokenCard(viewModel = viewModel)
         Spacer(modifier = Modifier.height(16.dp))
         SyncSettingsCard(
             periodicSyncEnabled = periodicSyncEnabled,
@@ -140,6 +146,59 @@ private fun ApiKeyCard(
                     isLoading = viewModel.isValidatingApiKey,
                     enabled = viewModel.apiKey.isNotBlank() && viewModel.persistedApiKey != viewModel.apiKey,
                     onClick = { viewModel.validateAndApplyApiKey() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GitHubAuthTokenCard(
+    viewModel: SettingsViewModel
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_github),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.padding(start = 8.dp))
+                Text(
+                    text = "GitHub Auth Token",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ObfuscatedTextField(
+                    modifier = Modifier.weight(1f),
+                    value = viewModel.githubAuthToken,
+                    onValueChange = { viewModel.onGithubAuthTokenChanged(it) },
+                    label = "GitHub Token",
+                    errorMessage = viewModel.githubAuthTokenValidationErrorMessage,
+                    supportingText = "Optional. Increases API rate limits and enables PR state access for private repositories.",
+                    onImeAction = { viewModel.validateAndApplyGithubAuthToken() }
+                )
+                LoadingStateButton(
+                    modifier = Modifier.padding(top = 11.dp),
+                    label = viewModel.applyGithubAuthTokenLabel,
+                    loadingLabel = "Validating...",
+                    isLoading = viewModel.isValidatingGithubAuthToken,
+                    enabled = viewModel.persistedGithubAuthToken != viewModel.githubAuthToken,
+                    onClick = { viewModel.validateAndApplyGithubAuthToken() }
                 )
             }
         }

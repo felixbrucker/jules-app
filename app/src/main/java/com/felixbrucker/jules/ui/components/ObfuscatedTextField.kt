@@ -21,31 +21,35 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 
 @Composable
-fun ApiKeyTextField(
+fun ObfuscatedTextField(
     modifier: Modifier = Modifier,
-    apiKey: String,
-    onApiKeyChange: (String) -> Unit,
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
     errorMessage: String?,
+    supportingText: String? = null,
     onImeAction: () -> Unit
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
 
     OutlinedTextField(
         modifier = modifier,
-        value = apiKey,
-        onValueChange = onApiKeyChange,
-        label = { Text("API Key") },
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
         singleLine = true,
         isError = errorMessage != null,
         supportingText = if (errorMessage != null) {
             { Text(errorMessage) }
+        } else if (supportingText != null) {
+            { Text(supportingText) }
         } else {
             null
         },
         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
             val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-            val description = if (passwordVisible) "Hide API key" else "Show API key"
+            val description = if (passwordVisible) "Hide $label" else "Show $label"
             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                 Icon(imageVector = image, contentDescription = description)
             }
@@ -57,5 +61,23 @@ fun ApiKeyTextField(
         keyboardActions = KeyboardActions(
             onDone = { onImeAction() }
         )
+    )
+}
+
+@Composable
+fun ApiKeyTextField(
+    modifier: Modifier = Modifier,
+    apiKey: String,
+    onApiKeyChange: (String) -> Unit,
+    errorMessage: String?,
+    onImeAction: () -> Unit
+) {
+    ObfuscatedTextField(
+        modifier = modifier,
+        value = apiKey,
+        onValueChange = onApiKeyChange,
+        label = "API Key",
+        errorMessage = errorMessage,
+        onImeAction = onImeAction
     )
 }

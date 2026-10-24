@@ -3,6 +3,7 @@ package com.felixbrucker.jules.di
 import android.content.Context
 import androidx.room.Room
 import com.felixbrucker.jules.data.database.AppDatabase
+import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.SessionDao
 import dagger.Module
 import dagger.Provides
@@ -29,5 +30,11 @@ object DatabaseModule {
     @Singleton
     fun provideSessionDao(database: AppDatabase): SessionDao {
         return database.sessionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePullRequestDao(database: AppDatabase): PullRequestDao {
+        return database.pullRequestDao()
     }
 }

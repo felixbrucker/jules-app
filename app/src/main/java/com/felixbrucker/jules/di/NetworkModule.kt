@@ -1,6 +1,10 @@
 package com.felixbrucker.jules.di
 
-import com.felixbrucker.jules.network.api.AuthInterceptor
+import com.felixbrucker.jules.network.api.JulesAuthInterceptor
+import com.felixbrucker.jules.network.api.GitHubApi
+import com.felixbrucker.jules.network.api.GitHubAuthInterceptor
+import com.felixbrucker.jules.network.api.UserAgentInterceptor
+import com.felixbrucker.jules.network.api.GitHubApiService
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.JulesApiService
 import com.felixbrucker.jules.network.api.adapter.ActivityAdapter
@@ -25,7 +29,19 @@ import javax.inject.Singleton
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class BaseUrl
+annotation class JulesBaseUrl
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class GitHubBaseUrl
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class JulesClient
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class GitHubClient
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -48,18 +64,36 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+    @JulesClient
+    fun provideJulesOkHttpClient(
+        julesAuthInterceptor: JulesAuthInterceptor,
+        userAgentInterceptor: UserAgentInterceptor
+    ): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(authInterceptor)
+            .addInterceptor(userAgentInterceptor)
+            .addInterceptor(julesAuthInterceptor)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @GitHubClient
+    fun provideGitHubOkHttpClient(
+        gitHubAuthInterceptor: GitHubAuthInterceptor,
+        userAgentInterceptor: UserAgentInterceptor
+    ): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(userAgentInterceptor)
+            .addInterceptor(gitHubAuthInterceptor)
             .build()
     }
 
     @Provides
     @Singleton
     fun provideJulesApiService(
-        okHttpClient: OkHttpClient,
+        @JulesClient okHttpClient: OkHttpClient,
         moshi: Moshi,
-        @BaseUrl baseUrl: String
+        @JulesBaseUrl baseUrl: String
     ): JulesApiService {
         return Retrofit.Builder()
             .baseUrl(baseUrl)
@@ -71,8 +105,30 @@ object NetworkModule {
 
     @Suppress("SameReturnValue")
     @Provides
-    @BaseUrl
-    fun provideBaseUrl(): String {
+    @JulesBaseUrl
+    fun provideJulesBaseUrl(): String {
         return JulesApi.DEFAULT_BASE_URL
+    }
+
+    @Provides
+    @Singleton
+    fun provideGitHubApiService(
+        @GitHubClient okHttpClient: OkHttpClient,
+        moshi: Moshi,
+        @GitHubBaseUrl baseUrl: String
+    ): GitHubApiService {
+        return Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(GitHubApiService::class.java)
+    }
+
+    @Suppress("SameReturnValue")
+    @Provides
+    @GitHubBaseUrl
+    fun provideGitHubBaseUrl(): String {
+        return GitHubApi.DEFAULT_BASE_URL
     }
 }
