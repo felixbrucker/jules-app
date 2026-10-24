@@ -14,11 +14,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Sync
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -27,6 +39,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -43,9 +58,28 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
     val syncIntervalMinutes by viewModel.syncIntervalMinutes.collectAsState()
-    val archivedSyncEnabled by viewModel.archivedSyncEnabled.collectAsState()
+    val smartSyncEnabled by viewModel.smartSyncEnabled.collectAsState()
+    val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
+    val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
+    val selectedPlan by viewModel.selectedPlan.collectAsState()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -68,7 +102,38 @@ fun SettingsScreen(
             viewModel = viewModel,
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
-            archivedSyncEnabled = archivedSyncEnabled
+            smartSyncEnabled = smartSyncEnabled,
+            feedbackNotificationsEnabled = feedbackNotificationsEnabled,
+            completionNotificationsEnabled = completionNotificationsEnabled,
+            selectedPlan = selectedPlan
+        )
+    }
+}
+
+@Composable
+private fun NotificationToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked && enabled,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange
         )
     }
 }
@@ -79,7 +144,10 @@ private fun SettingsContent(
     viewModel: SettingsViewModel,
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
-    archivedSyncEnabled: Boolean
+    smartSyncEnabled: Boolean,
+    feedbackNotificationsEnabled: Boolean,
+    completionNotificationsEnabled: Boolean,
+    selectedPlan: JulesPlan
 ) {
     Column(
         modifier = modifier
@@ -91,14 +159,77 @@ private fun SettingsContent(
         Spacer(modifier = Modifier.height(16.dp))
         GitHubAuthTokenCard(viewModel = viewModel)
         Spacer(modifier = Modifier.height(16.dp))
+        PlanSelectionCard(
+            currentPlan = selectedPlan,
+            onPlanSelected = { viewModel.selectPlan(it) }
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         SyncSettingsCard(
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
-            archivedSyncEnabled = archivedSyncEnabled,
+            smartSyncEnabled = smartSyncEnabled,
+            feedbackNotificationsEnabled = feedbackNotificationsEnabled,
+            completionNotificationsEnabled = completionNotificationsEnabled,
+            isForceSyncing = viewModel.isForceSyncing,
             onTogglePeriodicSync = { viewModel.setPeriodicSyncEnabled(it) },
             onIntervalChange = { viewModel.setSyncIntervalMinutes(it) },
-            onToggleArchivedSync = { viewModel.setArchivedSyncEnabled(it) }
+            onToggleSmartSync = { viewModel.setSmartSyncEnabled(it) },
+            onToggleFeedbackNotifications = { viewModel.setFeedbackNotificationsEnabled(it) },
+            onToggleCompletionNotifications = { viewModel.setCompletionNotificationsEnabled(it) },
+            onForceSync = { viewModel.forceSync() }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlanSelectionCard(
+    currentPlan: JulesPlan,
+    onPlanSelected: (JulesPlan) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Jules Plan",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = "${currentPlan.displayName} (${currentPlan.dailyLimit} sessions/day)",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Selected Plan") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    JulesPlan.entries.forEach { plan ->
+                        DropdownMenuItem(
+                            text = { Text("${plan.displayName} (${plan.dailyLimit} sessions/day)") },
+                            onClick = {
+                                expanded = false
+                                onPlanSelected(plan)
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -209,10 +340,16 @@ private fun GitHubAuthTokenCard(
 private fun SyncSettingsCard(
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
-    archivedSyncEnabled: Boolean,
+    smartSyncEnabled: Boolean,
+    feedbackNotificationsEnabled: Boolean,
+    completionNotificationsEnabled: Boolean,
+    isForceSyncing: Boolean,
     onTogglePeriodicSync: (Boolean) -> Unit,
     onIntervalChange: (Int) -> Unit,
-    onToggleArchivedSync: (Boolean) -> Unit
+    onToggleSmartSync: (Boolean) -> Unit,
+    onToggleFeedbackNotifications: (Boolean) -> Unit,
+    onToggleCompletionNotifications: (Boolean) -> Unit,
+    onForceSync: () -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth()
@@ -222,32 +359,18 @@ private fun SyncSettingsCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Sync,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.padding(start = 8.dp))
-                Text(
-                    text = "Sync & Background Work",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
+            SyncSettingsHeader()
             Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    modifier = Modifier.weight(1f),
-                    text = "Enable Periodic Sync"
-                )
-                Switch(
-                    checked = periodicSyncEnabled,
-                    onCheckedChange = onTogglePeriodicSync
-                )
-            }
+            PeriodicSyncRow(
+                periodicSyncEnabled = periodicSyncEnabled,
+                onTogglePeriodicSync = onTogglePeriodicSync
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            SmartSyncRow(
+                smartSyncEnabled = smartSyncEnabled,
+                periodicSyncEnabled = periodicSyncEnabled,
+                onToggleSmartSync = onToggleSmartSync
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Sync Interval: $syncIntervalMinutes minutes",
@@ -262,24 +385,173 @@ private fun SyncSettingsCard(
                 enabled = periodicSyncEnabled
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Sync Archived Sessions")
-                    Text(
-                        text = "Include archived sessions in periodic sync",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = archivedSyncEnabled,
-                    enabled = periodicSyncEnabled,
-                    onCheckedChange = onToggleArchivedSync
-                )
-            }
+            TaskNotificationsSection(
+                feedbackNotificationsEnabled = feedbackNotificationsEnabled,
+                completionNotificationsEnabled = completionNotificationsEnabled,
+                periodicSyncEnabled = periodicSyncEnabled,
+                onToggleFeedbackNotifications = onToggleFeedbackNotifications,
+                onToggleCompletionNotifications = onToggleCompletionNotifications
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            ForceSyncRow(
+                isForceSyncing = isForceSyncing,
+                onForceSync = onForceSync
+            )
         }
+    }
+}
+
+@Composable
+private fun SmartSyncRow(
+    smartSyncEnabled: Boolean,
+    periodicSyncEnabled: Boolean,
+    onToggleSmartSync: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Smart Background Sync")
+            Text(
+                text = "Only run background sync when tasks are in progress",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = smartSyncEnabled && periodicSyncEnabled,
+            enabled = periodicSyncEnabled,
+            onCheckedChange = onToggleSmartSync
+        )
+    }
+}
+
+@Composable
+private fun TaskNotificationsSection(
+    feedbackNotificationsEnabled: Boolean,
+    completionNotificationsEnabled: Boolean,
+    periodicSyncEnabled: Boolean,
+    onToggleFeedbackNotifications: (Boolean) -> Unit,
+    onToggleCompletionNotifications: (Boolean) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Task Notifications",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        NotificationToggleRow(
+            title = "Task Feedback Required",
+            description = "Notify when a task requires plan approval, feedback, or fails",
+            checked = feedbackNotificationsEnabled && periodicSyncEnabled,
+            enabled = periodicSyncEnabled,
+            onCheckedChange = onToggleFeedbackNotifications
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        NotificationToggleRow(
+            title = "Task Completed",
+            description = "Notify when a task state changes to completed",
+            checked = completionNotificationsEnabled && periodicSyncEnabled,
+            enabled = periodicSyncEnabled,
+            onCheckedChange = onToggleCompletionNotifications
+        )
+    }
+}
+
+@Composable
+private fun SubNotificationToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked && enabled,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+
+@Composable
+private fun SyncSettingsHeader() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Default.Sync,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.padding(start = 8.dp))
+        Text(
+            text = "Sync & Background Work",
+            style = MaterialTheme.typography.titleMedium
+        )
+    }
+}
+
+@Composable
+private fun PeriodicSyncRow(
+    periodicSyncEnabled: Boolean,
+    onTogglePeriodicSync: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            modifier = Modifier.weight(1f),
+            text = "Enable Periodic Sync"
+        )
+        Switch(
+            checked = periodicSyncEnabled,
+            onCheckedChange = onTogglePeriodicSync
+        )
+    }
+}
+
+
+@Composable
+private fun ForceSyncRow(
+    isForceSyncing: Boolean,
+    onForceSync: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Force Sync")
+            Text(
+                text = "Force sync sessions and sources immediately",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        LoadingStateButton(
+            label = "Force Sync",
+            loadingLabel = "Syncing...",
+            isLoading = isForceSyncing,
+            enabled = !isForceSyncing,
+            onClick = onForceSync
+        )
     }
 }

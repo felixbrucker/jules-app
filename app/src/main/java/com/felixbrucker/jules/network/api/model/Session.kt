@@ -14,7 +14,10 @@ enum class SessionState(val label: String) {
     @Json(name = "IN_PROGRESS") IN_PROGRESS("In Progress"),
     @Json(name = "PAUSED") PAUSED("Paused"),
     @Json(name = "FAILED") FAILED("Failed"),
-    @Json(name = "COMPLETED") COMPLETED("Completed")
+    @Json(name = "COMPLETED") COMPLETED("Completed");
+
+    val requiresFeedback: Boolean
+        get() = this == AWAITING_USER_FEEDBACK || this == AWAITING_PLAN_APPROVAL || this == FAILED
 }
 
 enum class AutomationMode {

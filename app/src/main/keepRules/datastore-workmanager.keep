@@ -1,0 +1,3 @@
+# Jetpack DataStore & WorkManager
+-keep class com.felixbrucker.jules.data.datastore.** { *; }
+-keep class com.felixbrucker.jules.data.worker.** { *; }

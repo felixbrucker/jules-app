@@ -12,9 +12,23 @@ import com.felixbrucker.jules.network.api.model.GitHubApiException
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
+
+enum class JulesPlan(val displayName: String, val dailyLimit: Int) {
+    FREE("Free", 15),
+    PRO("Google AI Pro", 100),
+    ULTRA("Google AI Ultra", 300);
+
+    companion object {
+        fun fromLimit(limit: Int): JulesPlan {
+            return entries.find { it.dailyLimit == limit } ?: FREE
+        }
+    }
+}
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -58,8 +72,24 @@ class SettingsViewModel @Inject constructor(
     val syncIntervalMinutes = appSettingsRepository.syncIntervalMinutesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
 
-    val archivedSyncEnabled = appSettingsRepository.archivedSyncEnabledFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val smartSyncEnabled = appSettingsRepository.smartSyncEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val feedbackNotificationsEnabled = appSettingsRepository.feedbackNotificationsEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val dailySessionLimit = appSettingsRepository.dailySessionLimitFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
+
+    val selectedPlan = appSettingsRepository.dailySessionLimitFlow
+        .map { JulesPlan.fromLimit(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), JulesPlan.FREE)
+
+    var isForceSyncing by mutableStateOf(false)
+        private set
 
     var persistedApiKey by mutableStateOf<String?>(null)
         private set
@@ -178,9 +208,46 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setArchivedSyncEnabled(enabled: Boolean) {
+    fun setSmartSyncEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            appSettingsRepository.setArchivedSyncEnabled(enabled)
+            appSettingsRepository.setSmartSyncEnabled(enabled)
+        }
+    }
+
+    fun setFeedbackNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setFeedbackNotificationsEnabled(enabled)
+        }
+    }
+
+    fun setCompletionNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setCompletionNotificationsEnabled(enabled)
+        }
+    }
+
+    fun selectPlan(plan: JulesPlan) {
+        viewModelScope.launch {
+            appSettingsRepository.setDailySessionLimit(plan.dailyLimit)
+        }
+    }
+
+    fun setDailySessionLimit(limit: Int) {
+        viewModelScope.launch {
+            appSettingsRepository.setDailySessionLimit(limit)
+        }
+    }
+
+    fun forceSync() {
+        viewModelScope.launch {
+            isForceSyncing = true
+            try {
+                julesRepository.sync(force = true)
+            } catch (e: Exception) {
+                Timber.e(e, "Force sync failed")
+            } finally {
+                isForceSyncing = false
+            }
         }
     }
 }

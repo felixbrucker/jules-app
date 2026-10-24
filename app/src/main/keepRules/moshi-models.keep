@@ -1,0 +1,29 @@
+# Application Data Models & Moshi JSON Adapters
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod, AnnotationDefault
+-keep @com.squareup.moshi.JsonClass class * { *; }
+-keepnames class com.felixbrucker.jules.network.api.model.** { *; }
+-keep class com.felixbrucker.jules.network.api.model.** { *; }
+-keep class com.felixbrucker.jules.network.api.model.**JsonAdapter {
+    public <init>(...);
+    public <init>(com.squareup.moshi.Moshi);
+    public <init>(com.squareup.moshi.Moshi, java.lang.reflect.Type[]);
+}
+-keep class * extends com.squareup.moshi.JsonAdapter {
+    public <init>(...);
+    public <init>(com.squareup.moshi.Moshi);
+    public <init>(com.squareup.moshi.Moshi, java.lang.reflect.Type[]);
+}
+-keep class **JsonAdapter {
+    public <init>(...);
+    public <init>(com.squareup.moshi.Moshi);
+    public <init>(com.squareup.moshi.Moshi, java.lang.reflect.Type[]);
+}
+-keepclassmembers class * {
+    @com.squareup.moshi.Json <fields>;
+}
+-keep class kotlin.jvm.internal.DefaultConstructorMarker { *; }
+-keepclassmembers class * {
+    synthetic kotlin.jvm.internal.DefaultConstructorMarker *;
+}
+-keep class com.felixbrucker.jules.network.api.JulesApiService { *; }
+-keep class com.felixbrucker.jules.network.api.GitHubApiService { *; }
