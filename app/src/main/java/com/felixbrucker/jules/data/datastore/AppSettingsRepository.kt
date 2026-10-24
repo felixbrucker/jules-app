@@ -18,7 +18,8 @@ data class AppSettings(
     val apiKey: String?,
     val periodicSyncEnabled: Boolean,
     val syncIntervalMinutes: Int,
-    val archivedSyncEnabled: Boolean
+    val archivedSyncEnabled: Boolean,
+    val dailySessionLimit: Int
 )
 
 @Singleton
@@ -31,6 +32,7 @@ class AppSettingsRepository @Inject constructor(
         val PERIODIC_SYNC_ENABLED = booleanPreferencesKey("periodic_sync_enabled")
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
         val ARCHIVED_SYNC_ENABLED = booleanPreferencesKey("archived_sync_enabled")
+        val DAILY_SESSION_LIMIT = intPreferencesKey("daily_session_limit")
     }
 
     val appSettingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -39,7 +41,8 @@ class AppSettingsRepository @Inject constructor(
                 apiKey = preferences[PreferencesKeys.API_KEY],
                 periodicSyncEnabled = preferences[PreferencesKeys.PERIODIC_SYNC_ENABLED] ?: false,
                 syncIntervalMinutes = preferences[PreferencesKeys.SYNC_INTERVAL_MINUTES] ?: 15,
-                archivedSyncEnabled = preferences[PreferencesKeys.ARCHIVED_SYNC_ENABLED] ?: false
+                archivedSyncEnabled = preferences[PreferencesKeys.ARCHIVED_SYNC_ENABLED] ?: false,
+                dailySessionLimit = preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15
             )
         }
 
@@ -57,6 +60,9 @@ class AppSettingsRepository @Inject constructor(
 
     val archivedSyncEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.ARCHIVED_SYNC_ENABLED] ?: false }
+
+    val dailySessionLimitFlow: Flow<Int> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15 }
 
     suspend fun saveApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
@@ -89,6 +95,12 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setArchivedSyncEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.ARCHIVED_SYNC_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setDailySessionLimit(limit: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DAILY_SESSION_LIMIT] = limit
         }
     }
 }

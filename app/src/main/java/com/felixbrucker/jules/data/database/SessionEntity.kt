@@ -2,6 +2,7 @@ package com.felixbrucker.jules.data.database
 
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.felixbrucker.jules.network.api.GitHubPullRequestUrl
@@ -32,13 +33,24 @@ data class EmbeddedChangeSet(
 
 @Entity(
     tableName = "sessions",
+    foreignKeys = [
+        ForeignKey(
+            entity = SourceEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sourceId"],
+            onDelete = ForeignKey.SET_NULL,
+            onUpdate = ForeignKey.CASCADE
+        )
+    ],
     indices = [
-        Index(value = ["pull_request_url"], unique = true)
+        Index(value = ["pull_request_url"], unique = true),
+        Index(value = ["sourceId"])
     ]
 )
 data class SessionEntity(
     @PrimaryKey
     val id: String,
+    val sourceId: String? = null,
     val name: String,
     val title: String?,
     val prompt: String,
@@ -66,9 +78,11 @@ fun Session.toEntity(): SessionEntity {
     val pullRequest = pullRequests.firstOrNull()
     val changeSet = changeSets.firstOrNull()
     val isArchived = archived == true
+    val extractedSourceId = sourceContext.source.removePrefix("sources/")
 
     return SessionEntity(
         id = id,
+        sourceId = extractedSourceId,
         name = name,
         title = title,
         prompt = prompt,

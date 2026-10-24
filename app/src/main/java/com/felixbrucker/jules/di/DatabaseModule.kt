@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.felixbrucker.jules.data.database.AppDatabase
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.SessionDao
+import com.felixbrucker.jules.data.database.SourceDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -36,5 +37,11 @@ object DatabaseModule {
     @Singleton
     fun providePullRequestDao(database: AppDatabase): PullRequestDao {
         return database.pullRequestDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSourceDao(database: AppDatabase): SourceDao {
+        return database.sourceDao()
     }
 }

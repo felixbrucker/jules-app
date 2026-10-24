@@ -48,12 +48,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -102,8 +104,10 @@ fun SessionListScreen(
 ) {
     val sessions by viewModel.sessions.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedStates by viewModel.selectedStates.collectAsState()
+    val selectedChips by viewModel.selectedChips.collectAsState()
     val includeArchived by viewModel.includeArchived.collectAsState()
+    val dailyCount by viewModel.dailySessionCount.collectAsState()
+    val dailyLimit by viewModel.dailySessionLimit.collectAsState()
     var isSearchActive by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -112,6 +116,8 @@ fun SessionListScreen(
             SessionTopBar(
                 isSearchActive = isSearchActive,
                 searchQuery = searchQuery,
+                dailyCount = dailyCount,
+                dailyLimit = dailyLimit,
                 onSearchQueryChange = { viewModel.updateSearchQuery(it) },
                 onSearchActiveChange = { isSearchActive = it },
                 onSettingsClick = onSettingsClick
@@ -121,16 +127,41 @@ fun SessionListScreen(
         SessionListContent(
             modifier = Modifier.padding(innerPadding),
             viewModel = viewModel,
-            selectedStates = selectedStates,
+            selectedChips = selectedChips,
             includeArchived = includeArchived,
             sessions = sessions
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionTopBar(
+    isSearchActive: Boolean,
+    searchQuery: String,
+    dailyCount: Int,
+    dailyLimit: Int,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchActiveChange: (Boolean) -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SessionTopAppBar(
+            isSearchActive = isSearchActive,
+            searchQuery = searchQuery,
+            onSearchQueryChange = onSearchQueryChange,
+            onSearchActiveChange = onSearchActiveChange,
+            onSettingsClick = onSettingsClick
+        )
+        DailySessionLimitBar(
+            dailyCount = dailyCount,
+            dailyLimit = dailyLimit
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SessionTopAppBar(
     isSearchActive: Boolean,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
@@ -139,41 +170,12 @@ private fun SessionTopBar(
 ) {
     TopAppBar(
         title = {
-            AnimatedContent(
-                targetState = isSearchActive,
-                transitionSpec = {
-                    if (targetState) {
-                        (slideInHorizontally { width -> width } + fadeIn()) togetherWith
-                                (slideOutHorizontally { width -> -width } + fadeOut())
-                    } else {
-                        (slideInHorizontally { width -> -width } + fadeIn()) togetherWith
-                                (slideOutHorizontally { width -> width } + fadeOut())
-                    }
-                },
-                label = "TopBarSearchTransition"
-            ) { active ->
-                if (active) {
-                    TopBarSearchField(
-                        searchQuery = searchQuery,
-                        onSearchQueryChange = onSearchQueryChange,
-                        onCloseSearch = {
-                            onSearchQueryChange("")
-                            onSearchActiveChange(false)
-                        }
-                    )
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_jules),
-                            contentDescription = "Jules Logo",
-                            modifier = Modifier.size(24.dp),
-                            tint = Color.Unspecified
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("Jules")
-                    }
-                }
-            }
+            TopAppBarTitleContent(
+                isSearchActive = isSearchActive,
+                searchQuery = searchQuery,
+                onSearchQueryChange = onSearchQueryChange,
+                onSearchActiveChange = onSearchActiveChange
+            )
         },
         actions = {
             if (!isSearchActive) {
@@ -186,6 +188,77 @@ private fun SessionTopBar(
             }
         }
     )
+}
+
+@Composable
+private fun TopAppBarTitleContent(
+    isSearchActive: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchActiveChange: (Boolean) -> Unit
+) {
+    AnimatedContent(
+        targetState = isSearchActive,
+        transitionSpec = {
+            if (targetState) {
+                (slideInHorizontally { width -> width } + fadeIn()) togetherWith
+                        (slideOutHorizontally { width -> -width } + fadeOut())
+            } else {
+                (slideInHorizontally { width -> -width } + fadeIn()) togetherWith
+                        (slideOutHorizontally { width -> width } + fadeOut())
+            }
+        },
+        label = "TopBarSearchTransition"
+    ) { active ->
+        if (active) {
+            TopBarSearchField(
+                searchQuery = searchQuery,
+                onSearchQueryChange = onSearchQueryChange,
+                onCloseSearch = {
+                    onSearchQueryChange("")
+                    onSearchActiveChange(false)
+                }
+            )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_jules),
+                    contentDescription = "Jules Logo",
+                    modifier = Modifier.size(24.dp),
+                    tint = Color.Unspecified
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Jules")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailySessionLimitBar(
+    dailyCount: Int,
+    dailyLimit: Int
+) {
+    val progress = (dailyCount.toFloat() / dailyLimit.coerceAtLeast(1)).coerceIn(0f, 1f)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "Daily session limit ($dailyCount/$dailyLimit)",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
@@ -288,7 +361,7 @@ private fun TopBarSearchFieldContent(
 private fun SessionListContent(
     modifier: Modifier = Modifier,
     viewModel: SessionListViewModel,
-    selectedStates: Set<SessionState>,
+    selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
     sessions: List<SessionWithPullRequest>
 ) {
@@ -334,9 +407,9 @@ private fun SessionListContent(
                 filterBarOffsetPx = filterBarOffsetPx,
                 onHeightMeasured = { filterBarHeightPx = it },
                 onOffsetClamped = { filterBarOffsetPx = it },
-                selectedStates = selectedStates,
+                selectedChips = selectedChips,
                 includeArchived = includeArchived,
-                onToggleState = { viewModel.toggleStateFilter(it) },
+                onToggleChip = { viewModel.toggleFilterChip(it) },
                 onToggleArchived = { viewModel.toggleIncludeArchived(it) }
             )
             SessionLazyColumn(
@@ -356,9 +429,9 @@ private fun CollapsingFilterBar(
     filterBarOffsetPx: Float,
     onHeightMeasured: (Float) -> Unit,
     onOffsetClamped: (Float) -> Unit,
-    selectedStates: Set<SessionState>,
+    selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
-    onToggleState: (SessionState) -> Unit,
+    onToggleChip: (SessionFilterChip) -> Unit,
     onToggleArchived: (Boolean) -> Unit
 ) {
     FilterChipsRow(
@@ -376,9 +449,9 @@ private fun CollapsingFilterBar(
                 }
             }
             .clipToBounds(),
-        selectedStates = selectedStates,
+        selectedChips = selectedChips,
         includeArchived = includeArchived,
-        onToggleState = onToggleState,
+        onToggleChip = onToggleChip,
         onToggleArchived = onToggleArchived
     )
 }
@@ -386,9 +459,9 @@ private fun CollapsingFilterBar(
 @Composable
 private fun FilterChipsRow(
     modifier: Modifier = Modifier,
-    selectedStates: Set<SessionState>,
+    selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
-    onToggleState: (SessionState) -> Unit,
+    onToggleChip: (SessionFilterChip) -> Unit,
     onToggleArchived: (Boolean) -> Unit
 ) {
     LazyRow(
@@ -397,11 +470,11 @@ private fun FilterChipsRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(SessionState.entries) { state ->
+        items(SessionFilterChip.entries) { chip ->
             FilterChip(
-                selected = selectedStates.contains(state),
-                onClick = { onToggleState(state) },
-                label = { Text(state.label) }
+                selected = selectedChips.contains(chip),
+                onClick = { onToggleChip(chip) },
+                label = { Text(chip.label) }
             )
         }
         item {
@@ -434,6 +507,7 @@ private fun SessionLazyColumn(
             key = { it.session.id }
         ) { item ->
             SessionCard(
+                modifier = Modifier.animateItem(),
                 sessionWithPullRequest = item,
                 onDelete = onDelete,
                 onArchive = onArchive,
@@ -445,6 +519,7 @@ private fun SessionLazyColumn(
 
 @Composable
 private fun SessionCard(
+    modifier: Modifier = Modifier,
     sessionWithPullRequest: SessionWithPullRequest,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
@@ -463,7 +538,7 @@ private fun SessionCard(
         )
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

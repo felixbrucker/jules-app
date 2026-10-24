@@ -46,6 +46,7 @@ fun SettingsScreen(
     val periodicSyncEnabled by viewModel.periodicSyncEnabled.collectAsState()
     val syncIntervalMinutes by viewModel.syncIntervalMinutes.collectAsState()
     val archivedSyncEnabled by viewModel.archivedSyncEnabled.collectAsState()
+    val dailySessionLimit by viewModel.dailySessionLimit.collectAsState()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -68,7 +69,8 @@ fun SettingsScreen(
             viewModel = viewModel,
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
-            archivedSyncEnabled = archivedSyncEnabled
+            archivedSyncEnabled = archivedSyncEnabled,
+            dailySessionLimit = dailySessionLimit
         )
     }
 }
@@ -79,7 +81,8 @@ private fun SettingsContent(
     viewModel: SettingsViewModel,
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
-    archivedSyncEnabled: Boolean
+    archivedSyncEnabled: Boolean,
+    dailySessionLimit: Int
 ) {
     Column(
         modifier = modifier
@@ -91,14 +94,52 @@ private fun SettingsContent(
         Spacer(modifier = Modifier.height(16.dp))
         GitHubAuthTokenCard(viewModel = viewModel)
         Spacer(modifier = Modifier.height(16.dp))
+        SessionLimitCard(
+            dailySessionLimit = dailySessionLimit,
+            onDailySessionLimitChange = { viewModel.setDailySessionLimit(it) }
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         SyncSettingsCard(
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
             archivedSyncEnabled = archivedSyncEnabled,
+            isForceSyncing = viewModel.isForceSyncing,
             onTogglePeriodicSync = { viewModel.setPeriodicSyncEnabled(it) },
             onIntervalChange = { viewModel.setSyncIntervalMinutes(it) },
-            onToggleArchivedSync = { viewModel.setArchivedSyncEnabled(it) }
+            onToggleArchivedSync = { viewModel.setArchivedSyncEnabled(it) },
+            onForceSync = { viewModel.forceSync() }
         )
+    }
+}
+
+@Composable
+private fun SessionLimitCard(
+    dailySessionLimit: Int,
+    onDailySessionLimitChange: (Int) -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Daily Session Limit",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Daily Limit: $dailySessionLimit sessions",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Slider(
+                modifier = Modifier.fillMaxWidth(),
+                value = dailySessionLimit.toFloat(),
+                onValueChange = { onDailySessionLimitChange(it.toInt()) },
+                valueRange = 1f..50f,
+                steps = 48
+            )
+        }
     }
 }
 
@@ -210,9 +251,11 @@ private fun SyncSettingsCard(
     periodicSyncEnabled: Boolean,
     syncIntervalMinutes: Int,
     archivedSyncEnabled: Boolean,
+    isForceSyncing: Boolean,
     onTogglePeriodicSync: (Boolean) -> Unit,
     onIntervalChange: (Int) -> Unit,
-    onToggleArchivedSync: (Boolean) -> Unit
+    onToggleArchivedSync: (Boolean) -> Unit,
+    onForceSync: () -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth()
@@ -222,32 +265,12 @@ private fun SyncSettingsCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Sync,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.padding(start = 8.dp))
-                Text(
-                    text = "Sync & Background Work",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
+            SyncSettingsHeader()
             Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    modifier = Modifier.weight(1f),
-                    text = "Enable Periodic Sync"
-                )
-                Switch(
-                    checked = periodicSyncEnabled,
-                    onCheckedChange = onTogglePeriodicSync
-                )
-            }
+            PeriodicSyncRow(
+                periodicSyncEnabled = periodicSyncEnabled,
+                onTogglePeriodicSync = onTogglePeriodicSync
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Sync Interval: $syncIntervalMinutes minutes",
@@ -262,24 +285,106 @@ private fun SyncSettingsCard(
                 enabled = periodicSyncEnabled
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Sync Archived Sessions")
-                    Text(
-                        text = "Include archived sessions in periodic sync",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = archivedSyncEnabled,
-                    enabled = periodicSyncEnabled,
-                    onCheckedChange = onToggleArchivedSync
-                )
-            }
+            ArchivedSyncRow(
+                archivedSyncEnabled = archivedSyncEnabled,
+                periodicSyncEnabled = periodicSyncEnabled,
+                onToggleArchivedSync = onToggleArchivedSync
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            ForceSyncRow(
+                isForceSyncing = isForceSyncing,
+                onForceSync = onForceSync
+            )
         }
+    }
+}
+
+@Composable
+private fun SyncSettingsHeader() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Default.Sync,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.padding(start = 8.dp))
+        Text(
+            text = "Sync & Background Work",
+            style = MaterialTheme.typography.titleMedium
+        )
+    }
+}
+
+@Composable
+private fun PeriodicSyncRow(
+    periodicSyncEnabled: Boolean,
+    onTogglePeriodicSync: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            modifier = Modifier.weight(1f),
+            text = "Enable Periodic Sync"
+        )
+        Switch(
+            checked = periodicSyncEnabled,
+            onCheckedChange = onTogglePeriodicSync
+        )
+    }
+}
+
+@Composable
+private fun ArchivedSyncRow(
+    archivedSyncEnabled: Boolean,
+    periodicSyncEnabled: Boolean,
+    onToggleArchivedSync: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Sync Archived Sessions")
+            Text(
+                text = "Include archived sessions in periodic sync",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = archivedSyncEnabled,
+            enabled = periodicSyncEnabled,
+            onCheckedChange = onToggleArchivedSync
+        )
+    }
+}
+
+@Composable
+private fun ForceSyncRow(
+    isForceSyncing: Boolean,
+    onForceSync: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Force Sync")
+            Text(
+                text = "Force sync sessions and sources immediately",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        LoadingStateButton(
+            label = "Force Sync",
+            loadingLabel = "Syncing...",
+            isLoading = isForceSyncing,
+            enabled = !isForceSyncing,
+            onClick = onForceSync
+        )
     }
 }

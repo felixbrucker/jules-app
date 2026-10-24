@@ -61,6 +61,12 @@ class SettingsViewModel @Inject constructor(
     val archivedSyncEnabled = appSettingsRepository.archivedSyncEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val dailySessionLimit = appSettingsRepository.dailySessionLimitFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
+
+    var isForceSyncing by mutableStateOf(false)
+        private set
+
     var persistedApiKey by mutableStateOf<String?>(null)
         private set
 
@@ -181,6 +187,25 @@ class SettingsViewModel @Inject constructor(
     fun setArchivedSyncEnabled(enabled: Boolean) {
         viewModelScope.launch {
             appSettingsRepository.setArchivedSyncEnabled(enabled)
+        }
+    }
+
+    fun setDailySessionLimit(limit: Int) {
+        viewModelScope.launch {
+            appSettingsRepository.setDailySessionLimit(limit)
+        }
+    }
+
+    fun forceSync() {
+        viewModelScope.launch {
+            isForceSyncing = true
+            try {
+                julesRepository.sync(force = true)
+            } catch (e: Exception) {
+                timber.log.Timber.e(e, "Force sync failed")
+            } finally {
+                isForceSyncing = false
+            }
         }
     }
 }
