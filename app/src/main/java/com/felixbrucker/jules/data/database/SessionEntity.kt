@@ -43,7 +43,7 @@ data class EmbeddedChangeSet(
         )
     ],
     indices = [
-        Index(value = ["pull_request_url"], unique = true),
+        Index(value = ["pull_request_url"]),
         Index(value = ["sourceId"])
     ]
 )
