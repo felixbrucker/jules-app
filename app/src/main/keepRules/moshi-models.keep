@@ -1,5 +1,10 @@
 # Application Data Models & Moshi JSON Adapters
 -keep @com.squareup.moshi.JsonClass class * { *; }
+-keep class * extends com.squareup.moshi.JsonAdapter {
+    public <init>(...);
+    public <init>(com.squareup.moshi.Moshi);
+    public <init>(com.squareup.moshi.Moshi, java.lang.reflect.Type[]);
+}
 -keep class *JsonAdapter {
     public <init>(...);
 }
