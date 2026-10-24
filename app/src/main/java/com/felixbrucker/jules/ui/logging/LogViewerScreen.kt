@@ -193,7 +193,7 @@ fun LogViewerScreen(
                 onJumpToBottom = {
                     if (pagedLogs.itemCount > 0) {
                         scope.launch {
-                            listState.animateScrollToItem(pagedLogs.itemCount - 1)
+                            listState.animateScrollToItem(0)
                         }
                     }
                 },
@@ -428,6 +428,7 @@ fun LogViewerList(
 ) {
     LazyColumn(
         state = listState,
+        reverseLayout = true,
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.testTag("log_entries_list")
     ) {
