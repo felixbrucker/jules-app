@@ -30,6 +30,7 @@ import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.minutes
 
 @Singleton
 class JulesRepository @Inject constructor(
@@ -44,7 +45,7 @@ class JulesRepository @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getDailySessionCountFlow(): Flow<Int> {
-        return periodicTickerFlow(10 * 60 * 1000L)
+        return periodicTickerFlow(10.minutes)
             .flatMapLatest { sessionDao.getDailySessionCountFlow() }
     }
 
