@@ -179,9 +179,11 @@ class SessionListViewModelTest {
         coEvery { appSettingsRepository.selectedFilterChipsFlow } returns flowOf(setOf("IN_PROGRESS", "AWAITING_FEEDBACK"))
 
         val vm = SessionListViewModel(julesRepository, appSettingsRepository)
+        val chipsCollector = launch { vm.selectedChips.collect {} }
         testDispatcher.scheduler.advanceUntilIdle()
 
         val chips = vm.selectedChips.value
         assertEquals(setOf(SessionFilterChip.IN_PROGRESS, SessionFilterChip.AWAITING_FEEDBACK), chips)
+        chipsCollector.cancel()
     }
 }

@@ -426,7 +426,6 @@ class JulesRepository @Inject constructor(
                 return@withContext
             }
 
-            val allFetchedWorkflowIds = java.util.Collections.synchronizedList(mutableListOf<String>())
             val semaphore = Semaphore(4)
             coroutineScope {
                 usableSources.map { source ->
@@ -461,7 +460,6 @@ class JulesRepository @Inject constructor(
 
                                 if (entitiesForSource.isNotEmpty()) {
                                     dispatchableWorkflowDao.upsertWorkflows(entitiesForSource)
-                                    allFetchedWorkflowIds.addAll(entitiesForSource.map { it.id })
                                 }
                                 sourceSyncMetadataDao.updateLastWorkflowSyncedAtTargeted(
                                     sourceId = source.id,
@@ -474,12 +472,6 @@ class JulesRepository @Inject constructor(
                         }
                     }
                 }.awaitAll()
-            }
-
-            if (allFetchedWorkflowIds.isNotEmpty()) {
-                dispatchableWorkflowDao.deleteWorkflowsNotIn(allFetchedWorkflowIds)
-            } else {
-                dispatchableWorkflowDao.deleteAllWorkflows()
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -160,49 +161,51 @@ private fun BranchSelectionDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
         Text(
             text = "Branch",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f).padding(end = 8.dp)
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = true },
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        androidx.compose.foundation.layout.Box {
+            Surface(
+                modifier = Modifier.clickable { expanded = true },
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
-                Text(
-                    text = selectedOption.ifBlank { "Select Branch" },
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                androidx.compose.material3.Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Select branch"
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = selectedOption.ifBlank { "Select Branch" },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Select branch"
+                    )
+                }
             }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = {
-                        onOptionSelected(option)
-                        expanded = false
-                    }
-                )
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onOptionSelected(option)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -237,17 +240,31 @@ private fun NumberInputField(
     onValueChange: (String) -> Unit
 ) {
     val labelText = if (input.required) "${input.name} *" else input.name
-    OutlinedTextField(
-        value = currentValue,
-        onValueChange = onValueChange,
-        label = { Text(labelText) },
-        supportingText = input.description?.let { { Text(it) } },
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(text = labelText, style = MaterialTheme.typography.labelMedium)
+            if (!input.description.isNullOrBlank()) {
+                Text(
+                    text = input.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        OutlinedTextField(
+            value = currentValue,
+            onValueChange = onValueChange,
+            modifier = Modifier.width(130.dp),
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+            )
         )
-    )
+    }
 }
 
 @Composable
@@ -259,39 +276,52 @@ private fun ChoiceInputField(
     var expanded by remember { mutableStateOf(false) }
     val labelText = if (input.required) "${input.name} *" else input.name
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = labelText, style = MaterialTheme.typography.labelMedium)
-        if (!input.description.isNullOrBlank()) {
-            Text(text = input.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = true },
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = currentValue.ifBlank { "Select ${input.name}" }, style = MaterialTheme.typography.bodyMedium)
-                androidx.compose.material3.Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(text = labelText, style = MaterialTheme.typography.labelMedium)
+            if (!input.description.isNullOrBlank()) {
+                Text(
+                    text = input.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            input.options.orEmpty().forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = {
-                        onValueChange(option)
-                        expanded = false
-                    }
-                )
+        androidx.compose.foundation.layout.Box {
+            Surface(
+                modifier = Modifier.clickable { expanded = true },
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = currentValue.ifBlank { "Select" },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null
+                    )
+                }
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                input.options.orEmpty().forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onValueChange(option)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -309,7 +339,7 @@ private fun BooleanInputField(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
             Text(text = input.name, style = MaterialTheme.typography.labelMedium)
             if (!input.description.isNullOrBlank()) {
                 Text(text = input.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -329,14 +359,28 @@ private fun TextInputField(
     onValueChange: (String) -> Unit
 ) {
     val labelText = if (input.required) "${input.name} *" else input.name
-    OutlinedTextField(
-        value = currentValue,
-        onValueChange = onValueChange,
-        label = { Text(labelText) },
-        supportingText = input.description?.let { { Text(it) } },
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(text = labelText, style = MaterialTheme.typography.labelMedium)
+            if (!input.description.isNullOrBlank()) {
+                Text(
+                    text = input.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        OutlinedTextField(
+            value = currentValue,
+            onValueChange = onValueChange,
+            modifier = Modifier.width(160.dp),
+            singleLine = true
+        )
+    }
 }
 
 private fun buildBranchOptions(

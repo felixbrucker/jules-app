@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -42,8 +43,21 @@ class SessionListViewModel @Inject constructor(
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-    private val _selectedChips = MutableStateFlow(setOf<SessionFilterChip>())
-    val selectedChips: StateFlow<Set<SessionFilterChip>> = _selectedChips.asStateFlow()
+    val selectedChips: StateFlow<Set<SessionFilterChip>> = appSettingsRepository.selectedFilterChipsFlow
+        .map { names ->
+            names.mapNotNull { name ->
+                try {
+                    SessionFilterChip.valueOf(name)
+                } catch (_: Exception) {
+                    null
+                }
+            }.toSet()
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptySet()
+        )
     private val _includeArchived = MutableStateFlow(false)
     val includeArchived: StateFlow<Boolean> = _includeArchived.asStateFlow()
     private val _includeDrafts = MutableStateFlow(true)
@@ -141,23 +155,6 @@ class SessionListViewModel @Inject constructor(
 
     init {
         syncSessions()
-        loadSelectedFilterChips()
-    }
-
-    private fun loadSelectedFilterChips() {
-        viewModelScope.launch {
-            val savedChipNames = appSettingsRepository.selectedFilterChipsFlow.first()
-            if (savedChipNames.isNotEmpty()) {
-                val restoredChips = savedChipNames.mapNotNull { name ->
-                    try {
-                        SessionFilterChip.valueOf(name)
-                    } catch (_: Exception) {
-                        null
-                    }
-                }.toSet()
-                _selectedChips.value = restoredChips
-            }
-        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -165,12 +162,12 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun toggleFilterChip(chip: SessionFilterChip) {
-        val updatedSet = if (_selectedChips.value.contains(chip)) {
-            _selectedChips.value - chip
+        val current = selectedChips.value
+        val updatedSet = if (current.contains(chip)) {
+            current - chip
         } else {
-            _selectedChips.value + chip
+            current + chip
         }
-        _selectedChips.value = updatedSet
         viewModelScope.launch {
             appSettingsRepository.saveSelectedFilterChips(updatedSet.map { it.name }.toSet())
         }

@@ -12,9 +12,6 @@ interface DispatchableWorkflowDao {
     @Query("SELECT * FROM workflow_dispatches WHERE sourceId = :sourceId")
     suspend fun getWorkflowsForSource(sourceId: String): List<DispatchableWorkflowEntity>
 
-    @Query("DELETE FROM workflow_dispatches WHERE id NOT IN (:ids)")
-    suspend fun deleteWorkflowsNotIn(ids: List<String>)
-
     @Query("DELETE FROM workflow_dispatches")
     suspend fun deleteAllWorkflows()
 }
