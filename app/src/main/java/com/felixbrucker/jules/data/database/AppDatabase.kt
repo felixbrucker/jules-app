@@ -30,26 +30,25 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `pull_requests_new` (
-                        `url` TEXT NOT NULL,
                         `sessionId` TEXT NOT NULL,
+                        `url` TEXT NOT NULL,
                         `state` TEXT NOT NULL,
-                        PRIMARY KEY(`url`),
+                        PRIMARY KEY(`sessionId`),
                         FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
                     )
                     """.trimIndent()
                 )
                 db.execSQL(
                     """
-                    INSERT INTO `pull_requests_new` (`url`, `sessionId`, `state`)
-                    SELECT pr.`url`, s.`id`, pr.`state`
+                    INSERT INTO `pull_requests_new` (`sessionId`, `url`, `state`)
+                    SELECT s.`id`, pr.`url`, pr.`state`
                     FROM `pull_requests` pr
                     INNER JOIN `sessions` s ON pr.`url` = s.`pull_request_url`
-                    GROUP BY pr.`url`
                     """.trimIndent()
                 )
                 db.execSQL("DROP TABLE `pull_requests`")
                 db.execSQL("ALTER TABLE `pull_requests_new` RENAME TO `pull_requests`")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pull_requests_sessionId` ON `pull_requests` (`sessionId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pull_requests_url` ON `pull_requests` (`url`)")
                 db.execSQL("DROP INDEX IF EXISTS `index_sessions_pull_request_url`")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_sessions_pull_request_url` ON `sessions` (`pull_request_url`)")
             }

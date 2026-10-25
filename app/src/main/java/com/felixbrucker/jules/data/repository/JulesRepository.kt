@@ -247,7 +247,7 @@ class JulesRepository @Inject constructor(
                     semaphore.withPermit {
                         try {
                             val state = gitHubApi.getPullRequestState(prUrl)
-                            PullRequestEntity(url = prUrl, sessionId = sessionId, state = state)
+                            PullRequestEntity(sessionId = sessionId, url = prUrl, state = state)
                         } catch (e: Exception) {
                             Timber.tag(TAG).e(e, "Failed to sync pull request state for $prUrl")
                             null

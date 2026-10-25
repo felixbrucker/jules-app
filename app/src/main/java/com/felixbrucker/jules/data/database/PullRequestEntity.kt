@@ -18,12 +18,12 @@ import com.felixbrucker.jules.network.api.model.PullRequestState
         )
     ],
     indices = [
-        Index(value = ["sessionId"])
+        Index(value = ["url"])
     ]
 )
 data class PullRequestEntity(
     @PrimaryKey
-    val url: String,
     val sessionId: String,
+    val url: String,
     val state: PullRequestState
 )

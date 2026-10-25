@@ -9,6 +9,9 @@ interface PullRequestDao {
     @Upsert
     suspend fun upsertPullRequests(pullRequests: List<PullRequestEntity>)
 
+    @Query("SELECT * FROM pull_requests WHERE sessionId = :sessionId")
+    suspend fun getPullRequestForSession(sessionId: String): PullRequestEntity?
+
     @Query("SELECT * FROM pull_requests WHERE url = :url")
-    suspend fun getPullRequest(url: String): PullRequestEntity?
+    suspend fun getPullRequestsByUrl(url: String): List<PullRequestEntity>
 }
