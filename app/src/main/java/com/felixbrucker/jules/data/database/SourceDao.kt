@@ -27,12 +27,10 @@ interface SourceDao {
         WHERE sess.isArchived = 0
           AND src.github_repo_owner IS NOT NULL AND src.github_repo_owner != ''
           AND src.github_repo_repo IS NOT NULL AND src.github_repo_repo != ''
-          AND (:includePrivate = 1 OR src.github_repo_isPrivate = 0 OR src.github_repo_isPrivate IS NULL)
           AND (:force = 1 OR meta.lastWorkflowSyncedAt IS NULL OR meta.lastWorkflowSyncedAt < :thresholdEpochMillis)
         """
     )
     suspend fun getSourcesNeedingWorkflowSync(
-        includePrivate: Boolean,
         thresholdEpochMillis: Long,
         force: Boolean
     ): List<SourceEntity>

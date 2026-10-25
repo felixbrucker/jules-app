@@ -412,11 +412,12 @@ class JulesRepository @Inject constructor(
     suspend fun syncWorkflows(force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
             val githubToken = appSettingsRepository.githubAuthTokenFlow.first()
-            val hasToken = !githubToken.isNullOrBlank()
+            if (githubToken.isNullOrBlank()) {
+                return@withContext
+            }
 
             val thresholdEpochMillis = Instant.now().minus(Duration.ofDays(14)).toEpochMilli()
             val usableSources = sourceDao.getSourcesNeedingWorkflowSync(
-                includePrivate = hasToken,
                 thresholdEpochMillis = thresholdEpochMillis,
                 force = force
             )

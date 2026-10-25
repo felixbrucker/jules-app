@@ -291,13 +291,25 @@ class JulesRepositoryTest {
     }
 
     @Test
-    fun testSyncWorkflowsQueriesSourcesNeedingSync() = runBlocking {
-        coEvery { sourceDao.getSourcesNeedingWorkflowSync(any(), any(), any()) } returns emptyList()
+    fun testSyncWorkflowsNoAuthTokenDoesNothing() = runBlocking {
+        coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf(null)
+
+        repository.syncWorkflows(force = false)
+
+        coVerify(exactly = 0) {
+            sourceDao.getSourcesNeedingWorkflowSync(any(), any())
+        }
+    }
+
+    @Test
+    fun testSyncWorkflowsWithTokenQueriesSourcesNeedingSync() = runBlocking {
+        coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf("ghp_token")
+        coEvery { sourceDao.getSourcesNeedingWorkflowSync(any(), any()) } returns emptyList()
 
         repository.syncWorkflows(force = false)
 
         coVerify {
-            sourceDao.getSourcesNeedingWorkflowSync(includePrivate = false, thresholdEpochMillis = any(), force = false)
+            sourceDao.getSourcesNeedingWorkflowSync(thresholdEpochMillis = any(), force = false)
         }
     }
 
