@@ -12,12 +12,49 @@ import androidx.work.WorkerParameters
 import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.google.common.util.concurrent.ListenableFuture
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.suspendCancellableCoroutine
 import timber.log.Timber
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+private suspend fun <T> ListenableFuture<T>.await(): T {
+    if (isDone) {
+        try {
+            return get()
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        }
+    }
+    return suspendCancellableCoroutine { continuation ->
+        addListener(
+            {
+                try {
+                    continuation.resume(get())
+                } catch (e: ExecutionException) {
+                    continuation.resumeWithException(e.cause ?: e)
+                } catch (e: Exception) {
+                    continuation.resumeWithException(e)
+                }
+            },
+            { command -> command?.run() }
+        )
+        continuation.invokeOnCancellation {
+            cancel(true)
+        }
+    }
+}
+
+suspend fun WorkManager.isUniqueTaskEnqueued(uniqueName: String): Boolean {
+    val workInfos = getWorkInfosForUniqueWork(uniqueName).await()
+    return workInfos.any { !it.state.isFinished }
+}
 
 @HiltWorker
 class JulesSyncWorker @AssistedInject constructor(
@@ -81,9 +118,12 @@ class JulesSyncWorker @AssistedInject constructor(
             }
         }
 
-        fun cancelSyncWork(context: Context) {
-            Timber.tag(TAG).d("Canceling sync worker")
-            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+        suspend fun cancelSyncWork(context: Context) {
+            val workManager = WorkManager.getInstance(context)
+            if (workManager.isUniqueTaskEnqueued(WORK_NAME)) {
+                Timber.tag(TAG).d("Canceling sync worker")
+                workManager.cancelUniqueWork(WORK_NAME)
+            }
         }
     }
 }
