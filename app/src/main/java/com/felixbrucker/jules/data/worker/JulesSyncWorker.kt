@@ -13,6 +13,7 @@ import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -36,6 +37,7 @@ class JulesSyncWorker @AssistedInject constructor(
 
             Result.success()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "JulesSyncWorker failed")
             Result.retry()
         }
