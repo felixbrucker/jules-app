@@ -94,7 +94,7 @@ private fun CreateSessionDialogBody(
     onCreateSession: (SessionDraftEntity) -> Unit
 ) {
     val initialSource = remember(draft.sourceId, sources) {
-        sources.firstOrNull { it.id == draft.sourceId || "sources/" + it.id == draft.sourceId }
+        sources.firstOrNull { it.id == draft.sourceId }
             ?: sources.firstOrNull()
     }
 

@@ -164,7 +164,7 @@ class SessionListViewModel @Inject constructor(
             } else {
                 val lastSourceId = appSettingsRepository.lastSelectedSourceIdFlow.first()
                 val targetSourceId = lastSourceId?.takeIf { id ->
-                    sources.value.any { it.id == id || "sources/" + it.id == id }
+                    sources.value.any { it.id == id }
                 } ?: sources.value.firstOrNull()?.id
                 (draft ?: SessionDraftEntity()).copy(sourceId = targetSourceId)
             }

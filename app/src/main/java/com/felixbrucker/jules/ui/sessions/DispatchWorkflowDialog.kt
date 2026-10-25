@@ -221,10 +221,33 @@ private fun WorkflowInputField(
         input.type == "boolean" -> {
             BooleanInputField(input = input, currentValue = currentValue, onValueChange = onValueChange)
         }
+        input.type == "number" -> {
+            NumberInputField(input = input, currentValue = currentValue, onValueChange = onValueChange)
+        }
         else -> {
             TextInputField(input = input, currentValue = currentValue, onValueChange = onValueChange)
         }
     }
+}
+
+@Composable
+private fun NumberInputField(
+    input: WorkflowInput,
+    currentValue: String,
+    onValueChange: (String) -> Unit
+) {
+    val labelText = if (input.required) "${input.name} *" else input.name
+    OutlinedTextField(
+        value = currentValue,
+        onValueChange = onValueChange,
+        label = { Text(labelText) },
+        supportingText = input.description?.let { { Text(it) } },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+        )
+    )
 }
 
 @Composable
@@ -322,6 +345,7 @@ private fun buildBranchOptions(
 ): List<String> {
     val branches = mutableSetOf<String>()
     session.pullRequest?.baseRef?.takeIf { it.isNotBlank() }?.let { branches.add(it) }
+    session.startingBranch?.takeIf { it.isNotBlank() }?.let { branches.add(it) }
     session.pullRequest?.headRef?.takeIf { it.isNotBlank() }?.let { branches.add(it) }
     source?.githubRepo?.branches?.forEach { b ->
         if (b.displayName.isNotBlank()) branches.add(b.displayName)
@@ -338,6 +362,9 @@ private fun determineDefaultBranch(
 ): String {
     val baseRef = session.pullRequest?.baseRef
     if (!baseRef.isNullOrBlank()) return baseRef
+
+    val startingBranch = session.startingBranch
+    if (!startingBranch.isNullOrBlank()) return startingBranch
 
     val defaultBranch = source?.githubRepo?.defaultBranchName
     if (!defaultBranch.isNullOrBlank()) return defaultBranch

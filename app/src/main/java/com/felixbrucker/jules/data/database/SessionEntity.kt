@@ -64,7 +64,8 @@ data class SessionEntity(
     @Embedded(prefix = "pull_request_")
     val pullRequest: EmbeddedPullRequest?,
     @Embedded(prefix = "change_set_")
-    val changeSet: EmbeddedChangeSet?
+    val changeSet: EmbeddedChangeSet?,
+    val startingBranch: String? = null
 ) {
     val duration: Duration
         get() = if (updateTime != null) {
@@ -108,6 +109,7 @@ fun Session.toEntity(): SessionEntity {
                 totalAdditions = it.summary.totalAdditions,
                 totalDeletions = it.summary.totalDeletions
             )
-        }
+        },
+        startingBranch = sourceContext.githubRepoContext?.startingBranch
     )
 }
