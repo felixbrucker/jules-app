@@ -33,7 +33,7 @@ enum class SessionOutputType {
 
 @JsonClass(generateAdapter = true)
 data class GitHubRepoContext(
-    @Json(name = "startingBranch") val startingBranch: String
+    @Json(name = "startingBranch") val startingBranch: String? = null
 )
 
 data class Repo(
