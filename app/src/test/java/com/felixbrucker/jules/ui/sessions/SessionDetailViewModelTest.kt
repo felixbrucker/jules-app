@@ -72,7 +72,7 @@ class SessionDetailViewModelTest {
         vm.updateSplitRatio(0.02f)
         assertEquals(0.0f, vm.splitRatio.value, 0.001f)
 
-        vm.updateSplitRatio(0.95f)
+        vm.updateSplitRatio(0.98f)
         assertEquals(1.0f, vm.splitRatio.value, 0.001f)
 
         vm.updateSplitRatio(0.6f)

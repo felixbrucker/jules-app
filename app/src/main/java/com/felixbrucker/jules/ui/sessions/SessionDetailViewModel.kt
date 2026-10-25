@@ -199,8 +199,8 @@ class SessionDetailViewModel @Inject constructor(
 
     fun updateSplitRatio(ratio: Float) {
         val clamped = when {
-            ratio <= 0.08f -> 0.0f
-            ratio >= 0.92f -> 1.0f
+            ratio <= 0.03f -> 0.0f
+            ratio >= 0.97f -> 1.0f
             else -> ratio.coerceIn(0.0f, 1.0f)
         }
         _splitRatio.value = clamped

@@ -58,7 +58,7 @@ class LogViewerViewModel @Inject constructor(
     ) { priorities, query ->
         priorities to query
     }.flatMapLatest { (priorities, query) ->
-        logRepository.getLogsPaged(priorities = priorities, searchQuery = query)
+        logRepository.getLogsPaged(priorities = priorities, searchQuery = query, pageSize = 15)
     }.cachedIn(viewModelScope)
 
     fun setSearchQuery(query: String) {

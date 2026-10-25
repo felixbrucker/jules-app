@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
@@ -486,6 +487,22 @@ private fun ChatWindowView(
     onApprovePlan: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    var initialScrolledSessionId by remember { mutableStateOf<String?>(null) }
+    var previousItemCount by remember { mutableStateOf(0) }
+
+    LaunchedEffect(session.id, activities.itemCount) {
+        if (activities.itemCount > 0) {
+            if (initialScrolledSessionId != session.id) {
+                initialScrolledSessionId = session.id
+                listState.scrollToItem(0)
+            } else if (activities.itemCount > previousItemCount) {
+                if (listState.firstVisibleItemIndex <= 1) {
+                    listState.animateScrollToItem(0)
+                }
+            }
+            previousItemCount = activities.itemCount
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -509,10 +526,6 @@ private fun ChatWindowView(
                         session = session
                     )
                 }
-            }
-
-            item(key = "prompt_top") {
-                PromptActivityBubble(prompt = session.prompt)
             }
         }
 
@@ -996,6 +1009,8 @@ private fun FileDiffView(
 ) {
     val expandedCards = remember { mutableStateMapOf<String, Boolean>() }
     val expandedFolders = remember { mutableStateMapOf<String, Boolean>() }
+    val listState = rememberLazyListState()
+    var selectedFilePath by remember { mutableStateOf<String?>(null) }
 
     if (currentDiff == null || currentDiff.parsedFiles.isEmpty()) {
         Box(
@@ -1007,8 +1022,18 @@ private fun FileDiffView(
         return
     }
 
+    LaunchedEffect(selectedFilePath) {
+        val path = selectedFilePath ?: return@LaunchedEffect
+        val fileIndex = currentDiff.parsedFiles.indexOfFirst { it.path == path }
+        if (fileIndex >= 0) {
+            kotlinx.coroutines.yield()
+            listState.animateScrollToItem(fileIndex)
+        }
+    }
+
     Row(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
@@ -1043,6 +1068,7 @@ private fun FileDiffView(
                     },
                     onSelectFile = { path ->
                         expandedCards[path] = true
+                        selectedFilePath = path
                     }
                 )
             }
@@ -1130,58 +1156,60 @@ data class ParsedDiffLine(
 private fun ColorCodedDiffBody(file: ParsedFile, unidiffPatch: String) {
     val fileLines = extractFileDiffLines(file.path, unidiffPatch)
 
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = Color(0xFF0D1117)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp)
+    SelectionContainer {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = Color(0xFF0D1117)
         ) {
-            fileLines.forEach { line ->
-                val (bgColor, textColor) = when (line.type) {
-                    DiffLineType.ADDITION -> Color(0xFF163B21) to Color(0xFF7EE787)
-                    DiffLineType.DELETION -> Color(0xFF3C1E1E) to Color(0xFFFF7B72)
-                    DiffLineType.CONTEXT -> Color.Transparent to Color(0xFFC9D1D9)
-                }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+            ) {
+                fileLines.forEach { line ->
+                    val (bgColor, textColor) = when (line.type) {
+                        DiffLineType.ADDITION -> Color(0xFF163B21) to Color(0xFF7EE787)
+                        DiffLineType.DELETION -> Color(0xFF3C1E1E) to Color(0xFFFF7B72)
+                        DiffLineType.CONTEXT -> Color.Transparent to Color(0xFFC9D1D9)
+                    }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(bgColor)
-                        .padding(vertical = 1.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = line.oldLineNumber?.toString() ?: "",
-                        modifier = Modifier.width(32.dp).padding(end = 4.dp),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End
-                        ),
-                        color = Color(0xFF6E7681)
-                    )
-                    Text(
-                        text = line.newLineNumber?.toString() ?: "",
-                        modifier = Modifier.width(32.dp).padding(end = 8.dp),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End
-                        ),
-                        color = Color(0xFF6E7681)
-                    )
-                    Text(
-                        text = line.content,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        ),
-                        color = textColor
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(bgColor)
+                            .padding(vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = line.oldLineNumber?.toString() ?: "",
+                            modifier = Modifier.width(32.dp).padding(end = 4.dp),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                            ),
+                            color = Color(0xFF6E7681)
+                        )
+                        Text(
+                            text = line.newLineNumber?.toString() ?: "",
+                            modifier = Modifier.width(32.dp).padding(end = 8.dp),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                            ),
+                            color = Color(0xFF6E7681)
+                        )
+                        Text(
+                            text = line.content,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            ),
+                            color = textColor
+                        )
+                    }
                 }
             }
         }
