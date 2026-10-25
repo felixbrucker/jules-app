@@ -4,11 +4,12 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import dagger.assisted.Assisted
@@ -23,17 +24,27 @@ class JulesSyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val julesRepository: JulesRepository,
-    private val appSettingsRepository: AppSettingsRepository
+    private val appSettingsRepository: AppSettingsRepository,
+    private val sessionDao: SessionDao
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         return try {
-            val apiKey = appSettingsRepository.apiKeyFlow.first()
-            if (apiKey.isNullOrBlank()) {
+            val settings = appSettingsRepository.appSettingsFlow.first()
+            if (settings.apiKey.isNullOrBlank()) {
                 return Result.success()
             }
 
             julesRepository.sync(isBackground = true)
+
+            val hasInProgress = sessionDao.hasActiveInProgressSessionsFlow().first()
+            val decision = WorkerScheduler.evaluate(settings, hasInProgress)
+
+            if (decision.shouldEnqueue) {
+                enqueueSyncWork(applicationContext, decision.intervalMinutes)
+            } else {
+                cancelSyncWork(applicationContext)
+            }
 
             Result.success()
         } catch (e: Exception) {
@@ -45,30 +56,27 @@ class JulesSyncWorker @AssistedInject constructor(
 
     companion object {
         private const val TAG = "JulesSyncWorker"
-        const val PERIODIC_WORK_NAME = "jules_periodic_sync"
+        const val WORK_NAME = "jules_sync_worker"
 
-        fun enqueuePeriodicSync(context: Context, intervalMinutes: Long) {
+        fun enqueueSyncWork(context: Context, intervalMinutes: Long) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
-            val workRequest = PeriodicWorkRequestBuilder<JulesSyncWorker>(
-                intervalMinutes,
-                TimeUnit.MINUTES
-            )
+            val workRequest = OneTimeWorkRequestBuilder<JulesSyncWorker>()
                 .setConstraints(constraints)
                 .setInitialDelay(intervalMinutes, TimeUnit.MINUTES)
                 .build()
 
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                PERIODIC_WORK_NAME,
-                ExistingPeriodicWorkPolicy.UPDATE,
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
                 workRequest
             )
         }
 
-        fun cancelPeriodicSync(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
+        fun cancelSyncWork(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
         }
     }
 }
