@@ -360,6 +360,9 @@ private fun determineDefaultBranch(
     source: SourceEntity?,
     branchOptions: List<String>
 ): String {
+    val headRef = session.pullRequest?.headRef
+    if (!headRef.isNullOrBlank()) return headRef
+
     val baseRef = session.pullRequest?.baseRef
     if (!baseRef.isNullOrBlank()) return baseRef
 
