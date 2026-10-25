@@ -106,31 +106,7 @@ fun JulesNavGraph(
             }
             composable(
                 route = Screen.SessionDetail.route,
-                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
-                enterTransition = {
-                    slideIntoContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeIn(tween(300))
-                },
-                exitTransition = {
-                    slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeOut(tween(300))
-                },
-                popEnterTransition = {
-                    slideIntoContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeIn(tween(300))
-                },
-                popExitTransition = {
-                    slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeOut(tween(300))
-                }
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
             ) {
                 val viewModel: SessionDetailViewModel = hiltViewModel()
                 SessionDetailScreen(
