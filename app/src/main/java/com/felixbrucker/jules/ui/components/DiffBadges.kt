@@ -15,25 +15,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun DiffAdditionsDeletionsBadges(
+fun DiffBadges(
     additions: Int,
     deletions: Int,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (additions > 0) {
             Surface(
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = Color(0xFF234C28)
             ) {
                 Text(
                     text = "+$additions",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     color = Color(0xFF6CF098),
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    style = MaterialTheme.typography.labelMedium.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
@@ -42,14 +42,14 @@ fun DiffAdditionsDeletionsBadges(
         }
         if (deletions > 0) {
             Surface(
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = Color(0xFF4C2323)
             ) {
                 Text(
                     text = "-$deletions",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     color = Color(0xFFFF8585),
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    style = MaterialTheme.typography.labelMedium.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )

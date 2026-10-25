@@ -117,7 +117,13 @@ private fun parseInlineMarkdown(text: String): AnnotatedString {
             } else if (text.startsWith("`", i)) {
                 val end = text.indexOf("`", i + 1)
                 if (end != -1) {
-                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0xFF2D3748))) {
+                    withStyle(
+                        SpanStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFF3F4F6)
+                        )
+                    ) {
                         append(text.substring(i + 1, end))
                     }
                     i = end + 1

@@ -47,11 +47,17 @@ class LoggingInterceptor @Inject constructor(
         val currentGithubToken = githubToken
 
         val logBuffer = StringBuilder()
+        var truncated = false
         val loggingInterceptor = HttpLoggingInterceptor { line ->
-            if (logBuffer.isNotEmpty()) {
-                logBuffer.append("\n")
+            if (logBuffer.length < MAX_LOG_LENGTH) {
+                if (logBuffer.isNotEmpty()) {
+                    logBuffer.append("\n")
+                }
+                logBuffer.append(line)
+            } else if (!truncated) {
+                logBuffer.append("\n... [truncated]")
+                truncated = true
             }
-            logBuffer.append(line)
         }.apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
@@ -96,5 +102,6 @@ class LoggingInterceptor @Inject constructor(
 
     companion object {
         private const val TAG = "OkHttp"
+        private const val MAX_LOG_LENGTH = 2000
     }
 }

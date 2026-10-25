@@ -133,6 +133,7 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.ui.components.AnimatedMovingDotsIcon
+import com.felixbrucker.jules.ui.components.DiffBadges
 import com.felixbrucker.jules.ui.components.PullRequestChip
 import com.felixbrucker.jules.ui.components.SessionStateBadge
 import kotlin.math.roundToInt
@@ -903,7 +904,7 @@ private fun SessionCardHeader(
                     )
                 }
             ) {
-                DiffBadges(changeSet = cs)
+                DiffBadges(additions = cs.totalAdditions, deletions = cs.totalDeletions)
             }
         }
     }
@@ -980,43 +981,6 @@ private fun SessionActionDropdownMenu(
     }
 }
 
-@Composable
-private fun DiffBadges(changeSet: EmbeddedChangeSet) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (changeSet.totalAdditions > 0) {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = Color(0xFF234C28)
-            ) {
-                Text(
-                    text = "+${changeSet.totalAdditions}",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = Color(0xFF6CF098),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-        }
-        if (changeSet.totalDeletions > 0) {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = Color(0xFF4C2323)
-            ) {
-                Text(
-                    text = "-${changeSet.totalDeletions}",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = Color(0xFFFF8585),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun RoundedBadge(text: String, color: Color) {
