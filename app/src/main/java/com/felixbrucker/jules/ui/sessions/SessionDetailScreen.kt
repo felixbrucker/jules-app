@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AssistChip
@@ -105,9 +107,14 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.Activity
 import com.felixbrucker.jules.network.api.model.FileChangeType
 import com.felixbrucker.jules.network.api.model.ParsedFile
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.network.api.model.PlanStep
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.ui.components.AnimatedMovingDotsIcon
+import com.felixbrucker.jules.ui.components.DiffAdditionsDeletionsBadges
+import com.felixbrucker.jules.ui.components.FormattedMarkdownText
+import com.felixbrucker.jules.ui.components.PullRequestChip
+import com.felixbrucker.jules.ui.components.SessionStateBadge
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -204,7 +211,7 @@ private fun SessionDetailTopBar(
     onArchive: () -> Unit,
     onUnarchive: () -> Unit,
     onDelete: () -> Unit,
-    onSelectWorkflow: (com.felixbrucker.jules.data.database.DispatchableWorkflowEntity) -> Unit
+    onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
 ) {
     val session = sessionWithPr.session
     var menuExpanded by remember { mutableStateOf(false) }
@@ -265,6 +272,12 @@ private fun RowScope.SessionTopBarLeftSection(
         IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
             Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
         }
+        SessionStateBadge(
+            state = session.state,
+            sessionId = session.id,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope
+        )
         session.repo?.let { repo ->
             Row(
                 modifier = with(sharedTransitionScope) {
@@ -323,7 +336,7 @@ private fun SessionTopBarRightSection(
     onArchive: () -> Unit,
     onUnarchive: () -> Unit,
     onDelete: () -> Unit,
-    onSelectWorkflow: (com.felixbrucker.jules.data.database.DispatchableWorkflowEntity) -> Unit
+    onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
 ) {
     val session = sessionWithPr.session
     val context = LocalContext.current
@@ -744,17 +757,23 @@ private fun ProgressUpdatedBubble(
                             )
                         }
                         Icon(
-                            imageVector = if (isExpanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = if (isExpanded) "Collapse" else "Expand",
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    if (isExpanded) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        FormattedMarkdownText(
-                            markdown = description,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                    AnimatedVisibility(
+                        visible = isExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            FormattedMarkdownText(
+                                markdown = description,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 } else {
                     title?.let {
@@ -832,19 +851,27 @@ private fun PlanStepItemRow(stepIndex: Int, step: PlanStep) {
             }
             if (hasDesc) {
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
-                    contentDescription = "Expand",
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
                     modifier = Modifier.size(20.dp)
                 )
             }
         }
-        if (hasDesc && isExpanded) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Box(modifier = Modifier.padding(start = 32.dp)) {
-                FormattedMarkdownText(
-                    markdown = step.description.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall
-                )
+        if (hasDesc) {
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(modifier = Modifier.padding(start = 32.dp)) {
+                        FormattedMarkdownText(
+                            markdown = step.description.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             }
         }
     }
@@ -1509,7 +1536,7 @@ private fun ScrollableFileTree(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Icon(
-                                imageVector = if (isExpanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
+                                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = "Toggle Folder",
                                 modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1543,137 +1570,6 @@ private fun ScrollableFileTree(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun DiffAdditionsDeletionsBadges(additions: Int, deletions: Int) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (additions > 0) {
-            Surface(shape = RoundedCornerShape(4.dp), color = Color(0xFF234C28)) {
-                Text(
-                    text = "+$additions",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    color = Color(0xFF6CF098),
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                )
-            }
-        }
-        if (deletions > 0) {
-            Surface(shape = RoundedCornerShape(4.dp), color = Color(0xFF4C2323)) {
-                Text(
-                    text = "-$deletions",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    color = Color(0xFFFF8585),
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FormattedMarkdownText(
-    markdown: String,
-    style: androidx.compose.ui.text.TextStyle
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        val lines = markdown.lines()
-        lines.forEach { line ->
-            val trimmed = line.trimStart()
-            val indentSpaces = line.length - trimmed.length
-            val indentLevel = indentSpaces / 2
-
-            when {
-                trimmed == "---" || trimmed == "***" -> {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                }
-                trimmed.startsWith("#") && trimmed.contains(" ") -> {
-                    val headerLevel = trimmed.takeWhile { it == '#' }.length
-                    val headerText = trimmed.drop(headerLevel).trimStart()
-                    val headerFontSize = when (headerLevel) {
-                        1 -> 20.sp
-                        2 -> 18.sp
-                        3 -> 16.sp
-                        else -> 14.sp
-                    }
-                    Text(
-                        text = parseInlineMarkdown(headerText),
-                        style = style.copy(
-                            fontSize = headerFontSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                }
-                trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("+ ") -> {
-                    val bulletContent = trimmed.drop(2)
-                    val indentPrefix = "  ".repeat(indentLevel)
-                    Row(
-                        modifier = Modifier.padding(start = (indentLevel * 12).dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Text(
-                            text = "•",
-                            style = style.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Text(
-                            text = parseInlineMarkdown(bulletContent),
-                            style = style
-                        )
-                    }
-                }
-                else -> {
-                    if (line.isNotBlank()) {
-                        Text(
-                            text = parseInlineMarkdown(line),
-                            style = style
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun parseInlineMarkdown(text: String): AnnotatedString {
-    return buildAnnotatedString {
-        var i = 0
-        while (i < text.length) {
-            if (text.startsWith("**", i)) {
-                val end = text.indexOf("**", i + 2)
-                if (end != -1) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append(text.substring(i + 2, end))
-                    }
-                    i = end + 2
-                    continue
-                }
-            } else if (text.startsWith("*", i)) {
-                val end = text.indexOf("*", i + 1)
-                if (end != -1) {
-                    withStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) {
-                        append(text.substring(i + 1, end))
-                    }
-                    i = end + 1
-                    continue
-                }
-            } else if (text.startsWith("`", i)) {
-                val end = text.indexOf("`", i + 1)
-                if (end != -1) {
-                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0xFF2D3748))) {
-                        append(text.substring(i + 1, end))
-                    }
-                    i = end + 1
-                    continue
-                }
-            }
-            append(text[i])
-            i++
         }
     }
 }

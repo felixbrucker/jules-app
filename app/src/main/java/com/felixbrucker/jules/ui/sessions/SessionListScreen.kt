@@ -133,6 +133,8 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.ui.components.AnimatedMovingDotsIcon
+import com.felixbrucker.jules.ui.components.PullRequestChip
+import com.felixbrucker.jules.ui.components.SessionStateBadge
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -870,7 +872,12 @@ private fun SessionCardHeader(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SessionStateBadge(state = session.state)
+            SessionStateBadge(
+                state = session.state,
+                sessionId = session.id,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
+            )
             if (session.isArchived) {
                 ArchivedBadge()
             }
@@ -903,38 +910,6 @@ private fun SessionCardHeader(
 }
 
 @Composable
-private fun SessionStateBadge(state: SessionState) {
-    val style = getSessionStateStyle(state)
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = style.containerColor
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (style.isAnimatedDots) {
-                AnimatedMovingDotsIcon(color = style.contentColor)
-            } else style.icon?.let { iconVec ->
-                Icon(
-                    imageVector = iconVec,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = style.contentColor
-                )
-            }
-            Text(
-                text = state.label,
-                color = style.contentColor,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
 private fun ArchivedBadge() {
     Surface(
         shape = RoundedCornerShape(6.dp),
@@ -958,53 +933,6 @@ private fun ArchivedBadge() {
                 fontWeight = FontWeight.Medium
             )
         }
-    }
-}
-
-data class StateBadgeStyle(
-    val containerColor: Color,
-    val contentColor: Color,
-    val icon: ImageVector? = null,
-    val isAnimatedDots: Boolean = false
-)
-
-private fun getSessionStateStyle(state: SessionState): StateBadgeStyle {
-    return when (state) {
-        SessionState.IN_PROGRESS -> StateBadgeStyle(
-            containerColor = Color(0xFF1E3A8A),
-            contentColor = Color(0xFF93C5FD),
-            isAnimatedDots = true
-        )
-        SessionState.AWAITING_PLAN_APPROVAL, SessionState.AWAITING_USER_FEEDBACK -> StateBadgeStyle(
-            containerColor = Color(0xFF78350F),
-            contentColor = Color(0xFFFDE68A),
-            icon = Icons.Default.RateReview
-        )
-        SessionState.COMPLETED -> StateBadgeStyle(
-            containerColor = Color(0xFF14532D),
-            contentColor = Color(0xFF86EFAC),
-            icon = Icons.Default.CheckCircle
-        )
-        SessionState.FAILED -> StateBadgeStyle(
-            containerColor = Color(0xFF7F1D1D),
-            contentColor = Color(0xFFFCA5A5),
-            icon = Icons.Default.Error
-        )
-        SessionState.QUEUED, SessionState.PLANNING -> StateBadgeStyle(
-            containerColor = Color(0xFF1E293B),
-            contentColor = Color(0xFF94A3B8),
-            icon = Icons.Default.HourglassEmpty
-        )
-        SessionState.PAUSED -> StateBadgeStyle(
-            containerColor = Color(0xFF374151),
-            contentColor = Color(0xFFD1D5DB),
-            icon = Icons.Default.PauseCircle
-        )
-        else -> StateBadgeStyle(
-            containerColor = Color(0xFF374151),
-            contentColor = Color(0xFFD1D5DB),
-            icon = Icons.AutoMirrored.Filled.Help
-        )
     }
 }
 
@@ -1188,159 +1116,6 @@ private fun SessionCardFooter(
     }
 }
 
-@Composable
-fun PullRequestChip(
-    pr: EmbeddedPullRequest,
-    pullRequestState: PullRequestState?,
-    workflows: List<DispatchableWorkflowEntity>,
-    onPrClick: (String) -> Unit,
-    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
-) {
-    if (workflows.isEmpty()) {
-        SimplePullRequestChip(
-            pr = pr,
-            pullRequestState = pullRequestState,
-            onPrClick = onPrClick
-        )
-    } else {
-        CompoundPullRequestWorkflowButton(
-            pr = pr,
-            pullRequestState = pullRequestState,
-            workflows = workflows,
-            onPrClick = onPrClick,
-            onWorkflowSelected = onWorkflowSelected
-        )
-    }
-}
-
-@Composable
-private fun SimplePullRequestChip(
-    pr: EmbeddedPullRequest,
-    pullRequestState: PullRequestState?,
-    onPrClick: (String) -> Unit
-) {
-    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
-    val prNumberText = pr.number?.let { " (#$it)" } ?: ""
-
-    AssistChip(
-        modifier = Modifier.height(28.dp),
-        onClick = { onPrClick(pr.url) },
-        label = { Text("View PR$prNumberText", style = MaterialTheme.typography.labelSmall) },
-        leadingIcon = {
-            Icon(
-                painter = painterResource(id = iconRes),
-                contentDescription = "GitHub PR",
-                modifier = Modifier.size(14.dp),
-                tint = iconColor
-            )
-        }
-    )
-}
-
-@Composable
-private fun CompoundPullRequestWorkflowButton(
-    pr: EmbeddedPullRequest,
-    pullRequestState: PullRequestState?,
-    workflows: List<DispatchableWorkflowEntity>,
-    onPrClick: (String) -> Unit,
-    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
-) {
-    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
-    val prNumberText = pr.number?.let { " (#$it)" } ?: ""
-    var menuExpanded by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = Modifier.height(28.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        )
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable { onPrClick(pr.url) }
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = "GitHub PR",
-                    modifier = Modifier.size(14.dp),
-                    tint = iconColor
-                )
-                Text(
-                    text = "View PR$prNumberText",
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable { menuExpanded = true }
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Workflow Dispatches",
-                    modifier = Modifier.size(18.dp)
-                )
-                WorkflowDropdownMenu(
-                    expanded = menuExpanded,
-                    workflows = workflows,
-                    onDismiss = { menuExpanded = false },
-                    onWorkflowSelected = onWorkflowSelected
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WorkflowDropdownMenu(
-    expanded: Boolean,
-    workflows: List<DispatchableWorkflowEntity>,
-    onDismiss: () -> Unit,
-    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
-) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss
-    ) {
-        workflows.forEach { workflow ->
-            DropdownMenuItem(
-                text = { Text(workflow.name) },
-                onClick = {
-                    onDismiss()
-                    onWorkflowSelected(workflow)
-                }
-            )
-        }
-    }
-}
-
-private fun getPullRequestIconInfo(pullRequestState: PullRequestState?): Pair<Int, Color> {
-    return when (pullRequestState) {
-        PullRequestState.MERGED -> R.drawable.ic_github_pr_merged to Color(0xFFA371F7)
-        PullRequestState.CLOSED -> R.drawable.ic_github_pr_closed to Color(0xFFF85149)
-        PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
-    }
-}
 
 @Composable
 private fun DeleteConfirmationDialog(
