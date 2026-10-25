@@ -39,7 +39,7 @@ data class Plan(
 
 @JsonClass(generateAdapter = true)
 data class GitPatch(
-    @Json(name = "unidiffPatch") val unidiffPatch: String,
+    @Json(name = "unidiffPatch") val unidiffPatch: String? = null,
     @Json(name = "baseCommitId") val baseCommitId: String? = null,
     @Json(name = "suggestedCommitMessage") val suggestedCommitMessage: String? = null
 )
@@ -49,7 +49,9 @@ data class ChangeSet(
     @Json(name = "source") val source: String,
     @Json(name = "gitPatch") val gitPatch: GitPatch
 ) {
-    val parsedFiles: List<ParsedFile> by lazy { UnidiffParser.parse(patch = gitPatch.unidiffPatch) }
+    val parsedFiles: List<ParsedFile> by lazy {
+        gitPatch.unidiffPatch?.let { UnidiffParser.parse(patch = it) } ?: emptyList()
+    }
 
     val summary: ChangeSetSummary by lazy {
         val files = parsedFiles
