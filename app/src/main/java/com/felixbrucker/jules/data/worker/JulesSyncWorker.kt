@@ -42,8 +42,6 @@ class JulesSyncWorker @AssistedInject constructor(
 
             if (decision.shouldEnqueue) {
                 enqueueSyncWork(applicationContext, decision.intervalMinutes, isSelfEnqueue = true)
-            } else {
-                cancelSyncWork(applicationContext)
             }
 
             Result.success()
