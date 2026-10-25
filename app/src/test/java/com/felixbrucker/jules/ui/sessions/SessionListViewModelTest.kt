@@ -148,4 +148,17 @@ class SessionListViewModelTest {
         assertNotNull(activeDraft)
         assertEquals("repo-2", activeDraft?.sourceId)
     }
+
+    @Test
+    fun testSyncSessionsErrorSetsUserError() = runTest {
+        coEvery { julesRepository.sync() } throws RuntimeException("Network error")
+
+        viewModel.syncSessions()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Network error", viewModel.userError.value)
+
+        viewModel.clearUserError()
+        assertNull(viewModel.userError.value)
+    }
 }

@@ -68,7 +68,6 @@ class JulesRepositoryTest {
         coEvery { appSettingsRepository.completionNotificationsEnabledFlow } returns flowOf(true)
         coEvery { syncMetadataRepository.lastSourcesSyncedAtFlow } returns flowOf(null)
         coEvery { syncMetadataRepository.lastArchivedSessionsSyncedAtFlow } returns flowOf(null)
-        coEvery { syncMetadataRepository.lastWorkflowsSyncedAtFlow } returns flowOf(null)
 
         repository = JulesRepository(
             sessionDao = sessionDao,

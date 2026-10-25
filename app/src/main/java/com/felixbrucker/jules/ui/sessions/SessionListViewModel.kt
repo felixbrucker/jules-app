@@ -62,6 +62,13 @@ class SessionListViewModel @Inject constructor(
     private val _dispatchDialogState = MutableStateFlow<DispatchDialogState?>(null)
     val dispatchDialogState: StateFlow<DispatchDialogState?> = _dispatchDialogState.asStateFlow()
 
+    private val _userError = MutableStateFlow<String?>(null)
+    val userError: StateFlow<String?> = _userError.asStateFlow()
+
+    fun clearUserError() {
+        _userError.value = null
+    }
+
     val dailySessionCount = julesRepository.getDailySessionCountFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
@@ -189,6 +196,7 @@ class SessionListViewModel @Inject constructor(
                 dismissCreateDialog()
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Failed to save draft")
+                _userError.value = e.message ?: "Failed to save draft"
             }
         }
     }
@@ -199,6 +207,7 @@ class SessionListViewModel @Inject constructor(
                 julesRepository.deleteDraft(draftId)
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Failed to delete draft")
+                _userError.value = e.message ?: "Failed to delete draft"
             }
         }
     }
@@ -225,7 +234,9 @@ class SessionListViewModel @Inject constructor(
             isRefreshing = true
             try {
                 julesRepository.sync()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Sync failed")
+                _userError.value = e.message ?: "Failed to sync"
             } finally {
                 isRefreshing = false
             }
@@ -236,7 +247,9 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.deleteSession(sessionId)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Delete session failed")
+                _userError.value = e.message ?: "Failed to delete session"
             }
         }
     }
@@ -245,7 +258,9 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.archiveSession(sessionId)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Archive session failed")
+                _userError.value = e.message ?: "Failed to archive session"
             }
         }
     }
@@ -254,7 +269,9 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.unarchiveSession(sessionId)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Unarchive session failed")
+                _userError.value = e.message ?: "Failed to unarchive session"
             }
         }
     }

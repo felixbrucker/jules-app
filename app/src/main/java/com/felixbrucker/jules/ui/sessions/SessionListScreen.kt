@@ -76,6 +76,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -146,7 +148,16 @@ fun SessionListScreen(
     val isCreatingSession by viewModel.isCreatingSession.collectAsState()
     val createSessionError by viewModel.createSessionError.collectAsState()
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
+    val userError by viewModel.userError.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var isSearchActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(userError) {
+        userError?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearUserError()
+        }
+    }
 
     if (showCreateDialog && activeDraft != null) {
         val activeDraftEntity = activeDraft!!
@@ -184,6 +195,7 @@ fun SessionListScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             SessionTopBar(
                 isSearchActive = isSearchActive,
