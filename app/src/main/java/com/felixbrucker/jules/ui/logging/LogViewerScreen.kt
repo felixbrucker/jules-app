@@ -19,12 +19,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -442,21 +441,49 @@ fun StreamingDot(alpha: Float) {
 fun StreamingDotsAnimation(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "streaming_dots")
     val alpha1 by transition.animateFloat(
-        initialValue = 0.2f,
+        initialValue = 0.3f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(600, 0, LinearEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1200
+                0.3f at 0
+                1.0f at 200
+                0.3f at 600
+                0.3f at 1200
+            },
+            repeatMode = RepeatMode.Restart
+        ),
         label = "dot1"
     )
     val alpha2 by transition.animateFloat(
-        initialValue = 0.2f,
+        initialValue = 0.3f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(600, 200, LinearEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1200
+                0.3f at 0
+                0.3f at 300
+                1.0f at 500
+                0.3f at 900
+                0.3f at 1200
+            },
+            repeatMode = RepeatMode.Restart
+        ),
         label = "dot2"
     )
     val alpha3 by transition.animateFloat(
-        initialValue = 0.2f,
+        initialValue = 0.3f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(600, 400, LinearEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1200
+                0.3f at 0
+                0.3f at 600
+                1.0f at 800
+                0.3f at 1200
+            },
+            repeatMode = RepeatMode.Restart
+        ),
         label = "dot3"
     )
 
