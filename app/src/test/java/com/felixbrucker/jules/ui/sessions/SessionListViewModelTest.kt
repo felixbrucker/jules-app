@@ -186,4 +186,26 @@ class SessionListViewModelTest {
         assertEquals(setOf(SessionFilterChip.IN_PROGRESS, SessionFilterChip.AWAITING_FEEDBACK), chips)
         chipsCollector.cancel()
     }
+
+    @Test
+    fun testInProgressFilterIncludesQueuedPlanningAndInProgressStates() = runTest {
+        coEvery { appSettingsRepository.selectedFilterChipsFlow } returns flowOf(setOf("IN_PROGRESS"))
+
+        val vm = SessionListViewModel(julesRepository, appSettingsRepository)
+        val sessionsCollector = launch { vm.sessions.collect {} }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            julesRepository.getSessionsFlow(
+                searchQuery = "",
+                states = listOf(
+                    SessionState.QUEUED,
+                    SessionState.PLANNING,
+                    SessionState.IN_PROGRESS
+                ),
+                includeArchived = false
+            )
+        }
+        sessionsCollector.cancel()
+    }
 }

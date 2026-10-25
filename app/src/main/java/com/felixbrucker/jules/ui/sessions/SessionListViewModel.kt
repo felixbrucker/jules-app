@@ -104,7 +104,11 @@ class SessionListViewModel @Inject constructor(
                     SessionState.AWAITING_USER_FEEDBACK,
                     SessionState.FAILED
                 )
-                SessionFilterChip.IN_PROGRESS -> listOf(SessionState.IN_PROGRESS)
+                SessionFilterChip.IN_PROGRESS -> listOf(
+                    SessionState.QUEUED,
+                    SessionState.PLANNING,
+                    SessionState.IN_PROGRESS
+                )
                 SessionFilterChip.COMPLETED -> listOf(
                     SessionState.COMPLETED
                 )
