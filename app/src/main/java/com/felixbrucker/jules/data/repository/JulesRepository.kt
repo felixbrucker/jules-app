@@ -49,6 +49,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -110,7 +111,7 @@ class JulesRepository @Inject constructor(
             activityDao.getActivitiesPagingSource(sessionId)
         }.flow.map { pagingData ->
             pagingData.map { entity -> entity.toActivity(moshi) }
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     fun getDraftsFlow(searchQuery: String): Flow<List<SessionDraftWithSource>> {

@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -111,7 +113,7 @@ class SessionDetailViewModel @Inject constructor(
         } else {
             null
         }
-    }
+    }.flowOn(Dispatchers.Default)
 
     val activitiesPagingDataFlow: Flow<PagingData<ActivityUiItem>> =
         julesRepository.getActivitiesPagingDataFlow(sessionId)

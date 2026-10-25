@@ -1222,7 +1222,9 @@ data class ParsedDiffLine(
 
 @Composable
 private fun ColorCodedDiffBody(file: ParsedFile, unidiffPatch: String) {
-    val fileLines = extractFileDiffLines(file.path, unidiffPatch)
+    val fileLines = remember(file.path, unidiffPatch) {
+        extractFileDiffLines(file.path, unidiffPatch)
+    }
 
     SelectionContainer {
         Surface(
@@ -1463,7 +1465,9 @@ private fun ScrollableFileTree(
     onSelectFile: (String) -> Unit
 ) {
     val rootNodes = remember(parsedFiles) { buildFileTree(parsedFiles) }
-    val flatNodes = flattenTreeNodes(rootNodes, expandedFolders)
+    val flatNodes = remember(rootNodes, expandedFolders.toMap()) {
+        flattenTreeNodes(rootNodes, expandedFolders)
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
