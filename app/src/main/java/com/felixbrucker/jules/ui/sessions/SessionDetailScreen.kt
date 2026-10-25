@@ -14,9 +14,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -477,24 +475,25 @@ private fun SplitDividerHandle(
 ) {
     val currentOnSplitRatioChange by rememberUpdatedState(onSplitRatioChange)
     val currentSplitRatio by rememberUpdatedState(splitRatio)
-    val currentContainerWidthPx by rememberUpdatedState(containerWidthPx)
-
-    val draggableState = rememberDraggableState { delta ->
-        if (currentContainerWidthPx > 0) {
-            val ratioDelta = delta / currentContainerWidthPx.toFloat()
-            currentOnSplitRatioChange(currentSplitRatio + ratioDelta)
-        }
-    }
 
     Box(
         modifier = Modifier
             .fillMaxHeight()
             .width(20.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .draggable(
-                state = draggableState,
-                orientation = Orientation.Horizontal
-            ),
+            .pointerInput(Unit) {
+                var rawDragRatio = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { rawDragRatio = currentSplitRatio },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        if (containerWidthPx > 0) {
+                            rawDragRatio = (rawDragRatio + dragAmount / containerWidthPx.toFloat()).coerceIn(0f, 1f)
+                            currentOnSplitRatioChange(rawDragRatio)
+                        }
+                    }
+                )
+            },
         contentAlignment = Alignment.Center
     ) {
         Box(
