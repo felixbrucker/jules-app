@@ -448,8 +448,6 @@ class JulesRepository @Inject constructor(
                                                     sourceId = source.id,
                                                     workflowId = wf.id,
                                                     name = wf.name,
-                                                    path = wf.path,
-                                                    state = wf.state,
                                                     inputs = parsed.inputs
                                                 )
                                             )

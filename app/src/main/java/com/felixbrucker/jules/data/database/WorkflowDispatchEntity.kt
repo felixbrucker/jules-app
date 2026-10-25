@@ -27,7 +27,5 @@ data class WorkflowDispatchEntity(
     val sourceId: String,
     val workflowId: Long,
     val name: String,
-    val path: String,
-    val state: String,
     val inputs: List<WorkflowInput>
 )

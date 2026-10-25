@@ -73,8 +73,6 @@ class SessionListViewModelTest {
             sourceId = "github/owner/repo",
             workflowId = 123L,
             name = "CI",
-            path = ".github/workflows/ci.yml",
-            state = "active",
             inputs = emptyList()
         )
 
@@ -111,8 +109,6 @@ class SessionListViewModelTest {
             sourceId = "github/owner/repo",
             workflowId = 123L,
             name = "CI",
-            path = ".github/workflows/ci.yml",
-            state = "active",
             inputs = emptyList()
         )
 
