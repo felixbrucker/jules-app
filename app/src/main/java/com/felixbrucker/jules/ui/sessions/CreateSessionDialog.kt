@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SourceEntity
+import com.felixbrucker.jules.ui.components.LoadingStateButton
 import java.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -437,19 +438,11 @@ private fun CreateSessionDialogButtons(
             Text(if (isPersistedDraft) "Save" else "Save as Draft")
         }
         Spacer(modifier = Modifier.width(4.dp))
-        Button(
-            onClick = onCreate,
-            enabled = canCreate && !isCreating
-        ) {
-            if (isCreating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text("Create")
-        }
+        LoadingStateButton(
+            label = "Create",
+            isLoading = isCreating,
+            enabled = canCreate,
+            onClick = onCreate
+        )
     }
 }

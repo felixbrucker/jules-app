@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +31,7 @@ fun LoadingStateButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     loadingLabel: String? = null,
+    colors: ButtonColors = ButtonDefaults.buttonColors(),
     animationDurationMillis: Int = 250
 ) {
     val slideTweenSpec = tween<IntOffset>(durationMillis = animationDurationMillis)
@@ -37,7 +40,8 @@ fun LoadingStateButton(
     Button(
         modifier = modifier,
         enabled = enabled && !isLoading,
-        onClick = onClick
+        onClick = onClick,
+        colors = colors
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AnimatedVisibility(
