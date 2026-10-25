@@ -120,7 +120,7 @@ data class CreateSessionRequest(
     @Json(name = "title") val title: String? = null,
     @Json(name = "sourceContext") val sourceContext: SourceContext? = null,
     @Json(name = "requirePlanApproval") val requirePlanApproval: Boolean? = null,
-    @Json(name = "automationMode") val automationMode: AutomationMode? = AutomationMode.AUTOMATION_MODE_UNSPECIFIED
+    @Json(name = "automationMode") val automationMode: AutomationMode? = AutomationMode.AUTO_CREATE_PR
 )
 
 @JsonClass(generateAdapter = true)
