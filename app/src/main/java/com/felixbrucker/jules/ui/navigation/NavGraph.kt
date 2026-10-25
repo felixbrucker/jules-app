@@ -1,11 +1,10 @@
 package com.felixbrucker.jules.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -28,34 +27,6 @@ sealed class Screen(val route: String) {
     object SessionList : Screen("session_list")
     object Settings : Screen("settings")
     object LogViewer : Screen("log_viewer")
-}
-
-private val slideInFromRight = {
-    slideInHorizontally(
-        initialOffsetX = { fullWidth -> fullWidth },
-        animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeIn(animationSpec = tween(300))
-}
-
-private val slideOutToLeftParallax = {
-    slideOutHorizontally(
-        targetOffsetX = { fullWidth -> -fullWidth / 3 },
-        animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeOut(animationSpec = tween(300))
-}
-
-private val slideInFromLeftParallax = {
-    slideInHorizontally(
-        initialOffsetX = { fullWidth -> -fullWidth / 3 },
-        animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeIn(animationSpec = tween(300))
-}
-
-private val slideOutToRight = {
-    slideOutHorizontally(
-        targetOffsetX = { fullWidth -> fullWidth },
-        animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeOut(animationSpec = tween(300))
 }
 
 @Composable
@@ -84,10 +55,30 @@ fun JulesNavGraph(
         }
         composable(
             route = Screen.SessionList.route,
-            enterTransition = { slideInFromLeftParallax() },
-            exitTransition = { slideOutToLeftParallax() },
-            popEnterTransition = { slideInFromLeftParallax() },
-            popExitTransition = { slideOutToRight() }
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(300))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(300))
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(300))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(300))
+            }
         ) {
             val viewModel: SessionListViewModel = hiltViewModel()
             SessionListScreen(
@@ -99,10 +90,30 @@ fun JulesNavGraph(
         }
         composable(
             route = Screen.Settings.route,
-            enterTransition = { slideInFromRight() },
-            exitTransition = { slideOutToLeftParallax() },
-            popEnterTransition = { slideInFromLeftParallax() },
-            popExitTransition = { slideOutToRight() }
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(300))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(300))
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(300))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(300))
+            }
         ) {
             val viewModel: SettingsViewModel = hiltViewModel()
             SettingsScreen(
@@ -117,10 +128,30 @@ fun JulesNavGraph(
         }
         composable(
             route = Screen.LogViewer.route,
-            enterTransition = { slideInFromRight() },
-            exitTransition = { slideOutToLeftParallax() },
-            popEnterTransition = { slideInFromLeftParallax() },
-            popExitTransition = { slideOutToRight() }
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(300))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(300))
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(300))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(300))
+            }
         ) {
             val viewModel: LogViewerViewModel = hiltViewModel()
             LogViewerScreen(
