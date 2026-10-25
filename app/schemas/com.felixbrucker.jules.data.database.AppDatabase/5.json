@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "e139d00562301faf220e0592475f54db",
+    "identityHash": "bfc6d13b0f12bf61f0215e86e269c1a4",
     "entities": [
       {
         "tableName": "sessions",
@@ -167,7 +167,7 @@
       },
       {
         "tableName": "pull_requests",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`url` TEXT NOT NULL, `sessionId` TEXT NOT NULL DEFAULT '', `state` TEXT NOT NULL, PRIMARY KEY(`url`), FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`url` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `state` TEXT NOT NULL, PRIMARY KEY(`url`), FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "url",
@@ -179,8 +179,7 @@
             "fieldPath": "sessionId",
             "columnName": "sessionId",
             "affinity": "TEXT",
-            "notNull": true,
-            "defaultValue": "''"
+            "notNull": true
           },
           {
             "fieldPath": "state",
@@ -318,7 +317,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e139d00562301faf220e0592475f54db')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bfc6d13b0f12bf61f0215e86e269c1a4')"
     ]
   }
 }

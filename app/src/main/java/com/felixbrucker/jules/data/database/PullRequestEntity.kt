@@ -1,6 +1,5 @@
 package com.felixbrucker.jules.data.database
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -25,7 +24,6 @@ import com.felixbrucker.jules.network.api.model.PullRequestState
 data class PullRequestEntity(
     @PrimaryKey
     val url: String,
-    @ColumnInfo(defaultValue = "")
     val sessionId: String,
     val state: PullRequestState
 )
