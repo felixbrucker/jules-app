@@ -7,8 +7,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
+import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceEntity
+import com.felixbrucker.jules.data.database.WorkflowDispatchEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.SessionState
@@ -55,6 +57,9 @@ class SessionListViewModel @Inject constructor(
     val isCreatingSession: StateFlow<Boolean> = _isCreatingSession.asStateFlow()
     private val _createSessionError = MutableStateFlow<String?>(null)
     val createSessionError: StateFlow<String?> = _createSessionError.asStateFlow()
+
+    private val _dispatchDialogState = MutableStateFlow<DispatchDialogState?>(null)
+    val dispatchDialogState: StateFlow<DispatchDialogState?> = _dispatchDialogState.asStateFlow()
 
     val dailySessionCount = julesRepository.getDailySessionCountFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -240,6 +245,42 @@ class SessionListViewModel @Inject constructor(
         }
     }
 
+    fun openDispatchDialog(session: SessionEntity, workflow: WorkflowDispatchEntity) {
+        _dispatchDialogState.value = DispatchDialogState(session = session, workflow = workflow)
+    }
+
+    fun dismissDispatchDialog() {
+        _dispatchDialogState.value = null
+    }
+
+    fun dispatchWorkflow(
+        session: SessionEntity,
+        workflow: WorkflowDispatchEntity,
+        branch: String,
+        inputs: Map<String, String>
+    ) {
+        val repo = session.repo ?: return
+        viewModelScope.launch {
+            _dispatchDialogState.value = _dispatchDialogState.value?.copy(isDispatching = true, errorMessage = null)
+            try {
+                julesRepository.dispatchWorkflow(
+                    owner = repo.owner,
+                    repo = repo.name,
+                    workflowId = workflow.workflowId.toString(),
+                    ref = branch,
+                    inputs = inputs
+                )
+                dismissDispatchDialog()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to dispatch workflow ${workflow.name}")
+                _dispatchDialogState.value = _dispatchDialogState.value?.copy(
+                    isDispatching = false,
+                    errorMessage = e.message ?: "Failed to dispatch workflow"
+                )
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "SessionListViewModel"
     }
@@ -255,4 +296,11 @@ data class SessionFilterParams(
     val searchQuery: String,
     val states: List<SessionState>,
     val includeArchived: Boolean
+)
+
+data class DispatchDialogState(
+    val session: SessionEntity,
+    val workflow: WorkflowDispatchEntity,
+    val isDispatching: Boolean = false,
+    val errorMessage: String? = null
 )

@@ -88,7 +88,7 @@ fun Session.toEntity(): SessionEntity {
         prompt = prompt,
         state = state ?: SessionState.UNSPECIFIED,
         isArchived = isArchived,
-        createTime = createTime,
+        createTime = createTime ?: Instant.now(),
         updateTime = updateTime,
         url = url,
         repo = sourceContext.repo,

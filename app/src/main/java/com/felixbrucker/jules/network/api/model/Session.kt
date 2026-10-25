@@ -91,17 +91,20 @@ data class Session(
     @Json(name = "prompt") val prompt: String,
     @Json(name = "state") val state: SessionState? = SessionState.UNSPECIFIED,
     @Json(name = "archived") val archived: Boolean? = null,
-    @Json(name = "createTime") val createTime: Instant,
+    @Json(name = "createTime") val createTime: Instant? = null,
     @Json(name = "updateTime") val updateTime: Instant? = null,
     @Json(name = "url") val url: String? = null,
     @Json(name = "sourceContext") val sourceContext: SourceContext,
     @Json(name = "outputs") val outputs: List<SessionOutput>? = emptyList()
 ) {
+    val effectiveCreateTime: Instant
+        get() = createTime ?: Instant.now()
+
     val duration: Duration
         get() = if (updateTime != null) {
-            Duration.between(createTime, updateTime)
+            Duration.between(effectiveCreateTime, updateTime)
         } else {
-            Duration.between(createTime, Instant.now())
+            Duration.between(effectiveCreateTime, Instant.now())
         }
 
     val pullRequests: List<PullRequest>

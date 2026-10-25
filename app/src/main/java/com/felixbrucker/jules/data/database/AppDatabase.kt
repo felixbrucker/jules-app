@@ -8,14 +8,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [SessionEntity::class, PullRequestEntity::class, SourceEntity::class, LogEntity::class, SessionDraftEntity::class],
-    version = 6,
+    entities = [SessionEntity::class, PullRequestEntity::class, SourceEntity::class, LogEntity::class, SessionDraftEntity::class, WorkflowDispatchEntity::class],
+    version = 7,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
         AutoMigration(from = 3, to = 4),
-        AutoMigration(from = 5, to = 6)
+        AutoMigration(from = 5, to = 6),
+        AutoMigration(from = 6, to = 7)
     ]
 )
 @TypeConverters(Converters::class)
@@ -25,6 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sourceDao(): SourceDao
     abstract fun logDao(): LogDao
     abstract fun sessionDraftDao(): SessionDraftDao
+    abstract fun workflowDispatchDao(): WorkflowDispatchDao
 
     companion object {
         val MIGRATION_4_5 = object : Migration(4, 5) {

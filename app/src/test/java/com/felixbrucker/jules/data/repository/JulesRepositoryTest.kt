@@ -8,6 +8,7 @@ import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceDao
+import com.felixbrucker.jules.data.database.WorkflowDispatchDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.notification.JulesNotificationManager
@@ -37,6 +38,7 @@ class JulesRepositoryTest {
     private lateinit var pullRequestDao: PullRequestDao
     private lateinit var sourceDao: SourceDao
     private lateinit var sessionDraftDao: SessionDraftDao
+    private lateinit var workflowDispatchDao: WorkflowDispatchDao
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
     private lateinit var notificationManager: JulesNotificationManager
@@ -50,6 +52,7 @@ class JulesRepositoryTest {
         pullRequestDao = mockk(relaxed = true)
         sourceDao = mockk(relaxed = true)
         sessionDraftDao = mockk(relaxed = true)
+        workflowDispatchDao = mockk(relaxed = true)
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
         notificationManager = mockk(relaxed = true)
@@ -62,12 +65,14 @@ class JulesRepositoryTest {
         coEvery { appSettingsRepository.completionNotificationsEnabledFlow } returns flowOf(true)
         coEvery { syncMetadataRepository.lastSourcesSyncedAtFlow } returns flowOf(null)
         coEvery { syncMetadataRepository.lastArchivedSessionsSyncedAtFlow } returns flowOf(null)
+        coEvery { syncMetadataRepository.lastWorkflowsSyncedAtFlow } returns flowOf(null)
 
         repository = JulesRepository(
             sessionDao = sessionDao,
             pullRequestDao = pullRequestDao,
             sourceDao = sourceDao,
             sessionDraftDao = sessionDraftDao,
+            workflowDispatchDao = workflowDispatchDao,
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,
             notificationManager = notificationManager,
@@ -279,6 +284,38 @@ class JulesRepositoryTest {
         coVerify {
             notificationManager.sendTaskFeedbackNotification(any())
             notificationManager.sendTaskCompletedNotification(any())
+        }
+    }
+
+    @Test
+    fun testSyncWorkflowsGatedWhenSyncedRecently() = runBlocking {
+        coEvery { syncMetadataRepository.lastWorkflowsSyncedAtFlow } returns flowOf(Instant.now())
+
+        repository.syncWorkflows(force = false)
+
+        coVerify(exactly = 0) {
+            sourceDao.getUsableGithubSources(any())
+        }
+    }
+
+    @Test
+    fun testDispatchWorkflow() = runBlocking {
+        repository.dispatchWorkflow(
+            owner = "octocat",
+            repo = "Hello-World",
+            workflowId = "12345",
+            ref = "main",
+            inputs = mapOf("param" to "value")
+        )
+
+        coVerify {
+            gitHubApi.dispatchWorkflow(
+                owner = "octocat",
+                repo = "Hello-World",
+                workflowId = "12345",
+                ref = "main",
+                inputs = mapOf("param" to "value")
+            )
         }
     }
 }

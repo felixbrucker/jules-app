@@ -16,8 +16,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -46,6 +49,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -116,6 +120,7 @@ import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
+import com.felixbrucker.jules.data.database.WorkflowDispatchEntity
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
 import kotlin.math.roundToInt
@@ -140,6 +145,7 @@ fun SessionListScreen(
     val activeDraft by viewModel.activeDraft.collectAsState()
     val isCreatingSession by viewModel.isCreatingSession.collectAsState()
     val createSessionError by viewModel.createSessionError.collectAsState()
+    val dispatchState by viewModel.dispatchDialogState.collectAsState()
     var isSearchActive by remember { mutableStateOf(false) }
 
     if (showCreateDialog && activeDraft != null) {
@@ -156,6 +162,23 @@ fun SessionListScreen(
             onDismiss = { viewModel.dismissCreateDialog() },
             onSaveDraft = { viewModel.saveDraft(it) },
             onCreateSession = { viewModel.createSessionFromDraft(it) }
+        )
+    }
+
+    dispatchState?.let { state ->
+        val source = remember(state.session.sourceId, sources) {
+            sources.find { it.id == state.session.sourceId }
+        }
+        DispatchWorkflowDialog(
+            session = state.session,
+            workflow = state.workflow,
+            source = source,
+            isDispatching = state.isDispatching,
+            errorMessage = state.errorMessage,
+            onDismiss = { viewModel.dismissDispatchDialog() },
+            onConfirmDispatch = { branch, inputs ->
+                viewModel.dispatchWorkflow(state.session, state.workflow, branch, inputs)
+            }
         )
     }
 
@@ -491,7 +514,8 @@ private fun SessionListContent(
                 onDeleteDraft = { viewModel.deleteDraft(it) },
                 onDelete = { viewModel.deleteSession(it) },
                 onArchive = { viewModel.archiveSession(it) },
-                onUnarchive = { viewModel.unarchiveSession(it) }
+                onUnarchive = { viewModel.unarchiveSession(it) },
+                onSelectWorkflow = { session, workflow -> viewModel.openDispatchDialog(session, workflow) }
             )
         }
     }
@@ -619,7 +643,8 @@ private fun SessionLazyColumn(
     onDeleteDraft: (String) -> Unit,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
-    onUnarchive: (String) -> Unit
+    onUnarchive: (String) -> Unit,
+    onSelectWorkflow: (SessionEntity, WorkflowDispatchEntity) -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -648,7 +673,8 @@ private fun SessionLazyColumn(
                 sessionWithPullRequest = item,
                 onDelete = onDelete,
                 onArchive = onArchive,
-                onUnarchive = onUnarchive
+                onUnarchive = onUnarchive,
+                onSelectWorkflow = onSelectWorkflow
             )
         }
     }
@@ -660,7 +686,8 @@ private fun SessionCard(
     sessionWithPullRequest: SessionWithPullRequest,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
-    onUnarchive: (String) -> Unit
+    onUnarchive: (String) -> Unit,
+    onSelectWorkflow: (SessionEntity, WorkflowDispatchEntity) -> Unit
 ) {
     val session = sessionWithPullRequest.session
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -693,7 +720,9 @@ private fun SessionCard(
             Spacer(modifier = Modifier.height(12.dp))
             SessionCardFooter(
                 session = session,
-                pullRequestState = sessionWithPullRequest.pullRequestState
+                pullRequestState = sessionWithPullRequest.pullRequestState,
+                workflows = sessionWithPullRequest.workflows,
+                onSelectWorkflow = { wf -> onSelectWorkflow(session, wf) }
             )
         }
     }
@@ -1052,7 +1081,9 @@ private fun RoundedBadge(text: String, color: Color) {
 @Composable
 private fun SessionCardFooter(
     session: SessionEntity,
-    pullRequestState: PullRequestState?
+    pullRequestState: PullRequestState?,
+    workflows: List<WorkflowDispatchEntity>,
+    onSelectWorkflow: (WorkflowDispatchEntity) -> Unit
 ) {
     val context = LocalContext.current
     val timeToFormat = session.updateTime ?: session.createTime
@@ -1100,7 +1131,9 @@ private fun SessionCardFooter(
                 PullRequestChip(
                     pr = pr,
                     pullRequestState = pullRequestState,
-                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+                    workflows = workflows,
+                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
+                    onWorkflowSelected = onSelectWorkflow
                 )
             }
         }
@@ -1111,14 +1144,34 @@ private fun SessionCardFooter(
 private fun PullRequestChip(
     pr: EmbeddedPullRequest,
     pullRequestState: PullRequestState?,
+    workflows: List<WorkflowDispatchEntity>,
+    onPrClick: (String) -> Unit,
+    onWorkflowSelected: (WorkflowDispatchEntity) -> Unit
+) {
+    if (workflows.isEmpty()) {
+        SimplePullRequestChip(
+            pr = pr,
+            pullRequestState = pullRequestState,
+            onPrClick = onPrClick
+        )
+    } else {
+        CompoundPullRequestWorkflowButton(
+            pr = pr,
+            pullRequestState = pullRequestState,
+            workflows = workflows,
+            onPrClick = onPrClick,
+            onWorkflowSelected = onWorkflowSelected
+        )
+    }
+}
+
+@Composable
+private fun SimplePullRequestChip(
+    pr: EmbeddedPullRequest,
+    pullRequestState: PullRequestState?,
     onPrClick: (String) -> Unit
 ) {
-    val (iconRes, iconColor) = when (pullRequestState) {
-        PullRequestState.MERGED -> R.drawable.ic_github_pr_merged to Color(0xFFA371F7)
-        PullRequestState.CLOSED -> R.drawable.ic_github_pr_closed to Color(0xFFF85149)
-        PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
-    }
-
+    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
     val prNumberText = pr.number?.let { " (#$it)" } ?: ""
 
     AssistChip(
@@ -1134,6 +1187,111 @@ private fun PullRequestChip(
             )
         }
     )
+}
+
+@Composable
+private fun CompoundPullRequestWorkflowButton(
+    pr: EmbeddedPullRequest,
+    pullRequestState: PullRequestState?,
+    workflows: List<WorkflowDispatchEntity>,
+    onPrClick: (String) -> Unit,
+    onWorkflowSelected: (WorkflowDispatchEntity) -> Unit
+) {
+    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
+    val prNumberText = pr.number?.let { " (#$it)" } ?: ""
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier.height(28.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clickable { onPrClick(pr.url) }
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = "GitHub PR",
+                    modifier = Modifier.size(14.dp),
+                    tint = iconColor
+                )
+                Text(
+                    text = "View PR$prNumberText",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clickable { menuExpanded = true }
+                    .padding(horizontal = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Workflow Dispatches",
+                    modifier = Modifier.size(18.dp)
+                )
+                WorkflowDropdownMenu(
+                    expanded = menuExpanded,
+                    workflows = workflows,
+                    onDismiss = { menuExpanded = false },
+                    onWorkflowSelected = onWorkflowSelected
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkflowDropdownMenu(
+    expanded: Boolean,
+    workflows: List<WorkflowDispatchEntity>,
+    onDismiss: () -> Unit,
+    onWorkflowSelected: (WorkflowDispatchEntity) -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss
+    ) {
+        workflows.forEach { workflow ->
+            DropdownMenuItem(
+                text = { Text(workflow.name) },
+                onClick = {
+                    onDismiss()
+                    onWorkflowSelected(workflow)
+                }
+            )
+        }
+    }
+}
+
+private fun getPullRequestIconInfo(pullRequestState: PullRequestState?): Pair<Int, Color> {
+    return when (pullRequestState) {
+        PullRequestState.MERGED -> R.drawable.ic_github_pr_merged to Color(0xFFA371F7)
+        PullRequestState.CLOSED -> R.drawable.ic_github_pr_closed to Color(0xFFF85149)
+        PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
+    }
 }
 
 @Composable
