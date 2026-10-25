@@ -44,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
                     SELECT pr.`url`, s.`id`, pr.`state`
                     FROM `pull_requests` pr
                     INNER JOIN `sessions` s ON pr.`url` = s.`pull_request_url`
+                    GROUP BY pr.`url`
                     """.trimIndent()
                 )
                 db.execSQL("DROP TABLE `pull_requests`")
