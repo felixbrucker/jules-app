@@ -14,7 +14,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -475,25 +477,24 @@ private fun SplitDividerHandle(
 ) {
     val currentOnSplitRatioChange by rememberUpdatedState(onSplitRatioChange)
     val currentSplitRatio by rememberUpdatedState(splitRatio)
+    val currentContainerWidthPx by rememberUpdatedState(containerWidthPx)
+
+    val draggableState = rememberDraggableState { delta ->
+        if (currentContainerWidthPx > 0) {
+            val ratioDelta = delta / currentContainerWidthPx.toFloat()
+            currentOnSplitRatioChange(currentSplitRatio + ratioDelta)
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxHeight()
             .width(20.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .pointerInput(containerWidthPx) {
-                var dragRatio = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { dragRatio = currentSplitRatio },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        if (containerWidthPx > 0) {
-                            dragRatio += dragAmount / containerWidthPx.toFloat()
-                            currentOnSplitRatioChange(dragRatio)
-                        }
-                    }
-                )
-            },
+            .draggable(
+                state = draggableState,
+                orientation = Orientation.Horizontal
+            ),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -517,19 +518,17 @@ private fun ChatWindowView(
 ) {
     val listState = rememberLazyListState()
     var initialScrolledSessionId by remember { mutableStateOf<String?>(null) }
-    var previousItemCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(session.id, activities.itemCount) {
+    val latestItemId = if (activities.itemCount > 0) activities[0]?.id else null
+
+    LaunchedEffect(session.id, latestItemId) {
         if (activities.itemCount > 0) {
             if (initialScrolledSessionId != session.id) {
                 initialScrolledSessionId = session.id
                 listState.scrollToItem(0)
-            } else if (activities.itemCount > previousItemCount) {
-                if (listState.firstVisibleItemIndex <= 1) {
-                    listState.animateScrollToItem(0)
-                }
+            } else if (listState.firstVisibleItemIndex <= 2) {
+                listState.animateScrollToItem(0)
             }
-            previousItemCount = activities.itemCount
         }
     }
 
@@ -641,7 +640,7 @@ private fun ActivityBubbleContainer(
         is Activity.UserMessaged -> UserMessageBubble(message = activity.userMessage)
         is Activity.AgentMessaged -> {
             if (isBottomMost) {
-                AgentThinkingBubble()
+                AgentStatusBubble(label = "Thinking")
             }
         }
         is Activity.ProgressUpdated -> {
@@ -650,6 +649,8 @@ private fun ActivityBubbleContainer(
                     title = activity.title,
                     description = activity.description
                 )
+            } else if (isBottomMost) {
+                AgentStatusBubble(label = "Working")
             }
         }
         is Activity.PlanGenerated -> PlanGeneratedCard(planSteps = activity.plan.steps)
@@ -683,7 +684,7 @@ private fun UserMessageBubble(message: String) {
 }
 
 @Composable
-private fun AgentThinkingBubble() {
+private fun AgentStatusBubble(label: String) {
     Row(
         modifier = Modifier.padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -698,7 +699,7 @@ private fun AgentThinkingBubble() {
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = "Agent is thinking",
+                    text = label,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
