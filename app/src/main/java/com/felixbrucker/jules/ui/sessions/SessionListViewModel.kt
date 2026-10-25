@@ -5,9 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.felixbrucker.jules.data.database.SessionDraftEntity
+import com.felixbrucker.jules.data.database.SessionDraftWithSource
+import com.felixbrucker.jules.data.database.SessionWithPullRequest
+import com.felixbrucker.jules.data.database.SourceEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
-import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.SessionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,8 +20,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 enum class SessionFilterChip(val label: String) {
@@ -39,6 +44,17 @@ class SessionListViewModel @Inject constructor(
     val selectedChips: StateFlow<Set<SessionFilterChip>> = _selectedChips.asStateFlow()
     private val _includeArchived = MutableStateFlow(false)
     val includeArchived: StateFlow<Boolean> = _includeArchived.asStateFlow()
+    private val _includeDrafts = MutableStateFlow(true)
+    val includeDrafts: StateFlow<Boolean> = _includeDrafts.asStateFlow()
+
+    private val _showCreateDialog = MutableStateFlow(false)
+    val showCreateDialog: StateFlow<Boolean> = _showCreateDialog.asStateFlow()
+    private val _activeDraft = MutableStateFlow<SessionDraftEntity?>(null)
+    val activeDraft: StateFlow<SessionDraftEntity?> = _activeDraft.asStateFlow()
+    private val _isCreatingSession = MutableStateFlow(false)
+    val isCreatingSession: StateFlow<Boolean> = _isCreatingSession.asStateFlow()
+    private val _createSessionError = MutableStateFlow<String?>(null)
+    val createSessionError: StateFlow<String?> = _createSessionError.asStateFlow()
 
     val dailySessionCount = julesRepository.getDailySessionCountFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -83,6 +99,34 @@ class SessionListViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val drafts: StateFlow<List<SessionDraftWithSource>> = combine(
+        searchQuery,
+        selectedChips,
+        includeDrafts
+    ) { query, chips, incDrafts ->
+        DraftFilterParams(query = query, hasStatusFilters = chips.isNotEmpty(), includeDrafts = incDrafts)
+    }
+        .flatMapLatest { params ->
+            if (!params.includeDrafts || params.hasStatusFilters) {
+                flowOf(emptyList())
+            } else {
+                julesRepository.getDraftsFlow(params.query)
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val sources: StateFlow<List<SourceEntity>> = julesRepository.getSourcesFlow()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     init {
         syncSessions()
     }
@@ -101,6 +145,60 @@ class SessionListViewModel @Inject constructor(
 
     fun toggleIncludeArchived(include: Boolean) {
         _includeArchived.value = include
+    }
+
+    fun toggleIncludeDrafts(include: Boolean) {
+        _includeDrafts.value = include
+    }
+
+    fun openCreateDialog(draft: SessionDraftEntity? = null) {
+        _activeDraft.value = draft ?: SessionDraftEntity()
+        _createSessionError.value = null
+        _showCreateDialog.value = true
+    }
+
+    fun dismissCreateDialog() {
+        _showCreateDialog.value = false
+        _activeDraft.value = null
+        _createSessionError.value = null
+        _isCreatingSession.value = false
+    }
+
+    fun saveDraft(draft: SessionDraftEntity) {
+        viewModelScope.launch {
+            try {
+                julesRepository.saveDraft(draft)
+                dismissCreateDialog()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to save draft")
+            }
+        }
+    }
+
+    fun deleteDraft(draftId: String) {
+        viewModelScope.launch {
+            try {
+                julesRepository.deleteDraft(draftId)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to delete draft")
+            }
+        }
+    }
+
+    fun createSessionFromDraft(draft: SessionDraftEntity) {
+        viewModelScope.launch {
+            _isCreatingSession.value = true
+            _createSessionError.value = null
+            try {
+                julesRepository.createSessionFromDraft(draft)
+                dismissCreateDialog()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to create session from draft")
+                _createSessionError.value = e.message ?: "Failed to create session"
+            } finally {
+                _isCreatingSession.value = false
+            }
+        }
     }
 
     fun syncSessions() {
@@ -141,7 +239,17 @@ class SessionListViewModel @Inject constructor(
             }
         }
     }
+
+    companion object {
+        private const val TAG = "SessionListViewModel"
+    }
 }
+
+data class DraftFilterParams(
+    val query: String,
+    val hasStatusFilters: Boolean,
+    val includeDrafts: Boolean
+)
 
 data class SessionFilterParams(
     val searchQuery: String,

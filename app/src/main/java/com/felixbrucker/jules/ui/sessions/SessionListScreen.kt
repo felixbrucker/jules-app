@@ -20,6 +20,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,10 +44,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.HourglassTop
@@ -62,6 +66,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -71,7 +76,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.ui.draw.clip
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -84,6 +88,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -108,6 +113,7 @@ import androidx.compose.ui.unit.sp
 import com.felixbrucker.jules.R
 import com.felixbrucker.jules.data.database.EmbeddedChangeSet
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
+import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.PullRequestState
@@ -121,12 +127,37 @@ fun SessionListScreen(
     onSettingsClick: () -> Unit
 ) {
     val sessions by viewModel.sessions.collectAsState()
+    val drafts by viewModel.drafts.collectAsState()
+    val sources by viewModel.sources.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedChips by viewModel.selectedChips.collectAsState()
     val includeArchived by viewModel.includeArchived.collectAsState()
+    val includeDrafts by viewModel.includeDrafts.collectAsState()
     val dailyCount by viewModel.dailySessionCount.collectAsState()
     val dailyLimit by viewModel.dailySessionLimit.collectAsState()
+
+    val showCreateDialog by viewModel.showCreateDialog.collectAsState()
+    val activeDraft by viewModel.activeDraft.collectAsState()
+    val isCreatingSession by viewModel.isCreatingSession.collectAsState()
+    val createSessionError by viewModel.createSessionError.collectAsState()
     var isSearchActive by remember { mutableStateOf(false) }
+
+    if (showCreateDialog && activeDraft != null) {
+        val activeDraftEntity = activeDraft!!
+        val isPersistedDraft = remember(activeDraftEntity.id, drafts) {
+            drafts.any { it.draft.id == activeDraftEntity.id }
+        }
+        CreateSessionDialog(
+            draft = activeDraftEntity,
+            sources = sources,
+            isCreating = isCreatingSession,
+            isPersistedDraft = isPersistedDraft,
+            errorMessage = createSessionError,
+            onDismiss = { viewModel.dismissCreateDialog() },
+            onSaveDraft = { viewModel.saveDraft(it) },
+            onCreateSession = { viewModel.createSessionFromDraft(it) }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -140,6 +171,15 @@ fun SessionListScreen(
                 onSearchActiveChange = { isSearchActive = it },
                 onSettingsClick = onSettingsClick
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.openCreateDialog() },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Create Session")
+            }
         }
     ) { innerPadding ->
         SessionListContent(
@@ -147,6 +187,8 @@ fun SessionListScreen(
             viewModel = viewModel,
             selectedChips = selectedChips,
             includeArchived = includeArchived,
+            includeDrafts = includeDrafts,
+            drafts = drafts,
             sessions = sessions
         )
     }
@@ -388,6 +430,8 @@ private fun SessionListContent(
     viewModel: SessionListViewModel,
     selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
+    includeDrafts: Boolean,
+    drafts: List<SessionDraftWithSource>,
     sessions: List<SessionWithPullRequest>
 ) {
     val listState = rememberLazyListState()
@@ -434,12 +478,17 @@ private fun SessionListContent(
                 onOffsetClamped = { filterBarOffsetPx = it },
                 selectedChips = selectedChips,
                 includeArchived = includeArchived,
+                includeDrafts = includeDrafts,
                 onToggleChip = { viewModel.toggleFilterChip(it) },
-                onToggleArchived = { viewModel.toggleIncludeArchived(it) }
+                onToggleArchived = { viewModel.toggleIncludeArchived(it) },
+                onToggleDrafts = { viewModel.toggleIncludeDrafts(it) }
             )
             SessionLazyColumn(
                 listState = listState,
+                drafts = drafts,
                 sessions = sessions,
+                onCardClickDraft = { viewModel.openCreateDialog(it.draft) },
+                onDeleteDraft = { viewModel.deleteDraft(it) },
                 onDelete = { viewModel.deleteSession(it) },
                 onArchive = { viewModel.archiveSession(it) },
                 onUnarchive = { viewModel.unarchiveSession(it) }
@@ -456,8 +505,10 @@ private fun CollapsingFilterBar(
     onOffsetClamped: (Float) -> Unit,
     selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
+    includeDrafts: Boolean,
     onToggleChip: (SessionFilterChip) -> Unit,
-    onToggleArchived: (Boolean) -> Unit
+    onToggleArchived: (Boolean) -> Unit,
+    onToggleDrafts: (Boolean) -> Unit
 ) {
     FilterChipsRow(
         modifier = Modifier
@@ -476,8 +527,10 @@ private fun CollapsingFilterBar(
             .clipToBounds(),
         selectedChips = selectedChips,
         includeArchived = includeArchived,
+        includeDrafts = includeDrafts,
         onToggleChip = onToggleChip,
-        onToggleArchived = onToggleArchived
+        onToggleArchived = onToggleArchived,
+        onToggleDrafts = onToggleDrafts
     )
 }
 
@@ -486,8 +539,10 @@ private fun FilterChipsRow(
     modifier: Modifier = Modifier,
     selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
+    includeDrafts: Boolean,
     onToggleChip: (SessionFilterChip) -> Unit,
-    onToggleArchived: (Boolean) -> Unit
+    onToggleArchived: (Boolean) -> Unit,
+    onToggleDrafts: (Boolean) -> Unit
 ) {
     LazyRow(
         modifier = modifier
@@ -501,6 +556,20 @@ private fun FilterChipsRow(
                 onClick = { onToggleChip(chip) },
                 label = { Text(chip.label) },
                 leadingIcon = { FilterChipLeadingIcon(chip = chip) }
+            )
+        }
+        item {
+            FilterChip(
+                selected = includeDrafts,
+                onClick = { onToggleDrafts(!includeDrafts) },
+                label = { Text("Drafts") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             )
         }
         item {
@@ -544,7 +613,10 @@ private fun FilterChipLeadingIcon(chip: SessionFilterChip) {
 @Composable
 private fun SessionLazyColumn(
     listState: LazyListState,
+    drafts: List<SessionDraftWithSource>,
     sessions: List<SessionWithPullRequest>,
+    onCardClickDraft: (SessionDraftWithSource) -> Unit,
+    onDeleteDraft: (String) -> Unit,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit
@@ -556,6 +628,17 @@ private fun SessionLazyColumn(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        items(
+            items = drafts,
+            key = { "draft_${it.draft.id}" }
+        ) { draftItem ->
+            SessionDraftCard(
+                modifier = Modifier.animateItem(),
+                draftWithSource = draftItem,
+                onCardClick = { onCardClickDraft(draftItem) },
+                onDeleteDraft = { onDeleteDraft(draftItem.draft.id) }
+            )
+        }
         items(
             items = sessions,
             key = { it.session.id }
@@ -965,6 +1048,7 @@ private fun RoundedBadge(text: String, color: Color) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SessionCardFooter(
     session: SessionEntity,
@@ -979,10 +1063,11 @@ private fun SessionCardFooter(
     ).toString()
     val durationStr = formatDuration(session.duration.toMillis())
 
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        maxItemsInEachRow = Int.MAX_VALUE
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
