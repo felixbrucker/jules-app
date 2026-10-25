@@ -34,8 +34,7 @@ data class PlanStep(
 @JsonClass(generateAdapter = true)
 data class Plan(
     @Json(name = "id") val id: String,
-    @Json(name = "steps") val steps: List<PlanStep>,
-    @Json(name = "createTime") val createTime: Instant
+    @Json(name = "steps") val steps: List<PlanStep>
 )
 
 @JsonClass(generateAdapter = true)

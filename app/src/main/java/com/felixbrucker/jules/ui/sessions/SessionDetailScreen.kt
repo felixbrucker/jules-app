@@ -1113,6 +1113,19 @@ private fun ChangeTypeBadge(changeType: FileChangeType) {
     }
 }
 
+enum class DiffLineType {
+    CONTEXT,
+    ADDITION,
+    DELETION
+}
+
+data class ParsedDiffLine(
+    val oldLineNumber: Int?,
+    val newLineNumber: Int?,
+    val content: String,
+    val type: DiffLineType
+)
+
 @Composable
 private fun ColorCodedDiffBody(file: ParsedFile, unidiffPatch: String) {
     val fileLines = extractFileDiffLines(file.path, unidiffPatch)
@@ -1124,24 +1137,45 @@ private fun ColorCodedDiffBody(file: ParsedFile, unidiffPatch: String) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(6.dp)
+                .padding(vertical = 6.dp)
         ) {
             fileLines.forEach { line ->
-                val (bgColor, textColor) = when {
-                    line.startsWith("+") && !line.startsWith("+++") -> Color(0xFF163B21) to Color(0xFF7EE787)
-                    line.startsWith("-") && !line.startsWith("---") -> Color(0xFF3C1E1E) to Color(0xFFFF7B72)
-                    line.startsWith("@@") -> Color(0xFF161B22) to Color(0xFF79C0FF)
-                    else -> Color.Transparent to Color(0xFFC9D1D9)
+                val (bgColor, textColor) = when (line.type) {
+                    DiffLineType.ADDITION -> Color(0xFF163B21) to Color(0xFF7EE787)
+                    DiffLineType.DELETION -> Color(0xFF3C1E1E) to Color(0xFFFF7B72)
+                    DiffLineType.CONTEXT -> Color.Transparent to Color(0xFFC9D1D9)
                 }
 
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(bgColor)
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                        .padding(vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = line,
+                        text = line.oldLineNumber?.toString() ?: "",
+                        modifier = Modifier.width(32.dp).padding(end = 4.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        ),
+                        color = Color(0xFF6E7681)
+                    )
+                    Text(
+                        text = line.newLineNumber?.toString() ?: "",
+                        modifier = Modifier.width(32.dp).padding(end = 8.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        ),
+                        color = Color(0xFF6E7681)
+                    )
+                    Text(
+                        text = line.content,
+                        modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp
@@ -1154,32 +1188,175 @@ private fun ColorCodedDiffBody(file: ParsedFile, unidiffPatch: String) {
     }
 }
 
-private fun extractFileDiffLines(path: String, unidiffPatch: String): List<String> {
+private fun extractFileDiffLines(path: String, unidiffPatch: String): List<ParsedDiffLine> {
     val blocks = unidiffPatch.split(Regex("^diff --git ", RegexOption.MULTILINE))
+    val result = mutableListOf<ParsedDiffLine>()
+
     for (block in blocks) {
         if (block.contains("a/$path") || block.contains("b/$path")) {
             val lines = block.lines()
-            val hunkStartIndex = lines.indexOfFirst { it.startsWith("@@ ") }
-            return if (hunkStartIndex != -1) {
-                lines.subList(hunkStartIndex, lines.size).take(300)
-            } else {
-                lines.filterNot { line ->
-                    line.startsWith("diff ") ||
-                    line.startsWith("index ") ||
-                    line.startsWith("--- ") ||
-                    line.startsWith("+++ ") ||
-                    line.startsWith("old mode ") ||
-                    line.startsWith("new mode ") ||
-                    line.startsWith("deleted file mode ") ||
-                    line.startsWith("new file mode ") ||
-                    line.startsWith("similarity index ") ||
-                    line.contains("a/$path") ||
-                    line.contains("b/$path")
-                }.take(300)
+            var oldLine = 1
+            var newLine = 1
+            var inHunk = false
+
+            for (line in lines) {
+                if (line.startsWith("@@ ")) {
+                    inHunk = true
+                    val match = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""").find(line)
+                    if (match != null) {
+                        oldLine = match.groupValues[1].toInt()
+                        newLine = match.groupValues[2].toInt()
+                    }
+                    continue
+                }
+
+                if (!inHunk) continue
+
+                when {
+                    line.startsWith("+") && !line.startsWith("+++") -> {
+                        result.add(
+                            ParsedDiffLine(
+                                oldLineNumber = null,
+                                newLineNumber = newLine,
+                                content = line,
+                                type = DiffLineType.ADDITION
+                            )
+                        )
+                        newLine++
+                    }
+                    line.startsWith("-") && !line.startsWith("---") -> {
+                        result.add(
+                            ParsedDiffLine(
+                                oldLineNumber = oldLine,
+                                newLineNumber = null,
+                                content = line,
+                                type = DiffLineType.DELETION
+                            )
+                        )
+                        oldLine++
+                    }
+                    line.startsWith(" ") || line.isEmpty() -> {
+                        result.add(
+                            ParsedDiffLine(
+                                oldLineNumber = oldLine,
+                                newLineNumber = newLine,
+                                content = line,
+                                type = DiffLineType.CONTEXT
+                            )
+                        )
+                        oldLine++
+                        newLine++
+                    }
+                }
             }
+            return result.take(300)
         }
     }
     return emptyList()
+}
+
+private sealed interface FileTreeNode {
+    val name: String
+    val fullPath: String
+
+    data class Directory(
+        override val name: String,
+        override val fullPath: String,
+        val children: List<FileTreeNode>
+    ) : FileTreeNode
+
+    data class File(
+        override val name: String,
+        override val fullPath: String,
+        val parsedFile: ParsedFile
+    ) : FileTreeNode
+}
+
+private fun buildFileTree(parsedFiles: List<ParsedFile>): List<FileTreeNode> {
+    class DirBuilder(val name: String, val fullPath: String) {
+        val subDirs = mutableMapOf<String, DirBuilder>()
+        val files = mutableListOf<ParsedFile>()
+
+        fun toTreeNode(): FileTreeNode.Directory {
+            val childrenList = mutableListOf<FileTreeNode>()
+            subDirs.values.sortedBy { it.name }.forEach { dir ->
+                childrenList.add(dir.toTreeNode())
+            }
+            files.sortedBy { it.path.substringAfterLast('/') }.forEach { file ->
+                childrenList.add(
+                    FileTreeNode.File(
+                        name = file.path.substringAfterLast('/'),
+                        fullPath = file.path,
+                        parsedFile = file
+                    )
+                )
+            }
+            return FileTreeNode.Directory(name, fullPath, childrenList)
+        }
+    }
+
+    val rootDirs = mutableMapOf<String, DirBuilder>()
+    val rootFiles = mutableListOf<ParsedFile>()
+
+    for (file in parsedFiles) {
+        val parts = file.path.split('/')
+        if (parts.size == 1) {
+            rootFiles.add(file)
+        } else {
+            val topLevelDirName = parts[0]
+            val topLevelDir = rootDirs.getOrPut(topLevelDirName) {
+                DirBuilder(topLevelDirName, topLevelDirName)
+            }
+            var currentDir = topLevelDir
+            var currentPath = topLevelDirName
+            for (i in 1 until parts.size - 1) {
+                val dirName = parts[i]
+                currentPath = "$currentPath/$dirName"
+                currentDir = currentDir.subDirs.getOrPut(dirName) {
+                    DirBuilder(dirName, currentPath)
+                }
+            }
+            currentDir.files.add(file)
+        }
+    }
+
+    val result = mutableListOf<FileTreeNode>()
+    rootDirs.values.sortedBy { it.name }.forEach { dir ->
+        result.add(dir.toTreeNode())
+    }
+    rootFiles.sortedBy { it.path }.forEach { file ->
+        result.add(
+            FileTreeNode.File(
+                name = file.path,
+                fullPath = file.path,
+                parsedFile = file
+            )
+        )
+    }
+    return result
+}
+
+private data class FlatTreeNode(
+    val node: FileTreeNode,
+    val depth: Int
+)
+
+private fun flattenTreeNodes(
+    nodes: List<FileTreeNode>,
+    expandedFolders: Map<String, Boolean>,
+    depth: Int = 0
+): List<FlatTreeNode> {
+    val result = mutableListOf<FlatTreeNode>()
+    for (node in nodes) {
+        result.add(FlatTreeNode(node, depth))
+        if (node is FileTreeNode.Directory) {
+            val isExpanded = expandedFolders[node.fullPath] ?: true
+            if (isExpanded) {
+                result.addAll(flattenTreeNodes(node.children, expandedFolders, depth + 1))
+            }
+        }
+    }
+    return result
 }
 
 @Composable
@@ -1189,6 +1366,9 @@ private fun ScrollableFileTree(
     onToggleFolder: (String) -> Unit,
     onSelectFile: (String) -> Unit
 ) {
+    val rootNodes = remember(parsedFiles) { buildFileTree(parsedFiles) }
+    val flatNodes = flattenTreeNodes(rootNodes, expandedFolders)
+
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "File Tree",
@@ -1196,30 +1376,72 @@ private fun ScrollableFileTree(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(parsedFiles.size) { idx ->
-                val file = parsedFiles[idx]
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { onSelectFile(file.path) }
-                        .padding(vertical = 4.dp, horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
-                        contentDescription = "File",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = file.path,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            items(flatNodes.size) { idx ->
+                val flatItem = flatNodes[idx]
+                val indent = (flatItem.depth * 12).dp
+                when (val node = flatItem.node) {
+                    is FileTreeNode.Directory -> {
+                        val isExpanded = expandedFolders[node.fullPath] ?: true
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = indent)
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { onToggleFolder(node.fullPath) }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder,
+                                contentDescription = "Folder",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = node.name,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
+                                contentDescription = "Toggle Folder",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    is FileTreeNode.File -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = indent)
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { onSelectFile(node.fullPath) }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
+                                contentDescription = "File",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = node.name,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
         }
