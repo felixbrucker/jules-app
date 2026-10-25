@@ -141,6 +141,23 @@ class SessionListViewModel @Inject constructor(
 
     init {
         syncSessions()
+        loadSelectedFilterChips()
+    }
+
+    private fun loadSelectedFilterChips() {
+        viewModelScope.launch {
+            val savedChipNames = appSettingsRepository.selectedFilterChipsFlow.first()
+            if (savedChipNames.isNotEmpty()) {
+                val restoredChips = savedChipNames.mapNotNull { name ->
+                    try {
+                        SessionFilterChip.valueOf(name)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }.toSet()
+                _selectedChips.value = restoredChips
+            }
+        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -148,10 +165,14 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun toggleFilterChip(chip: SessionFilterChip) {
-        _selectedChips.value = if (_selectedChips.value.contains(chip)) {
+        val updatedSet = if (_selectedChips.value.contains(chip)) {
             _selectedChips.value - chip
         } else {
             _selectedChips.value + chip
+        }
+        _selectedChips.value = updatedSet
+        viewModelScope.launch {
+            appSettingsRepository.saveSelectedFilterChips(updatedSet.map { it.name }.toSet())
         }
     }
 

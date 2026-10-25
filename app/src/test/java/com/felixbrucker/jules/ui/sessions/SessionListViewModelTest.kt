@@ -44,6 +44,8 @@ class SessionListViewModelTest {
         coEvery { julesRepository.getDraftsFlow(any()) } returns flowOf(emptyList())
         coEvery { julesRepository.getSourcesFlow() } returns flowOf(emptyList())
         coEvery { appSettingsRepository.dailySessionLimitFlow } returns flowOf(15)
+        coEvery { appSettingsRepository.selectedFilterChipsFlow } returns flowOf(emptySet())
+        coEvery { appSettingsRepository.lastSelectedSourceIdFlow } returns flowOf(null)
 
         viewModel = SessionListViewModel(julesRepository, appSettingsRepository)
     }
@@ -160,5 +162,26 @@ class SessionListViewModelTest {
 
         viewModel.clearUserError()
         assertNull(viewModel.userError.value)
+    }
+
+    @Test
+    fun testToggleFilterChipPersistsSelectedChips() = runTest {
+        viewModel.toggleFilterChip(SessionFilterChip.COMPLETED)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            appSettingsRepository.saveSelectedFilterChips(setOf("COMPLETED"))
+        }
+    }
+
+    @Test
+    fun testRestoresSelectedFilterChips() = runTest {
+        coEvery { appSettingsRepository.selectedFilterChipsFlow } returns flowOf(setOf("IN_PROGRESS", "AWAITING_FEEDBACK"))
+
+        val vm = SessionListViewModel(julesRepository, appSettingsRepository)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val chips = vm.selectedChips.value
+        assertEquals(setOf(SessionFilterChip.IN_PROGRESS, SessionFilterChip.AWAITING_FEEDBACK), chips)
     }
 }
