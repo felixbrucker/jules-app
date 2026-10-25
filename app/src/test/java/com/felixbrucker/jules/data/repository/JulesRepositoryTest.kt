@@ -1,5 +1,6 @@
 package com.felixbrucker.jules.data.repository
 
+import com.felixbrucker.jules.data.database.ActivityDao
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
@@ -41,6 +42,7 @@ class JulesRepositoryTest {
     private lateinit var sessionDraftDao: SessionDraftDao
     private lateinit var dispatchableWorkflowDao: DispatchableWorkflowDao
     private lateinit var sourceSyncMetadataDao: SourceSyncMetadataDao
+    private lateinit var activityDao: ActivityDao
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
     private lateinit var notificationManager: JulesNotificationManager
@@ -56,6 +58,7 @@ class JulesRepositoryTest {
         sessionDraftDao = mockk(relaxed = true)
         dispatchableWorkflowDao = mockk(relaxed = true)
         sourceSyncMetadataDao = mockk(relaxed = true)
+        activityDao = mockk<ActivityDao>(relaxed = true)
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
         notificationManager = mockk(relaxed = true)
@@ -76,11 +79,17 @@ class JulesRepositoryTest {
             sessionDraftDao = sessionDraftDao,
             dispatchableWorkflowDao = dispatchableWorkflowDao,
             sourceSyncMetadataDao = sourceSyncMetadataDao,
+            activityDao = activityDao,
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,
             notificationManager = notificationManager,
             julesApi = julesApi,
-            gitHubApi = gitHubApi
+            gitHubApi = gitHubApi,
+            moshi = com.squareup.moshi.Moshi.Builder()
+                .add(com.felixbrucker.jules.network.api.adapter.InstantAdapter())
+                .add(com.felixbrucker.jules.network.api.adapter.ActivityAdapter())
+                .addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+                .build()
         )
     }
 

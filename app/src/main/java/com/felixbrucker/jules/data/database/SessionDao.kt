@@ -34,6 +34,14 @@ interface SessionDao {
     @Query("SELECT EXISTS(SELECT 1 FROM sessions WHERE isArchived = 0 AND state IN ('QUEUED', 'PLANNING', 'IN_PROGRESS'))")
     fun hasActiveInProgressSessionsFlow(): Flow<Boolean>
 
+    @Transaction
+    @Query("SELECT * FROM sessions WHERE id = :sessionId")
+    fun getSessionByIdFlow(sessionId: String): Flow<SessionWithPullRequest?>
+
+    @Transaction
+    @Query("SELECT * FROM sessions WHERE id = :sessionId")
+    suspend fun getSessionById(sessionId: String): SessionWithPullRequest?
+
     @Query("SELECT * FROM sessions WHERE id IN (:ids)")
     suspend fun getSessionsByIds(ids: List<String>): List<SessionEntity>
 

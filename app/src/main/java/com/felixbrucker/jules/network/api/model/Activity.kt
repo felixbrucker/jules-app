@@ -253,6 +253,16 @@ data class RestActivity(
     }
 }
 
+fun Activity.toRestActivity(): RestActivity = when (this) {
+    is Activity.UserMessaged -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, userMessaged = UserMessagedDto(userMessage))
+    is Activity.AgentMessaged -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, agentMessaged = AgentMessagedDto(agentMessage))
+    is Activity.PlanGenerated -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, planGenerated = PlanGeneratedDto(plan))
+    is Activity.PlanApproved -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, planApproved = PlanApprovedDto(planId))
+    is Activity.ProgressUpdated -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, artifacts = artifacts, progressUpdated = ProgressUpdatedDto(title, description))
+    is Activity.SessionCompleted -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, artifacts = artifacts, sessionCompleted = SessionCompletedDto())
+    is Activity.SessionFailed -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, artifacts = artifacts, sessionFailed = SessionFailedDto(reason))
+}
+
 @JsonClass(generateAdapter = true)
 data class ActivitiesListResponse(
     @Json(name = "activities") val activities: List<Activity>,

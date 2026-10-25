@@ -1,5 +1,11 @@
 package com.felixbrucker.jules.data.repository
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
+import com.felixbrucker.jules.data.database.ActivityDao
+import com.felixbrucker.jules.data.database.ActivityEntity
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
 import com.felixbrucker.jules.data.database.SessionDao
@@ -16,9 +22,13 @@ import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.toEntity
 import com.felixbrucker.jules.network.api.util.WorkflowDispatchParser
+import com.felixbrucker.jules.network.api.util.UnidiffParser
+import com.felixbrucker.jules.network.api.filter.ActivityFilter
+import com.felixbrucker.jules.network.api.model.Activity
 import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.CreateSessionRequest
 import com.felixbrucker.jules.network.api.model.GitHubRepoContext
+import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.SourceContext
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
@@ -28,6 +38,8 @@ import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.util.periodicTickerFlow
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,6 +49,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -55,11 +68,13 @@ class JulesRepository @Inject constructor(
     private val sessionDraftDao: SessionDraftDao,
     private val dispatchableWorkflowDao: DispatchableWorkflowDao,
     private val sourceSyncMetadataDao: SourceSyncMetadataDao,
+    private val activityDao: ActivityDao,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val notificationManager: JulesNotificationManager,
     private val julesApi: JulesApi,
-    private val gitHubApi: GitHubApi
+    private val gitHubApi: GitHubApi,
+    private val moshi: Moshi
 ) {
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -80,6 +95,22 @@ class JulesRepository @Inject constructor(
             statesIsEmpty = states.isEmpty(),
             includeArchived = includeArchived
         )
+    }
+
+    fun getSessionFlow(sessionId: String): Flow<SessionWithPullRequest?> =
+        sessionDao.getSessionByIdFlow(sessionId)
+
+    fun getLatestActivityWithChangesetFlow(sessionId: String): Flow<ActivityEntity?> =
+        activityDao.getLatestActivityWithChangesetFlow(sessionId)
+
+    fun getActivitiesPagingDataFlow(sessionId: String): Flow<PagingData<Activity>> {
+        return Pager(
+            config = PagingConfig(pageSize = 30, enablePlaceholders = false)
+        ) {
+            activityDao.getActivitiesPagingSource(sessionId)
+        }.flow.map { pagingData ->
+            pagingData.map { entity -> entity.toActivity(moshi) }
+        }
     }
 
     fun getDraftsFlow(searchQuery: String): Flow<List<SessionDraftWithSource>> {
@@ -131,6 +162,57 @@ class JulesRepository @Inject constructor(
         syncArchivedSessions(isBackground = isBackground, force = force)
         syncPullRequests()
         syncWorkflows(force = force)
+    }
+
+    suspend fun syncActivities(sessionId: String, pageSize: Int = 30) = withContext(Dispatchers.IO) {
+        try {
+            val latestActivity = activityDao.getLatestActivityForSession(sessionId)
+            val createTimeFilter = latestActivity?.createTime?.let { ActivityFilter.CreatedAfter(it) }
+
+            var pageToken: String? = null
+            do {
+                val response = julesApi.getActivities(
+                    sessionId = sessionId,
+                    filter = createTimeFilter,
+                    pageSize = pageSize,
+                    pageToken = pageToken
+                )
+
+                val entities = response.activities.map { it.toEntity(sessionId, moshi) }
+                if (entities.isNotEmpty()) {
+                    activityDao.upsertActivities(entities)
+                }
+                pageToken = response.nextPageToken
+            } while (!pageToken.isNullOrBlank())
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.tag(TAG).e(e, "Error syncing activities for session $sessionId")
+            throw e
+        }
+    }
+
+    suspend fun syncSession(sessionId: String) = withContext(Dispatchers.IO) {
+        try {
+            val fetched = julesApi.getSession(sessionId)
+            saveSessions(listOf(fetched.toEntity()), isBackground = false)
+            syncPullRequests()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.tag(TAG).e(e, "Error syncing session $sessionId")
+            throw e
+        }
+    }
+
+    suspend fun sendMessage(sessionId: String, prompt: String) = withContext(Dispatchers.IO) {
+        julesApi.sendMessage(sessionId = sessionId, prompt = prompt)
+        syncActivities(sessionId = sessionId)
+        syncSession(sessionId = sessionId)
+    }
+
+    suspend fun approvePlan(sessionId: String) = withContext(Dispatchers.IO) {
+        julesApi.approvePlan(sessionId = sessionId)
+        syncActivities(sessionId = sessionId)
+        syncSession(sessionId = sessionId)
     }
 
     suspend fun syncSources(force: Boolean = false) = withContext(Dispatchers.IO) {
@@ -499,4 +581,44 @@ class JulesRepository @Inject constructor(
     companion object {
         private const val TAG = "JulesRepository"
     }
+}
+
+private fun Activity.toEntity(sessionId: String, moshi: Moshi): ActivityEntity {
+    val typeName = when (this) {
+        is Activity.UserMessaged -> "USER_MESSAGED"
+        is Activity.AgentMessaged -> "AGENT_MESSAGED"
+        is Activity.PlanGenerated -> "PLAN_GENERATED"
+        is Activity.PlanApproved -> "PLAN_APPROVED"
+        is Activity.ProgressUpdated -> "PROGRESS_UPDATED"
+        is Activity.SessionCompleted -> "SESSION_COMPLETED"
+        is Activity.SessionFailed -> "SESSION_FAILED"
+    }
+
+    val unidiffPatch = when (this) {
+        is Activity.ProgressUpdated -> artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
+        is Activity.SessionCompleted -> artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
+        is Activity.SessionFailed -> artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
+        else -> null
+    }
+
+    val parsedFiles = unidiffPatch?.let { UnidiffParser.parse(it) }
+
+    val activityJson = moshi.adapter(Activity::class.java).toJson(this)
+    val parsedFilesType = Types.newParameterizedType(List::class.java, ParsedFile::class.java)
+    val changedFilesJson = parsedFiles?.let { moshi.adapter<List<ParsedFile>>(parsedFilesType).toJson(it) }
+
+    return ActivityEntity(
+        id = id,
+        sessionId = sessionId,
+        originator = originator.name,
+        createTime = createTime,
+        type = typeName,
+        activityJson = activityJson,
+        unidiffPatch = unidiffPatch,
+        changedFilesJson = changedFilesJson
+    )
+}
+
+private fun ActivityEntity.toActivity(moshi: Moshi): Activity {
+    return moshi.adapter(Activity::class.java).fromJson(activityJson)!!
 }

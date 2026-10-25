@@ -2,6 +2,7 @@ package com.felixbrucker.jules.di
 
 import android.content.Context
 import androidx.room.Room
+import com.felixbrucker.jules.data.database.ActivityDao
 import com.felixbrucker.jules.data.database.AppDatabase
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.SessionDao
@@ -72,5 +73,11 @@ object DatabaseModule {
     @Singleton
     fun provideSourceSyncMetadataDao(database: AppDatabase): SourceSyncMetadataDao {
         return database.sourceSyncMetadataDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideActivityDao(database: AppDatabase): ActivityDao {
+        return database.activityDao()
     }
 }

@@ -2,8 +2,8 @@ package com.felixbrucker.jules.network.api.adapter
 
 import com.felixbrucker.jules.network.api.model.Activity
 import com.felixbrucker.jules.network.api.model.RestActivity
+import com.felixbrucker.jules.network.api.model.toRestActivity
 import com.squareup.moshi.FromJson
-import com.squareup.moshi.JsonWriter
 import com.squareup.moshi.ToJson
 
 class ActivityAdapter {
@@ -16,7 +16,7 @@ class ActivityAdapter {
 
     @Suppress("unused")
     @ToJson
-    fun toJson(writer: JsonWriter, value: Activity) {
-        throw UnsupportedOperationException("Activity serialization is not supported")
+    fun toJson(activity: Activity): RestActivity {
+        return activity.toRestActivity()
     }
 }
