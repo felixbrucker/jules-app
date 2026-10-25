@@ -243,8 +243,7 @@ class SettingsViewModel @Inject constructor(
             isForceSyncing = true
             try {
                 julesRepository.sync(force = true)
-            } catch (e: Exception) {
-                Timber.e(e, "Force sync failed")
+            } catch (_: Exception) {
             } finally {
                 isForceSyncing = false
             }

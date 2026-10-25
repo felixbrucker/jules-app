@@ -15,7 +15,12 @@ fun JulesApi.Companion.createForTesting(
 
     val julesAuthInterceptor = JulesAuthInterceptor(mockAppSettingsRepository)
     val userAgentInterceptor = UserAgentInterceptor()
-    val okHttpClient = NetworkModule.provideJulesOkHttpClient(julesAuthInterceptor, userAgentInterceptor)
+    val loggingInterceptor = LoggingInterceptor(mockAppSettingsRepository)
+    val okHttpClient = NetworkModule.provideJulesOkHttpClient(
+        julesAuthInterceptor = julesAuthInterceptor,
+        userAgentInterceptor = userAgentInterceptor,
+        loggingInterceptor = loggingInterceptor
+    )
     val moshi = NetworkModule.provideMoshi()
     val apiService = NetworkModule.provideJulesApiService(
         okHttpClient = okHttpClient,

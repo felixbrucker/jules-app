@@ -42,8 +42,8 @@ data class Plan(
 @JsonClass(generateAdapter = true)
 data class GitPatch(
     @Json(name = "unidiffPatch") val unidiffPatch: String,
-    @Json(name = "baseCommitId") val baseCommitId: String,
-    @Json(name = "suggestedCommitMessage") val suggestedCommitMessage: String
+    @Json(name = "baseCommitId") val baseCommitId: String? = null,
+    @Json(name = "suggestedCommitMessage") val suggestedCommitMessage: String? = null
 )
 
 @JsonClass(generateAdapter = true)

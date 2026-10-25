@@ -227,7 +227,8 @@ private fun DailySessionLimitIndicator(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(RoundedCornerShape(2.dp)),
+            drawStopIndicator = {}
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(

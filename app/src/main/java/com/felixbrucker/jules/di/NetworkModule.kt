@@ -3,6 +3,7 @@ package com.felixbrucker.jules.di
 import com.felixbrucker.jules.network.api.JulesAuthInterceptor
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.GitHubAuthInterceptor
+import com.felixbrucker.jules.network.api.LoggingInterceptor
 import com.felixbrucker.jules.network.api.UserAgentInterceptor
 import com.felixbrucker.jules.network.api.GitHubApiService
 import com.felixbrucker.jules.network.api.JulesApi
@@ -67,11 +68,13 @@ object NetworkModule {
     @JulesClient
     fun provideJulesOkHttpClient(
         julesAuthInterceptor: JulesAuthInterceptor,
-        userAgentInterceptor: UserAgentInterceptor
+        userAgentInterceptor: UserAgentInterceptor,
+        loggingInterceptor: LoggingInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(userAgentInterceptor)
             .addInterceptor(julesAuthInterceptor)
+            .addInterceptor(loggingInterceptor)
             .build()
     }
 
@@ -80,11 +83,13 @@ object NetworkModule {
     @GitHubClient
     fun provideGitHubOkHttpClient(
         gitHubAuthInterceptor: GitHubAuthInterceptor,
-        userAgentInterceptor: UserAgentInterceptor
+        userAgentInterceptor: UserAgentInterceptor,
+        loggingInterceptor: LoggingInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(userAgentInterceptor)
             .addInterceptor(gitHubAuthInterceptor)
+            .addInterceptor(loggingInterceptor)
             .build()
     }
 

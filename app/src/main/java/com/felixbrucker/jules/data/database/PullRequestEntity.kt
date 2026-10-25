@@ -11,8 +11,8 @@ import com.felixbrucker.jules.network.api.model.PullRequestState
     foreignKeys = [
         ForeignKey(
             entity = SessionEntity::class,
-            parentColumns = ["pull_request_url"],
-            childColumns = ["url"],
+            parentColumns = ["id"],
+            childColumns = ["sessionId"],
             onUpdate = ForeignKey.CASCADE,
             onDelete = ForeignKey.CASCADE
         )
@@ -23,6 +23,7 @@ import com.felixbrucker.jules.network.api.model.PullRequestState
 )
 data class PullRequestEntity(
     @PrimaryKey
+    val sessionId: String,
     val url: String,
     val state: PullRequestState
 )

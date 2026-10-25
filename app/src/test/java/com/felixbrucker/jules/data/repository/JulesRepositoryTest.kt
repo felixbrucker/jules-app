@@ -125,7 +125,7 @@ class JulesRepositoryTest {
         coVerify {
             sessionDao.getActiveSessionsWithPullRequests(includePrivate = false)
             gitHubApi.getPullRequestState(prUrl)
-            pullRequestDao.upsertPullRequests(listOf(PullRequestEntity(url = prUrl, state = PullRequestState.MERGED)))
+            pullRequestDao.upsertPullRequests(listOf(PullRequestEntity(sessionId = "sess-1", url = prUrl, state = PullRequestState.MERGED)))
         }
     }
 
