@@ -2,8 +2,10 @@ package com.felixbrucker.jules.network.api
 
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
@@ -13,14 +15,36 @@ import javax.inject.Singleton
 
 @Singleton
 class LoggingInterceptor @Inject constructor(
-    private val appSettingsRepository: AppSettingsRepository
+    appSettingsRepository: AppSettingsRepository
 ) : Interceptor {
+
+    private val externalScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    private var apiKey: String? = null
+
+    @Volatile
+    private var githubToken: String? = null
+
+    init {
+        externalScope.launch {
+            appSettingsRepository.apiKeyFlow.collect { key ->
+                apiKey = key
+            }
+        }
+        externalScope.launch {
+            appSettingsRepository.githubAuthTokenFlow.collect { token ->
+                githubToken = token
+            }
+        }
+    }
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val url = request.url.toString()
 
-        val (apiKey, githubToken) = getCredentials()
+        val currentApiKey = apiKey
+        val currentGithubToken = githubToken
 
         val logBuffer = StringBuilder()
         val loggingInterceptor = HttpLoggingInterceptor { line ->
@@ -36,7 +60,7 @@ class LoggingInterceptor @Inject constructor(
             loggingInterceptor.intercept(chain)
         } catch (e: Exception) {
             if (e !is CancellationException) {
-                val sanitizedLog = sanitizeLog(logBuffer.toString(), apiKey, githubToken)
+                val sanitizedLog = sanitizeLog(logBuffer.toString(), currentApiKey, currentGithubToken)
                 if (sanitizedLog.isNotEmpty()) {
                     Timber.tag(TAG).e(e, sanitizedLog)
                 } else {
@@ -46,7 +70,7 @@ class LoggingInterceptor @Inject constructor(
             throw e
         }
 
-        val sanitizedLog = sanitizeLog(logBuffer.toString(), apiKey, githubToken)
+        val sanitizedLog = sanitizeLog(logBuffer.toString(), currentApiKey, currentGithubToken)
         if (sanitizedLog.isNotEmpty()) {
             if (response.isSuccessful) {
                 Timber.tag(TAG).d(sanitizedLog)
@@ -56,18 +80,6 @@ class LoggingInterceptor @Inject constructor(
         }
 
         return response
-    }
-
-    private fun getCredentials(): Pair<String?, String?> {
-        return try {
-            runBlocking {
-                val key = appSettingsRepository.apiKeyFlow.first()
-                val token = appSettingsRepository.githubAuthTokenFlow.first()
-                Pair(key, token)
-            }
-        } catch (_: Exception) {
-            Pair(null, null)
-        }
     }
 
     private fun sanitizeLog(rawLog: String, apiKey: String?, githubToken: String?): String {
