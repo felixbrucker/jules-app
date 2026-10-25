@@ -2,6 +2,7 @@ package com.felixbrucker.jules.ui.sessions
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -18,6 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -31,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceEntity
@@ -172,7 +176,7 @@ private fun BranchSelectionDropdown(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f).padding(end = 8.dp)
         )
-        androidx.compose.foundation.layout.Box {
+        Box {
             Surface(
                 modifier = Modifier.clickable { expanded = true },
                 shape = RoundedCornerShape(8.dp),
@@ -187,7 +191,7 @@ private fun BranchSelectionDropdown(
                         text = selectedOption.ifBlank { "Select Branch" },
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    androidx.compose.material3.Icon(
+                    Icon(
                         imageVector = Icons.Default.ArrowDropDown,
                         contentDescription = "Select branch"
                     )
@@ -260,8 +264,8 @@ private fun NumberInputField(
             onValueChange = onValueChange,
             modifier = Modifier.width(130.dp),
             singleLine = true,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number
             )
         )
     }
@@ -291,7 +295,7 @@ private fun ChoiceInputField(
                 )
             }
         }
-        androidx.compose.foundation.layout.Box {
+        Box {
             Surface(
                 modifier = Modifier.clickable { expanded = true },
                 shape = RoundedCornerShape(8.dp),
@@ -306,7 +310,7 @@ private fun ChoiceInputField(
                         text = currentValue.ifBlank { "Select" },
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    androidx.compose.material3.Icon(
+                    Icon(
                         imageVector = Icons.Default.ArrowDropDown,
                         contentDescription = null
                     )
