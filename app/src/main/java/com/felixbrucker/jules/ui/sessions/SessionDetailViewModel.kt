@@ -8,6 +8,8 @@ import androidx.paging.cachedIn
 import androidx.paging.insertSeparators
 import androidx.paging.map
 import com.felixbrucker.jules.data.database.ActivityEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
+import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.Activity
@@ -155,6 +157,44 @@ class SessionDetailViewModel @Inject constructor(
 
     private val _errorEvents = MutableSharedFlow<String>()
     val errorEvents: SharedFlow<String> = _errorEvents.asSharedFlow()
+
+    private val _dispatchDialogState = MutableStateFlow<DispatchDialogState?>(null)
+    val dispatchDialogState: StateFlow<DispatchDialogState?> = _dispatchDialogState.asStateFlow()
+
+    fun openDispatchDialog(session: SessionEntity, workflow: DispatchableWorkflowEntity) {
+        _dispatchDialogState.value = DispatchDialogState(session = session, workflow = workflow)
+    }
+
+    fun dismissDispatchDialog() {
+        _dispatchDialogState.value = null
+    }
+
+    fun dispatchWorkflow(
+        session: SessionEntity,
+        workflow: DispatchableWorkflowEntity,
+        branch: String,
+        inputs: Map<String, String>
+    ) {
+        val repo = session.repo ?: return
+        viewModelScope.launch {
+            _dispatchDialogState.value = _dispatchDialogState.value?.copy(isDispatching = true, errorMessage = null)
+            try {
+                julesRepository.dispatchWorkflow(
+                    owner = repo.owner,
+                    repo = repo.name,
+                    workflowId = workflow.workflowId.toString(),
+                    ref = branch,
+                    inputs = inputs
+                )
+                dismissDispatchDialog()
+            } catch (e: Exception) {
+                _dispatchDialogState.value = _dispatchDialogState.value?.copy(
+                    isDispatching = false,
+                    errorMessage = e.message ?: "Failed to dispatch workflow"
+                )
+            }
+        }
+    }
 
     private var pollingJob: Job? = null
 

@@ -1189,7 +1189,7 @@ private fun SessionCardFooter(
 }
 
 @Composable
-private fun PullRequestChip(
+fun PullRequestChip(
     pr: EmbeddedPullRequest,
     pullRequestState: PullRequestState?,
     workflows: List<DispatchableWorkflowEntity>,

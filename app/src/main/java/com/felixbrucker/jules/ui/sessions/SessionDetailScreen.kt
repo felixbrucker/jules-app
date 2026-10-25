@@ -124,6 +124,7 @@ fun SessionDetailScreen(
     val splitRatio by viewModel.splitRatio.collectAsState()
     val isSendingMessage by viewModel.isSendingMessage.collectAsState()
     val isApprovingPlan by viewModel.isApprovingPlan.collectAsState()
+    val dispatchState by viewModel.dispatchDialogState.collectAsState()
     val errorEvent by viewModel.errorEvents.collectAsState(initial = null)
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -140,6 +141,20 @@ fun SessionDetailScreen(
 
     val session = sessionWithPr?.session
 
+    dispatchState?.let { state ->
+        DispatchWorkflowDialog(
+            session = state.session,
+            workflow = state.workflow,
+            source = null,
+            isDispatching = state.isDispatching,
+            errorMessage = state.errorMessage,
+            onDismiss = { viewModel.dismissDispatchDialog() },
+            onConfirmDispatch = { branch, inputs ->
+                viewModel.dispatchWorkflow(state.session, state.workflow, branch, inputs)
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
@@ -151,7 +166,8 @@ fun SessionDetailScreen(
                     onBackClick = onBackClick,
                     onArchive = { viewModel.archiveSession() },
                     onUnarchive = { viewModel.unarchiveSession() },
-                    onDelete = { viewModel.deleteSession(onBackClick) }
+                    onDelete = { viewModel.deleteSession(onBackClick) },
+                    onSelectWorkflow = { wf -> viewModel.openDispatchDialog(it, wf) }
                 )
             }
         }
@@ -187,7 +203,8 @@ private fun SessionDetailTopBar(
     onBackClick: () -> Unit,
     onArchive: () -> Unit,
     onUnarchive: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSelectWorkflow: (com.felixbrucker.jules.data.database.DispatchableWorkflowEntity) -> Unit
 ) {
     val session = sessionWithPr.session
     var menuExpanded by remember { mutableStateOf(false) }
@@ -225,7 +242,8 @@ private fun SessionDetailTopBar(
                 onMenuToggle = { menuExpanded = it },
                 onArchive = onArchive,
                 onUnarchive = onUnarchive,
-                onDelete = onDelete
+                onDelete = onDelete,
+                onSelectWorkflow = onSelectWorkflow
             )
         }
     }
@@ -271,6 +289,11 @@ private fun RowScope.SessionTopBarLeftSection(
                     maxLines = 1
                 )
             }
+            Text(
+                text = "•",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         Text(
             text = session.title ?: "Untitled",
@@ -299,7 +322,8 @@ private fun SessionTopBarRightSection(
     onMenuToggle: (Boolean) -> Unit,
     onArchive: () -> Unit,
     onUnarchive: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSelectWorkflow: (com.felixbrucker.jules.data.database.DispatchableWorkflowEntity) -> Unit
 ) {
     val session = sessionWithPr.session
     val context = LocalContext.current
@@ -317,10 +341,12 @@ private fun SessionTopBarRightSection(
                     )
                 }
             ) {
-                AssistChip(
-                    modifier = Modifier.height(28.dp),
-                    onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, pr.url.toUri())) },
-                    label = { Text("PR #${pr.number ?: ""}", style = MaterialTheme.typography.labelSmall) }
+                PullRequestChip(
+                    pr = pr,
+                    pullRequestState = sessionWithPr.pullRequestState,
+                    workflows = sessionWithPr.workflows,
+                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
+                    onWorkflowSelected = onSelectWorkflow
                 )
             }
         }
@@ -410,8 +436,8 @@ private fun SessionDetailSplitContent(
             .onGloballyPositioned { containerWidthPx = it.size.width }
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            if (splitRatio > 0.0f) {
-                Box(modifier = Modifier.weight(splitRatio.coerceAtLeast(0.01f))) {
+            Box(modifier = Modifier.weight(splitRatio.coerceAtLeast(0.0001f))) {
+                if (splitRatio > 0.0f) {
                     ChatWindowView(
                         session = session,
                         activities = activities,
@@ -429,8 +455,8 @@ private fun SessionDetailSplitContent(
                 onSplitRatioChange = onSplitRatioChange
             )
 
-            if (splitRatio < 1.0f) {
-                Box(modifier = Modifier.weight((1.0f - splitRatio).coerceAtLeast(0.01f))) {
+            Box(modifier = Modifier.weight((1.0f - splitRatio).coerceAtLeast(0.0001f))) {
+                if (splitRatio < 1.0f) {
                     FileDiffView(
                         currentDiff = currentDiff,
                         isFullScreen = (splitRatio == 0.0f)
@@ -448,6 +474,7 @@ private fun SplitDividerHandle(
     onSplitRatioChange: (Float) -> Unit
 ) {
     val currentOnSplitRatioChange by rememberUpdatedState(onSplitRatioChange)
+    val currentSplitRatio by rememberUpdatedState(splitRatio)
 
     Box(
         modifier = Modifier
@@ -455,14 +482,14 @@ private fun SplitDividerHandle(
             .width(20.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .pointerInput(containerWidthPx) {
-                var currentRatio = splitRatio
+                var dragRatio = 0f
                 detectHorizontalDragGestures(
-                    onDragStart = { currentRatio = splitRatio },
+                    onDragStart = { dragRatio = currentSplitRatio },
                     onHorizontalDrag = { change, dragAmount ->
                         change.consume()
                         if (containerWidthPx > 0) {
-                            currentRatio += dragAmount / containerWidthPx.toFloat()
-                            currentOnSplitRatioChange(currentRatio)
+                            dragRatio += dragAmount / containerWidthPx.toFloat()
+                            currentOnSplitRatioChange(dragRatio)
                         }
                     }
                 )
