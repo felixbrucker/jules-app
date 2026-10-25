@@ -11,7 +11,7 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceEntity
 import com.felixbrucker.jules.data.database.WorkflowDispatchDao
-import com.felixbrucker.jules.data.database.WorkflowDispatchEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.toEntity
 import com.felixbrucker.jules.network.api.util.WorkflowDispatchParser
 import com.felixbrucker.jules.network.api.model.AutomationMode
@@ -436,14 +436,14 @@ class JulesRepository @Inject constructor(
                                 val activeWorkflows = gitHubApi.getWorkflows(owner = repo.owner, repo = repo.repo)
                                     .filter { it.state.equals("active", ignoreCase = true) }
 
-                                val entitiesForSource = mutableListOf<WorkflowDispatchEntity>()
+                                val entitiesForSource = mutableListOf<DispatchableWorkflowEntity>()
                                 for (wf in activeWorkflows) {
                                     try {
                                         val content = gitHubApi.getWorkflowContent(owner = repo.owner, repo = repo.repo, path = wf.path)
                                         val parsed = WorkflowDispatchParser.parseWorkflowDispatch(content)
                                         if (parsed.hasWorkflowDispatch) {
                                             entitiesForSource.add(
-                                                WorkflowDispatchEntity(
+                                                DispatchableWorkflowEntity(
                                                     id = "${source.id}_${wf.id}",
                                                     sourceId = source.id,
                                                     workflowId = wf.id,

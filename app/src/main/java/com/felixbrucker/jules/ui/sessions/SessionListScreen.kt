@@ -120,7 +120,7 @@ import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
-import com.felixbrucker.jules.data.database.WorkflowDispatchEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
 import kotlin.math.roundToInt
@@ -644,7 +644,7 @@ private fun SessionLazyColumn(
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit,
-    onSelectWorkflow: (SessionEntity, WorkflowDispatchEntity) -> Unit
+    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -687,7 +687,7 @@ private fun SessionCard(
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit,
-    onSelectWorkflow: (SessionEntity, WorkflowDispatchEntity) -> Unit
+    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit
 ) {
     val session = sessionWithPullRequest.session
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -1082,8 +1082,8 @@ private fun RoundedBadge(text: String, color: Color) {
 private fun SessionCardFooter(
     session: SessionEntity,
     pullRequestState: PullRequestState?,
-    workflows: List<WorkflowDispatchEntity>,
-    onSelectWorkflow: (WorkflowDispatchEntity) -> Unit
+    workflows: List<DispatchableWorkflowEntity>,
+    onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
 ) {
     val context = LocalContext.current
     val timeToFormat = session.updateTime ?: session.createTime
@@ -1144,9 +1144,9 @@ private fun SessionCardFooter(
 private fun PullRequestChip(
     pr: EmbeddedPullRequest,
     pullRequestState: PullRequestState?,
-    workflows: List<WorkflowDispatchEntity>,
+    workflows: List<DispatchableWorkflowEntity>,
     onPrClick: (String) -> Unit,
-    onWorkflowSelected: (WorkflowDispatchEntity) -> Unit
+    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
 ) {
     if (workflows.isEmpty()) {
         SimplePullRequestChip(
@@ -1193,9 +1193,9 @@ private fun SimplePullRequestChip(
 private fun CompoundPullRequestWorkflowButton(
     pr: EmbeddedPullRequest,
     pullRequestState: PullRequestState?,
-    workflows: List<WorkflowDispatchEntity>,
+    workflows: List<DispatchableWorkflowEntity>,
     onPrClick: (String) -> Unit,
-    onWorkflowSelected: (WorkflowDispatchEntity) -> Unit
+    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
 ) {
     val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
     val prNumberText = pr.number?.let { " (#$it)" } ?: ""
@@ -1266,9 +1266,9 @@ private fun CompoundPullRequestWorkflowButton(
 @Composable
 private fun WorkflowDropdownMenu(
     expanded: Boolean,
-    workflows: List<WorkflowDispatchEntity>,
+    workflows: List<DispatchableWorkflowEntity>,
     onDismiss: () -> Unit,
-    onWorkflowSelected: (WorkflowDispatchEntity) -> Unit
+    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
 ) {
     DropdownMenu(
         expanded = expanded,

@@ -1,7 +1,7 @@
 package com.felixbrucker.jules.ui.sessions
 
 import com.felixbrucker.jules.data.database.SessionEntity
-import com.felixbrucker.jules.data.database.WorkflowDispatchEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.Repo
@@ -68,7 +68,7 @@ class SessionListViewModelTest {
             pullRequest = null,
             changeSet = null
         )
-        val workflow = WorkflowDispatchEntity(
+        val workflow = DispatchableWorkflowEntity(
             id = "github/owner/repo_123",
             sourceId = "github/owner/repo",
             workflowId = 123L,
@@ -104,7 +104,7 @@ class SessionListViewModelTest {
             pullRequest = null,
             changeSet = null
         )
-        val workflow = WorkflowDispatchEntity(
+        val workflow = DispatchableWorkflowEntity(
             id = "github/owner/repo_123",
             sourceId = "github/owner/repo",
             workflowId = 123L,

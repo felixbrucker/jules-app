@@ -33,14 +33,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceEntity
-import com.felixbrucker.jules.data.database.WorkflowDispatchEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.network.api.model.WorkflowInput
 import com.felixbrucker.jules.ui.components.LoadingStateButton
 
 @Composable
 fun DispatchWorkflowDialog(
     session: SessionEntity,
-    workflow: WorkflowDispatchEntity,
+    workflow: DispatchableWorkflowEntity,
     source: SourceEntity?,
     isDispatching: Boolean,
     errorMessage: String?,

@@ -10,7 +10,7 @@ import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceEntity
-import com.felixbrucker.jules.data.database.WorkflowDispatchEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.SessionState
@@ -245,7 +245,7 @@ class SessionListViewModel @Inject constructor(
         }
     }
 
-    fun openDispatchDialog(session: SessionEntity, workflow: WorkflowDispatchEntity) {
+    fun openDispatchDialog(session: SessionEntity, workflow: DispatchableWorkflowEntity) {
         _dispatchDialogState.value = DispatchDialogState(session = session, workflow = workflow)
     }
 
@@ -255,7 +255,7 @@ class SessionListViewModel @Inject constructor(
 
     fun dispatchWorkflow(
         session: SessionEntity,
-        workflow: WorkflowDispatchEntity,
+        workflow: DispatchableWorkflowEntity,
         branch: String,
         inputs: Map<String, String>
     ) {
@@ -300,7 +300,7 @@ data class SessionFilterParams(
 
 data class DispatchDialogState(
     val session: SessionEntity,
-    val workflow: WorkflowDispatchEntity,
+    val workflow: DispatchableWorkflowEntity,
     val isDispatching: Boolean = false,
     val errorMessage: String? = null
 )

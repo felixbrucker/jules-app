@@ -21,7 +21,7 @@ import com.felixbrucker.jules.network.api.model.WorkflowInput
         Index(value = ["sourceId"])
     ]
 )
-data class WorkflowDispatchEntity(
+data class DispatchableWorkflowEntity(
     @PrimaryKey
     val id: String,
     val sourceId: String,

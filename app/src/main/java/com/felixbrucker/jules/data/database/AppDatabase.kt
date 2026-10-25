@@ -8,7 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [SessionEntity::class, PullRequestEntity::class, SourceEntity::class, LogEntity::class, SessionDraftEntity::class, WorkflowDispatchEntity::class],
+    entities = [SessionEntity::class, PullRequestEntity::class, SourceEntity::class, LogEntity::class, SessionDraftEntity::class, DispatchableWorkflowEntity::class],
     version = 7,
     exportSchema = true,
     autoMigrations = [
