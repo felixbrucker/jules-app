@@ -10,7 +10,12 @@ import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceEntity
+import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
+import com.felixbrucker.jules.data.database.SourceSyncMetadataEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.toEntity
+import com.felixbrucker.jules.network.api.util.WorkflowDispatchParser
 import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.CreateSessionRequest
 import com.felixbrucker.jules.network.api.model.GitHubRepoContext
@@ -48,6 +53,8 @@ class JulesRepository @Inject constructor(
     private val pullRequestDao: PullRequestDao,
     private val sourceDao: SourceDao,
     private val sessionDraftDao: SessionDraftDao,
+    private val dispatchableWorkflowDao: DispatchableWorkflowDao,
+    private val sourceSyncMetadataDao: SourceSyncMetadataDao,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val notificationManager: JulesNotificationManager,
@@ -123,6 +130,7 @@ class JulesRepository @Inject constructor(
         syncSessions(isBackground = isBackground)
         syncArchivedSessions(isBackground = isBackground, force = force)
         syncPullRequests()
+        syncWorkflows(force = force)
     }
 
     suspend fun syncSources(force: Boolean = false) = withContext(Dispatchers.IO) {
@@ -399,6 +407,93 @@ class JulesRepository @Inject constructor(
             Timber.tag(TAG).e(e, "Failed to unarchive session $sessionId")
             throw e
         }
+    }
+
+    suspend fun syncWorkflows(force: Boolean = false) = withContext(Dispatchers.IO) {
+        try {
+            val githubToken = appSettingsRepository.githubAuthTokenFlow.first()
+            if (githubToken.isNullOrBlank()) {
+                return@withContext
+            }
+
+            val thresholdEpochMillis = Instant.now().minus(Duration.ofDays(14)).toEpochMilli()
+            val usableSources = sourceDao.getSourcesNeedingWorkflowSync(
+                thresholdEpochMillis = thresholdEpochMillis,
+                force = force
+            )
+
+            if (usableSources.isEmpty()) {
+                return@withContext
+            }
+
+            val semaphore = Semaphore(4)
+            coroutineScope {
+                usableSources.map { source ->
+                    async {
+                        semaphore.withPermit {
+                            try {
+                                val repo = source.githubRepo!!
+                                val activeWorkflows = gitHubApi.getWorkflows(owner = repo.owner, repo = repo.repo)
+                                    .filter { it.state.equals("active", ignoreCase = true) }
+
+                                val entitiesForSource = mutableListOf<DispatchableWorkflowEntity>()
+                                for (wf in activeWorkflows) {
+                                    try {
+                                        val content = gitHubApi.getWorkflowContent(owner = repo.owner, repo = repo.repo, path = wf.path)
+                                        val parsed = WorkflowDispatchParser.parseWorkflowDispatch(content)
+                                        if (parsed.hasWorkflowDispatch) {
+                                            entitiesForSource.add(
+                                                DispatchableWorkflowEntity(
+                                                    id = "${source.id}_${wf.id}",
+                                                    sourceId = source.id,
+                                                    workflowId = wf.id,
+                                                    name = wf.name,
+                                                    inputs = parsed.inputs
+                                                )
+                                            )
+                                        }
+                                    } catch (e: Exception) {
+                                        if (e is CancellationException) throw e
+                                        Timber.tag(TAG).e(e, "Failed to fetch/parse workflow content for ${wf.path} in ${source.id}")
+                                    }
+                                }
+
+                                if (entitiesForSource.isNotEmpty()) {
+                                    dispatchableWorkflowDao.upsertWorkflows(entitiesForSource)
+                                }
+                                sourceSyncMetadataDao.updateLastWorkflowSyncedAtTargeted(
+                                    sourceId = source.id,
+                                    timestamp = Instant.now()
+                                )
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                Timber.tag(TAG).e(e, "Failed to fetch workflows for source ${source.id}")
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.tag(TAG).e(e, "Error syncing workflows")
+            throw e
+        }
+    }
+
+    suspend fun dispatchWorkflow(
+        owner: String,
+        repo: String,
+        workflowId: String,
+        ref: String,
+        inputs: Map<String, String>? = null
+    ) = withContext(Dispatchers.IO) {
+        gitHubApi.dispatchWorkflow(
+            owner = owner,
+            repo = repo,
+            workflowId = workflowId,
+            ref = ref,
+            inputs = inputs
+        )
     }
 
     companion object {

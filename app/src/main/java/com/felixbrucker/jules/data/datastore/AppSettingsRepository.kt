@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,8 @@ class AppSettingsRepository @Inject constructor(
         val DAILY_SESSION_LIMIT = intPreferencesKey("daily_session_limit")
         val FEEDBACK_NOTIFICATIONS_ENABLED = booleanPreferencesKey("feedback_notifications_enabled")
         val COMPLETION_NOTIFICATIONS_ENABLED = booleanPreferencesKey("completion_notifications_enabled")
+        val LAST_SELECTED_SOURCE_ID = stringPreferencesKey("last_selected_source_id")
+        val SELECTED_FILTER_CHIPS = stringSetPreferencesKey("selected_filter_chips")
     }
 
     val appSettingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -75,6 +78,12 @@ class AppSettingsRepository @Inject constructor(
 
     val completionNotificationsEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true }
+
+    val lastSelectedSourceIdFlow: Flow<String?> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.LAST_SELECTED_SOURCE_ID] }
+
+    val selectedFilterChipsFlow: Flow<Set<String>> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.SELECTED_FILTER_CHIPS] ?: emptySet() }
 
     suspend fun saveApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
@@ -125,6 +134,22 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setCompletionNotificationsEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveLastSelectedSourceId(sourceId: String?) {
+        context.dataStore.edit { preferences ->
+            if (sourceId.isNullOrBlank()) {
+                preferences.remove(PreferencesKeys.LAST_SELECTED_SOURCE_ID)
+            } else {
+                preferences[PreferencesKeys.LAST_SELECTED_SOURCE_ID] = sourceId
+            }
+        }
+    }
+
+    suspend fun saveSelectedFilterChips(chips: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SELECTED_FILTER_CHIPS] = chips
         }
     }
 }

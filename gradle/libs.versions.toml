@@ -23,8 +23,10 @@ lifecycle = "2.11.0"
 paging = "3.5.3"
 ksp = "2.3.12"
 kotlin = "2.4.21"
+kaml = "0.72.0"
 
 [libraries]
+kaml = { group = "com.charleskorn.kaml", name = "kaml", version.ref = "kaml" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
@@ -77,3 +79,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

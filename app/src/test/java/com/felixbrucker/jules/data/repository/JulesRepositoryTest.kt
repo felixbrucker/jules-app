@@ -8,6 +8,8 @@ import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceDao
+import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.notification.JulesNotificationManager
@@ -37,6 +39,8 @@ class JulesRepositoryTest {
     private lateinit var pullRequestDao: PullRequestDao
     private lateinit var sourceDao: SourceDao
     private lateinit var sessionDraftDao: SessionDraftDao
+    private lateinit var dispatchableWorkflowDao: DispatchableWorkflowDao
+    private lateinit var sourceSyncMetadataDao: SourceSyncMetadataDao
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
     private lateinit var notificationManager: JulesNotificationManager
@@ -50,6 +54,8 @@ class JulesRepositoryTest {
         pullRequestDao = mockk(relaxed = true)
         sourceDao = mockk(relaxed = true)
         sessionDraftDao = mockk(relaxed = true)
+        dispatchableWorkflowDao = mockk(relaxed = true)
+        sourceSyncMetadataDao = mockk(relaxed = true)
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
         notificationManager = mockk(relaxed = true)
@@ -68,6 +74,8 @@ class JulesRepositoryTest {
             pullRequestDao = pullRequestDao,
             sourceDao = sourceDao,
             sessionDraftDao = sessionDraftDao,
+            dispatchableWorkflowDao = dispatchableWorkflowDao,
+            sourceSyncMetadataDao = sourceSyncMetadataDao,
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,
             notificationManager = notificationManager,
@@ -279,6 +287,50 @@ class JulesRepositoryTest {
         coVerify {
             notificationManager.sendTaskFeedbackNotification(any())
             notificationManager.sendTaskCompletedNotification(any())
+        }
+    }
+
+    @Test
+    fun testSyncWorkflowsNoAuthTokenDoesNothing() = runBlocking {
+        coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf(null)
+
+        repository.syncWorkflows(force = false)
+
+        coVerify(exactly = 0) {
+            sourceDao.getSourcesNeedingWorkflowSync(any(), any())
+        }
+    }
+
+    @Test
+    fun testSyncWorkflowsWithTokenQueriesSourcesNeedingSync() = runBlocking {
+        coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf("ghp_token")
+        coEvery { sourceDao.getSourcesNeedingWorkflowSync(any(), any()) } returns emptyList()
+
+        repository.syncWorkflows(force = false)
+
+        coVerify {
+            sourceDao.getSourcesNeedingWorkflowSync(thresholdEpochMillis = any(), force = false)
+        }
+    }
+
+    @Test
+    fun testDispatchWorkflow() = runBlocking {
+        repository.dispatchWorkflow(
+            owner = "octocat",
+            repo = "Hello-World",
+            workflowId = "12345",
+            ref = "main",
+            inputs = mapOf("param" to "value")
+        )
+
+        coVerify {
+            gitHubApi.dispatchWorkflow(
+                owner = "octocat",
+                repo = "Hello-World",
+                workflowId = "12345",
+                ref = "main",
+                inputs = mapOf("param" to "value")
+            )
         }
     }
 }

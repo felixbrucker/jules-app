@@ -7,8 +7,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
+import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.SessionState
@@ -19,11 +21,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 enum class SessionFilterChip(val label: String) {
@@ -40,8 +43,21 @@ class SessionListViewModel @Inject constructor(
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-    private val _selectedChips = MutableStateFlow(setOf<SessionFilterChip>())
-    val selectedChips: StateFlow<Set<SessionFilterChip>> = _selectedChips.asStateFlow()
+    val selectedChips: StateFlow<Set<SessionFilterChip>> = appSettingsRepository.selectedFilterChipsFlow
+        .map { names ->
+            names.mapNotNull { name ->
+                try {
+                    SessionFilterChip.valueOf(name)
+                } catch (_: Exception) {
+                    null
+                }
+            }.toSet()
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptySet()
+        )
     private val _includeArchived = MutableStateFlow(false)
     val includeArchived: StateFlow<Boolean> = _includeArchived.asStateFlow()
     private val _includeDrafts = MutableStateFlow(true)
@@ -55,6 +71,16 @@ class SessionListViewModel @Inject constructor(
     val isCreatingSession: StateFlow<Boolean> = _isCreatingSession.asStateFlow()
     private val _createSessionError = MutableStateFlow<String?>(null)
     val createSessionError: StateFlow<String?> = _createSessionError.asStateFlow()
+
+    private val _dispatchDialogState = MutableStateFlow<DispatchDialogState?>(null)
+    val dispatchDialogState: StateFlow<DispatchDialogState?> = _dispatchDialogState.asStateFlow()
+
+    private val _userError = MutableStateFlow<String?>(null)
+    val userError: StateFlow<String?> = _userError.asStateFlow()
+
+    fun clearUserError() {
+        _userError.value = null
+    }
 
     val dailySessionCount = julesRepository.getDailySessionCountFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -136,10 +162,14 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun toggleFilterChip(chip: SessionFilterChip) {
-        _selectedChips.value = if (_selectedChips.value.contains(chip)) {
-            _selectedChips.value - chip
+        val current = selectedChips.value
+        val updatedSet = if (current.contains(chip)) {
+            current - chip
         } else {
-            _selectedChips.value + chip
+            current + chip
+        }
+        viewModelScope.launch {
+            appSettingsRepository.saveSelectedFilterChips(updatedSet.map { it.name }.toSet())
         }
     }
 
@@ -152,9 +182,20 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun openCreateDialog(draft: SessionDraftEntity? = null) {
-        _activeDraft.value = draft ?: SessionDraftEntity()
-        _createSessionError.value = null
-        _showCreateDialog.value = true
+        viewModelScope.launch {
+            val initialDraft = if (draft != null && draft.sourceId != null) {
+                draft
+            } else {
+                val lastSourceId = appSettingsRepository.lastSelectedSourceIdFlow.first()
+                val targetSourceId = lastSourceId?.takeIf { id ->
+                    sources.value.any { it.id == id }
+                } ?: sources.value.firstOrNull()?.id
+                (draft ?: SessionDraftEntity()).copy(sourceId = targetSourceId)
+            }
+            _activeDraft.value = initialDraft
+            _createSessionError.value = null
+            _showCreateDialog.value = true
+        }
     }
 
     fun dismissCreateDialog() {
@@ -167,10 +208,11 @@ class SessionListViewModel @Inject constructor(
     fun saveDraft(draft: SessionDraftEntity) {
         viewModelScope.launch {
             try {
+                draft.sourceId?.let { appSettingsRepository.saveLastSelectedSourceId(it) }
                 julesRepository.saveDraft(draft)
                 dismissCreateDialog()
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to save draft")
+                _userError.value = e.message ?: "Failed to save draft"
             }
         }
     }
@@ -180,7 +222,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.deleteDraft(draftId)
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to delete draft")
+                _userError.value = e.message ?: "Failed to delete draft"
             }
         }
     }
@@ -190,10 +232,10 @@ class SessionListViewModel @Inject constructor(
             _isCreatingSession.value = true
             _createSessionError.value = null
             try {
+                draft.sourceId?.let { appSettingsRepository.saveLastSelectedSourceId(it) }
                 julesRepository.createSessionFromDraft(draft)
                 dismissCreateDialog()
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to create session from draft")
                 _createSessionError.value = e.message ?: "Failed to create session"
             } finally {
                 _isCreatingSession.value = false
@@ -206,7 +248,8 @@ class SessionListViewModel @Inject constructor(
             isRefreshing = true
             try {
                 julesRepository.sync()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                _userError.value = e.message ?: "Failed to sync"
             } finally {
                 isRefreshing = false
             }
@@ -217,7 +260,8 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.deleteSession(sessionId)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                _userError.value = e.message ?: "Failed to delete session"
             }
         }
     }
@@ -226,7 +270,8 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.archiveSession(sessionId)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                _userError.value = e.message ?: "Failed to archive session"
             }
         }
     }
@@ -235,13 +280,45 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.unarchiveSession(sessionId)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                _userError.value = e.message ?: "Failed to unarchive session"
             }
         }
     }
 
-    companion object {
-        private const val TAG = "SessionListViewModel"
+    fun openDispatchDialog(session: SessionEntity, workflow: DispatchableWorkflowEntity) {
+        _dispatchDialogState.value = DispatchDialogState(session = session, workflow = workflow)
+    }
+
+    fun dismissDispatchDialog() {
+        _dispatchDialogState.value = null
+    }
+
+    fun dispatchWorkflow(
+        session: SessionEntity,
+        workflow: DispatchableWorkflowEntity,
+        branch: String,
+        inputs: Map<String, String>
+    ) {
+        val repo = session.repo ?: return
+        viewModelScope.launch {
+            _dispatchDialogState.value = _dispatchDialogState.value?.copy(isDispatching = true, errorMessage = null)
+            try {
+                julesRepository.dispatchWorkflow(
+                    owner = repo.owner,
+                    repo = repo.name,
+                    workflowId = workflow.workflowId.toString(),
+                    ref = branch,
+                    inputs = inputs
+                )
+                dismissDispatchDialog()
+            } catch (e: Exception) {
+                _dispatchDialogState.value = _dispatchDialogState.value?.copy(
+                    isDispatching = false,
+                    errorMessage = e.message ?: "Failed to dispatch workflow"
+                )
+            }
+        }
     }
 }
 
@@ -255,4 +332,11 @@ data class SessionFilterParams(
     val searchQuery: String,
     val states: List<SessionState>,
     val includeArchived: Boolean
+)
+
+data class DispatchDialogState(
+    val session: SessionEntity,
+    val workflow: DispatchableWorkflowEntity,
+    val isDispatching: Boolean = false,
+    val errorMessage: String? = null
 )

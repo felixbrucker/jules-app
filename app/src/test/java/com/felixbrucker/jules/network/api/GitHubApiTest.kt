@@ -158,4 +158,68 @@ class GitHubApiTest {
 
         assertTrue("Expected GitHubApiException", exceptionThrown)
     }
+
+    @Test
+    fun testGetWorkflows() = runBlocking {
+        val responseBody = """
+            {
+              "total_count": 1,
+              "workflows": [
+                {
+                  "id": 12345,
+                  "name": "CI",
+                  "path": ".github/workflows/ci.yml",
+                  "state": "active"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(responseBody))
+
+        val workflows = gitHubApi.getWorkflows("octocat", "Hello-World")
+        assertEquals(1, workflows.size)
+        assertEquals(12345L, workflows[0].id)
+        assertEquals("CI", workflows[0].name)
+        assertEquals(".github/workflows/ci.yml", workflows[0].path)
+        assertEquals("active", workflows[0].state)
+    }
+
+    @Test
+    fun testGetWorkflowContent() = runBlocking {
+        val base64Content = java.util.Base64.getEncoder().encodeToString("name: CI\non: workflow_dispatch".toByteArray())
+        val responseBody = """
+            {
+              "name": "ci.yml",
+              "path": ".github/workflows/ci.yml",
+              "content": "$base64Content\n",
+              "encoding": "base64"
+            }
+        """.trimIndent()
+
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(responseBody))
+
+        val content = gitHubApi.getWorkflowContent("octocat", "Hello-World", ".github/workflows/ci.yml")
+        assertEquals("name: CI\non: workflow_dispatch", content)
+    }
+
+    @Test
+    fun testDispatchWorkflow() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(204))
+
+        gitHubApi.dispatchWorkflow(
+            owner = "octocat",
+            repo = "Hello-World",
+            workflowId = "12345",
+            ref = "main",
+            inputs = mapOf("logLevel" to "info")
+        )
+
+        val recordedRequest = mockWebServer.takeRequest()
+        assertEquals("/repos/octocat/Hello-World/actions/workflows/12345/dispatches", recordedRequest.path)
+        assertEquals("POST", recordedRequest.method)
+        val body = recordedRequest.body.readUtf8()
+        assertTrue(body.contains("\"ref\":\"main\""))
+        assertTrue(body.contains("\"inputs\":{\"logLevel\":\"info\"}"))
+    }
 }

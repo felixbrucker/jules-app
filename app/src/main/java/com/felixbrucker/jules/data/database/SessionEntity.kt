@@ -64,7 +64,8 @@ data class SessionEntity(
     @Embedded(prefix = "pull_request_")
     val pullRequest: EmbeddedPullRequest?,
     @Embedded(prefix = "change_set_")
-    val changeSet: EmbeddedChangeSet?
+    val changeSet: EmbeddedChangeSet?,
+    val startingBranch: String? = null
 ) {
     val duration: Duration
         get() = if (updateTime != null) {
@@ -88,7 +89,7 @@ fun Session.toEntity(): SessionEntity {
         prompt = prompt,
         state = state ?: SessionState.UNSPECIFIED,
         isArchived = isArchived,
-        createTime = createTime,
+        createTime = createTime ?: Instant.now(),
         updateTime = updateTime,
         url = url,
         repo = sourceContext.repo,
@@ -108,6 +109,7 @@ fun Session.toEntity(): SessionEntity {
                 totalAdditions = it.summary.totalAdditions,
                 totalDeletions = it.summary.totalDeletions
             )
-        }
+        },
+        startingBranch = sourceContext.githubRepoContext?.startingBranch
     )
 }

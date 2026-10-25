@@ -1,6 +1,8 @@
 package com.felixbrucker.jules.network.api
 
 import com.felixbrucker.jules.network.api.model.GitHubApiException
+import com.felixbrucker.jules.network.api.model.GitHubWorkflow
+import com.felixbrucker.jules.network.api.model.GitHubWorkflowDispatchRequest
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.parseGitHubError
 import com.squareup.moshi.Moshi
@@ -66,6 +68,48 @@ class GitHubApi @Inject constructor(
     suspend fun validateAuthToken(token: String) {
         executeApiCall {
             apiService.getUser("Bearer $token")
+        }
+    }
+
+    suspend fun getWorkflows(owner: String, repo: String): List<GitHubWorkflow> {
+        val response = executeApiCall {
+            apiService.getWorkflows(owner = owner, repo = repo)
+        }
+        return response.workflows
+    }
+
+    suspend fun getWorkflowContent(owner: String, repo: String, path: String): String {
+        val response = executeApiCall {
+            apiService.getRepoContent(owner = owner, repo = repo, path = path)
+        }
+        val rawContent = response.content ?: ""
+        return if (rawContent.isNotBlank()) {
+            val cleanedContent = rawContent.replace("\n", "").replace("\r", "")
+            String(java.util.Base64.getMimeDecoder().decode(cleanedContent), Charsets.UTF_8)
+        } else ""
+    }
+
+    suspend fun dispatchWorkflow(
+        owner: String,
+        repo: String,
+        workflowId: String,
+        ref: String,
+        inputs: Map<String, String>? = null
+    ) {
+        val request = GitHubWorkflowDispatchRequest(
+            ref = ref,
+            inputs = inputs?.ifEmpty { null }
+        )
+        val response = executeApiCall {
+            apiService.dispatchWorkflow(
+                owner = owner,
+                repo = repo,
+                workflowId = workflowId,
+                request = request
+            )
+        }
+        if (!response.isSuccessful) {
+            throw HttpException(response)
         }
     }
 

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,10 +15,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -46,6 +52,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -72,6 +79,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -116,6 +125,7 @@ import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
 import kotlin.math.roundToInt
@@ -140,7 +150,17 @@ fun SessionListScreen(
     val activeDraft by viewModel.activeDraft.collectAsState()
     val isCreatingSession by viewModel.isCreatingSession.collectAsState()
     val createSessionError by viewModel.createSessionError.collectAsState()
+    val dispatchState by viewModel.dispatchDialogState.collectAsState()
+    val userError by viewModel.userError.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var isSearchActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(userError) {
+        userError?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearUserError()
+        }
+    }
 
     if (showCreateDialog && activeDraft != null) {
         val activeDraftEntity = activeDraft!!
@@ -159,8 +179,28 @@ fun SessionListScreen(
         )
     }
 
+    dispatchState?.let { state ->
+        val source = remember(state.session.sourceId, sources) {
+            sources.find { it.id == state.session.sourceId }
+        }
+        DispatchWorkflowDialog(
+            session = state.session,
+            workflow = state.workflow,
+            source = source,
+            isDispatching = state.isDispatching,
+            errorMessage = state.errorMessage,
+            onDismiss = { viewModel.dismissDispatchDialog() },
+            onConfirmDispatch = { branch, inputs ->
+                viewModel.dispatchWorkflow(state.session, state.workflow, branch, inputs)
+            }
+        )
+    }
+
+    var isFabVisible by remember { mutableStateOf(true) }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             SessionTopBar(
                 isSearchActive = isSearchActive,
@@ -173,12 +213,18 @@ fun SessionListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.openCreateDialog() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+            AnimatedVisibility(
+                visible = isFabVisible,
+                enter = slideInVertically(initialOffsetY = { it * 2 }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it * 2 }) + fadeOut()
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Create Session")
+                FloatingActionButton(
+                    onClick = { viewModel.openCreateDialog() },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Create Session")
+                }
             }
         }
     ) { innerPadding ->
@@ -189,7 +235,8 @@ fun SessionListScreen(
             includeArchived = includeArchived,
             includeDrafts = includeDrafts,
             drafts = drafts,
-            sessions = sessions
+            sessions = sessions,
+            onFabVisibilityChanged = { isFabVisible = it }
         )
     }
 }
@@ -432,7 +479,8 @@ private fun SessionListContent(
     includeArchived: Boolean,
     includeDrafts: Boolean,
     drafts: List<SessionDraftWithSource>,
-    sessions: List<SessionWithPullRequest>
+    sessions: List<SessionWithPullRequest>,
+    onFabVisibilityChanged: (Boolean) -> Unit
 ) {
     val listState = rememberLazyListState()
     var filterBarHeightPx by remember { mutableFloatStateOf(0f) }
@@ -442,6 +490,11 @@ private fun SessionListContent(
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
+                if (delta < -10f) {
+                    onFabVisibilityChanged(false)
+                } else if (delta > 10f) {
+                    onFabVisibilityChanged(true)
+                }
                 if (filterBarHeightPx <= 0f) return Offset.Zero
                 val oldOffset = filterBarOffsetPx
                 val newOffset = (oldOffset + delta).coerceIn(-filterBarHeightPx, 0f)
@@ -457,6 +510,7 @@ private fun SessionListContent(
             .collect { (index, offset) ->
                 if (index == 0 && offset == 0) {
                     filterBarOffsetPx = 0f
+                    onFabVisibilityChanged(true)
                 }
             }
     }
@@ -491,7 +545,8 @@ private fun SessionListContent(
                 onDeleteDraft = { viewModel.deleteDraft(it) },
                 onDelete = { viewModel.deleteSession(it) },
                 onArchive = { viewModel.archiveSession(it) },
-                onUnarchive = { viewModel.unarchiveSession(it) }
+                onUnarchive = { viewModel.unarchiveSession(it) },
+                onSelectWorkflow = { session, workflow -> viewModel.openDispatchDialog(session, workflow) }
             )
         }
     }
@@ -619,7 +674,8 @@ private fun SessionLazyColumn(
     onDeleteDraft: (String) -> Unit,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
-    onUnarchive: (String) -> Unit
+    onUnarchive: (String) -> Unit,
+    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -648,7 +704,8 @@ private fun SessionLazyColumn(
                 sessionWithPullRequest = item,
                 onDelete = onDelete,
                 onArchive = onArchive,
-                onUnarchive = onUnarchive
+                onUnarchive = onUnarchive,
+                onSelectWorkflow = onSelectWorkflow
             )
         }
     }
@@ -660,7 +717,8 @@ private fun SessionCard(
     sessionWithPullRequest: SessionWithPullRequest,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
-    onUnarchive: (String) -> Unit
+    onUnarchive: (String) -> Unit,
+    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit
 ) {
     val session = sessionWithPullRequest.session
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -693,7 +751,9 @@ private fun SessionCard(
             Spacer(modifier = Modifier.height(12.dp))
             SessionCardFooter(
                 session = session,
-                pullRequestState = sessionWithPullRequest.pullRequestState
+                pullRequestState = sessionWithPullRequest.pullRequestState,
+                workflows = sessionWithPullRequest.workflows,
+                onSelectWorkflow = { wf -> onSelectWorkflow(session, wf) }
             )
         }
     }
@@ -1052,7 +1112,9 @@ private fun RoundedBadge(text: String, color: Color) {
 @Composable
 private fun SessionCardFooter(
     session: SessionEntity,
-    pullRequestState: PullRequestState?
+    pullRequestState: PullRequestState?,
+    workflows: List<DispatchableWorkflowEntity>,
+    onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
 ) {
     val context = LocalContext.current
     val timeToFormat = session.updateTime ?: session.createTime
@@ -1100,7 +1162,9 @@ private fun SessionCardFooter(
                 PullRequestChip(
                     pr = pr,
                     pullRequestState = pullRequestState,
-                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+                    workflows = workflows,
+                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
+                    onWorkflowSelected = onSelectWorkflow
                 )
             }
         }
@@ -1111,14 +1175,34 @@ private fun SessionCardFooter(
 private fun PullRequestChip(
     pr: EmbeddedPullRequest,
     pullRequestState: PullRequestState?,
+    workflows: List<DispatchableWorkflowEntity>,
+    onPrClick: (String) -> Unit,
+    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
+) {
+    if (workflows.isEmpty()) {
+        SimplePullRequestChip(
+            pr = pr,
+            pullRequestState = pullRequestState,
+            onPrClick = onPrClick
+        )
+    } else {
+        CompoundPullRequestWorkflowButton(
+            pr = pr,
+            pullRequestState = pullRequestState,
+            workflows = workflows,
+            onPrClick = onPrClick,
+            onWorkflowSelected = onWorkflowSelected
+        )
+    }
+}
+
+@Composable
+private fun SimplePullRequestChip(
+    pr: EmbeddedPullRequest,
+    pullRequestState: PullRequestState?,
     onPrClick: (String) -> Unit
 ) {
-    val (iconRes, iconColor) = when (pullRequestState) {
-        PullRequestState.MERGED -> R.drawable.ic_github_pr_merged to Color(0xFFA371F7)
-        PullRequestState.CLOSED -> R.drawable.ic_github_pr_closed to Color(0xFFF85149)
-        PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
-    }
-
+    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
     val prNumberText = pr.number?.let { " (#$it)" } ?: ""
 
     AssistChip(
@@ -1134,6 +1218,111 @@ private fun PullRequestChip(
             )
         }
     )
+}
+
+@Composable
+private fun CompoundPullRequestWorkflowButton(
+    pr: EmbeddedPullRequest,
+    pullRequestState: PullRequestState?,
+    workflows: List<DispatchableWorkflowEntity>,
+    onPrClick: (String) -> Unit,
+    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
+) {
+    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
+    val prNumberText = pr.number?.let { " (#$it)" } ?: ""
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier.height(28.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clickable { onPrClick(pr.url) }
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = "GitHub PR",
+                    modifier = Modifier.size(14.dp),
+                    tint = iconColor
+                )
+                Text(
+                    text = "View PR$prNumberText",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clickable { menuExpanded = true }
+                    .padding(horizontal = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Workflow Dispatches",
+                    modifier = Modifier.size(18.dp)
+                )
+                WorkflowDropdownMenu(
+                    expanded = menuExpanded,
+                    workflows = workflows,
+                    onDismiss = { menuExpanded = false },
+                    onWorkflowSelected = onWorkflowSelected
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkflowDropdownMenu(
+    expanded: Boolean,
+    workflows: List<DispatchableWorkflowEntity>,
+    onDismiss: () -> Unit,
+    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss
+    ) {
+        workflows.forEach { workflow ->
+            DropdownMenuItem(
+                text = { Text(workflow.name) },
+                onClick = {
+                    onDismiss()
+                    onWorkflowSelected(workflow)
+                }
+            )
+        }
+    }
+}
+
+private fun getPullRequestIconInfo(pullRequestState: PullRequestState?): Pair<Int, Color> {
+    return when (pullRequestState) {
+        PullRequestState.MERGED -> R.drawable.ic_github_pr_merged to Color(0xFFA371F7)
+        PullRequestState.CLOSED -> R.drawable.ic_github_pr_closed to Color(0xFFF85149)
+        PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
+    }
 }
 
 @Composable
