@@ -10,6 +10,8 @@ import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceEntity
+import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
+import com.felixbrucker.jules.data.database.SourceSyncMetadataEntity
 import com.felixbrucker.jules.data.database.WorkflowDispatchDao
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.toEntity
@@ -52,6 +54,7 @@ class JulesRepository @Inject constructor(
     private val sourceDao: SourceDao,
     private val sessionDraftDao: SessionDraftDao,
     private val workflowDispatchDao: WorkflowDispatchDao,
+    private val sourceSyncMetadataDao: SourceSyncMetadataDao,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val notificationManager: JulesNotificationManager,
@@ -408,21 +411,17 @@ class JulesRepository @Inject constructor(
 
     suspend fun syncWorkflows(force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
-            if (!force) {
-                val lastSyncedAt = syncMetadataRepository.lastWorkflowsSyncedAtFlow.first()
-                if (lastSyncedAt != null && Duration.between(lastSyncedAt, Instant.now()).toDays() < 14) {
-                    return@withContext
-                }
-            }
-
             val githubToken = appSettingsRepository.githubAuthTokenFlow.first()
             val hasToken = !githubToken.isNullOrBlank()
 
-            val usableSources = sourceDao.getUsableGithubSources(includePrivate = hasToken)
+            val thresholdEpochMillis = Instant.now().minus(Duration.ofDays(14)).toEpochMilli()
+            val usableSources = sourceDao.getSourcesNeedingWorkflowSync(
+                includePrivate = hasToken,
+                thresholdEpochMillis = thresholdEpochMillis,
+                force = force
+            )
 
             if (usableSources.isEmpty()) {
-                workflowDispatchDao.deleteAllWorkflows()
-                syncMetadataRepository.saveLastWorkflowsSyncedAt(Instant.now())
                 return@withContext
             }
 
@@ -457,6 +456,12 @@ class JulesRepository @Inject constructor(
                                         Timber.tag(TAG).e(e, "Failed to fetch/parse workflow content for ${wf.path} in ${source.id}")
                                     }
                                 }
+                                sourceSyncMetadataDao.upsertMetadata(
+                                    SourceSyncMetadataEntity(
+                                        sourceId = source.id,
+                                        lastWorkflowSyncedAt = Instant.now()
+                                    )
+                                )
                                 entitiesForSource
                             } catch (e: Exception) {
                                 if (e is CancellationException) throw e
@@ -470,13 +475,7 @@ class JulesRepository @Inject constructor(
 
             if (allFetchedWorkflowEntities.isNotEmpty()) {
                 workflowDispatchDao.upsertWorkflows(allFetchedWorkflowEntities)
-                val fetchedIds = allFetchedWorkflowEntities.map { it.id }
-                workflowDispatchDao.deleteWorkflowsNotIn(fetchedIds)
-            } else {
-                workflowDispatchDao.deleteAllWorkflows()
             }
-
-            syncMetadataRepository.saveLastWorkflowsSyncedAt(Instant.now())
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing workflows")
