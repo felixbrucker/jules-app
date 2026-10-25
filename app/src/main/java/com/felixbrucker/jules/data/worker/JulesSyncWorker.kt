@@ -41,7 +41,7 @@ class JulesSyncWorker @AssistedInject constructor(
             val decision = WorkerScheduler.evaluate(settings, hasInProgress)
 
             if (decision.shouldEnqueue) {
-                enqueueSyncWork(applicationContext, decision.intervalMinutes)
+                enqueueSyncWork(applicationContext, decision.intervalMinutes, isSelfEnqueue = true)
             } else {
                 cancelSyncWork(applicationContext)
             }
@@ -58,7 +58,7 @@ class JulesSyncWorker @AssistedInject constructor(
         private const val TAG = "JulesSyncWorker"
         const val WORK_NAME = "jules_sync_worker"
 
-        fun enqueueSyncWork(context: Context, intervalMinutes: Long) {
+        fun enqueueSyncWork(context: Context, intervalMinutes: Long, isSelfEnqueue: Boolean = false) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
@@ -68,11 +68,16 @@ class JulesSyncWorker @AssistedInject constructor(
                 .setInitialDelay(intervalMinutes, TimeUnit.MINUTES)
                 .build()
 
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                WORK_NAME,
-                ExistingWorkPolicy.REPLACE,
-                workRequest
-            )
+            val workManager = WorkManager.getInstance(context)
+            if (isSelfEnqueue) {
+                workManager.enqueue(workRequest)
+            } else {
+                workManager.enqueueUniqueWork(
+                    WORK_NAME,
+                    ExistingWorkPolicy.REPLACE,
+                    workRequest
+                )
+            }
         }
 
         fun cancelSyncWork(context: Context) {
