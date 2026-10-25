@@ -15,6 +15,7 @@ import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.notification.JulesNotificationManager
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
+import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.GitHubRepo
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.Session
@@ -122,7 +123,7 @@ class JulesRepositoryTest {
         repository.createSessionFromDraft(draft)
 
         coVerify {
-            julesApi.createSession(any())
+            julesApi.createSession(match { it.automationMode == AutomationMode.AUTO_CREATE_PR })
             julesApi.getSession("sess-100")
             sessionDao.insertSessions(any())
             sessionDraftDao.deleteDraft("draft-10")

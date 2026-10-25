@@ -107,7 +107,7 @@ class JulesRepository @Inject constructor(
             title = draft.title?.ifBlank { null },
             sourceContext = sourceContext,
             requirePlanApproval = draft.requirePlanApproval,
-            automationMode = AutomationMode.AUTOMATION_MODE_UNSPECIFIED
+            automationMode = AutomationMode.AUTO_CREATE_PR
         )
         val created = julesApi.createSession(request)
         val fetched = julesApi.getSession(created.id)
