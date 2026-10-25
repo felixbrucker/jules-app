@@ -16,15 +16,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -32,17 +32,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
+import com.felixbrucker.jules.R
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SourceEntity
 import com.felixbrucker.jules.ui.components.LoadingStateButton
@@ -61,13 +60,12 @@ fun CreateSessionDialog(
     onCreateSession: (SessionDraftEntity) -> Unit
 ) {
     BasicAlertDialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = onDismiss
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .padding(vertical = 16.dp),
+                .fillMaxWidth()
+                .padding(16.dp),
             shape = RoundedCornerShape(16.dp)
         ) {
             CreateSessionDialogBody(
@@ -201,18 +199,23 @@ private fun RepoAndBranchSelectionRow(
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth()
+        color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_github),
+                contentDescription = "GitHub Repo",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(6.dp))
             RepoDropdown(
                 sources = sources,
                 selectedSource = selectedSource,
-                onSourceSelected = onSourceSelected,
-                modifier = Modifier.weight(1f, fill = false)
+                onSourceSelected = onSourceSelected
             )
             Text(
                 text = ":",
@@ -287,7 +290,8 @@ private fun RepoDropdownMenu(
 
     DropdownMenu(
         expanded = expanded,
-        onDismissRequest = onDismiss
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(12.dp)
     ) {
         OutlinedTextField(
             value = searchQuery,
@@ -295,27 +299,52 @@ private fun RepoDropdownMenu(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
-            placeholder = { Text("Choose a repo", style = MaterialTheme.typography.bodySmall) },
+            placeholder = { Text("Choose a repo", style = MaterialTheme.typography.bodyMedium) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             },
-            singleLine = true
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onSearchQueryChange("") },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Clear",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(10.dp)
         )
+        Spacer(modifier = Modifier.height(4.dp))
         Column(
             modifier = Modifier
-                .heightIn(max = 200.dp)
+                .heightIn(max = 220.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            filteredSources.forEach { source ->
-                val label = source.githubRepo?.let { "${it.owner}/${it.repo}" } ?: source.name
-                DropdownMenuItem(
-                    text = { Text(label, style = MaterialTheme.typography.bodyMedium) },
-                    onClick = { onSourceSelected(source) }
+            if (filteredSources.isEmpty()) {
+                Text(
+                    text = "No repos found",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            } else {
+                filteredSources.forEach { source ->
+                    val label = source.githubRepo?.let { "${it.owner}/${it.repo}" } ?: source.name
+                    DropdownMenuItem(
+                        text = { Text(label, style = MaterialTheme.typography.bodyMedium) },
+                        onClick = { onSourceSelected(source) }
+                    )
+                }
             }
         }
     }
