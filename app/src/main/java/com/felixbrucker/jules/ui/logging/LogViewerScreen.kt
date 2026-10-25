@@ -1,10 +1,6 @@
 package com.felixbrucker.jules.ui.logging
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -36,7 +32,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -107,7 +102,6 @@ fun LogViewerScreen(
     viewModel: LogViewerViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -146,38 +140,11 @@ fun LogViewerScreen(
             }
     }
 
-    fun copyLogsToClipboard() {
-        if (pagedLogs.itemCount == 0) {
-            Toast.makeText(context, "No logs to copy", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val textBuilder = StringBuilder()
-        for (i in 0 until pagedLogs.itemCount) {
-            val entry = pagedLogs[i] ?: continue
-            val timeStr = try {
-                logTimeFormatter.format(Instant.ofEpochMilli(entry.timestamp))
-            } catch (_: Exception) {
-                entry.timestamp.toString()
-            }
-            val tagStr = entry.tag ?: "Jules"
-            val levelStr = entry.priorityLabel()
-            textBuilder.append("[$timeStr] [$levelStr] [$tagStr]: ${entry.message}\n")
-            if (!entry.throwableStackTrace.isNullOrBlank()) {
-                textBuilder.append("${entry.throwableStackTrace}\n")
-            }
-        }
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Jules Logs", textBuilder.toString())
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Copied ${pagedLogs.itemCount} log entries to clipboard", Toast.LENGTH_SHORT).show()
-    }
-
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             LogViewerTopBar(
                 onNavigateBack = onNavigateBack,
-                onCopyLogs = { copyLogsToClipboard() },
                 onClearLogs = { showClearDialog = true }
             )
         },
@@ -249,7 +216,6 @@ fun LogViewerScreen(
 @Composable
 fun LogViewerTopBar(
     onNavigateBack: () -> Unit,
-    onCopyLogs: () -> Unit,
     onClearLogs: () -> Unit
 ) {
     TopAppBar(
@@ -260,9 +226,6 @@ fun LogViewerTopBar(
             }
         },
         actions = {
-            IconButton(onClick = onCopyLogs, modifier = Modifier.testTag("copy_logs_button")) {
-                Icon(Icons.Default.ContentCopy, contentDescription = "Copy Logs", tint = LogColors.PurpleLight)
-            }
             IconButton(onClick = onClearLogs, modifier = Modifier.testTag("clear_logs_button")) {
                 Icon(Icons.Default.Delete, contentDescription = "Clear Logs", tint = LogColors.ErrorPink)
             }
