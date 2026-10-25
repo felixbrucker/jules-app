@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 enum class SessionFilterChip(val label: String) {
@@ -109,8 +108,7 @@ class SessionListViewModel @Inject constructor(
             isRefreshing = true
             try {
                 julesRepository.sync()
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to sync sessions and pull requests")
+            } catch (_: Exception) {
             } finally {
                 isRefreshing = false
             }
@@ -121,8 +119,7 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.deleteSession(sessionId)
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to delete session $sessionId")
+            } catch (_: Exception) {
             }
         }
     }
@@ -131,8 +128,7 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.archiveSession(sessionId)
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to archive session $sessionId")
+            } catch (_: Exception) {
             }
         }
     }
@@ -141,14 +137,9 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.unarchiveSession(sessionId)
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to unarchive session $sessionId")
+            } catch (_: Exception) {
             }
         }
-    }
-
-    companion object {
-        private const val TAG = "SessionListViewModel"
     }
 }
 

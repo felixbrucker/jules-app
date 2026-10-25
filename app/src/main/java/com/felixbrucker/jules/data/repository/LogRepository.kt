@@ -8,6 +8,7 @@ import com.felixbrucker.jules.data.database.LogEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -53,12 +54,22 @@ class LogRepository @Inject constructor(
     }
 
     suspend fun clearLogs() = withContext(Dispatchers.IO) {
-        logDao.clearAllLogs()
+        try {
+            logDao.clearAllLogs()
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to clear logs")
+            throw e
+        }
     }
 
     suspend fun pruneOldLogs(daysToKeep: Long = 7) = withContext(Dispatchers.IO) {
-        val cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(daysToKeep)
-        logDao.deleteLogsOlderThan(cutoff)
+        try {
+            val cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(daysToKeep)
+            logDao.deleteLogsOlderThan(cutoff)
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to prune old logs")
+            throw e
+        }
     }
 
     companion object {

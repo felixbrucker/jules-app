@@ -76,13 +76,8 @@ class LogViewerViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 logRepository.clearLogs()
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to clear logs")
+            } catch (_: Exception) {
             }
         }
-    }
-
-    companion object {
-        private const val TAG = "LogViewerViewModel"
     }
 }
