@@ -15,6 +15,7 @@ import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.util.periodicTickerFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -109,6 +110,7 @@ class JulesRepository @Inject constructor(
             }
             syncMetadataRepository.saveLastSourcesSyncedAt(Instant.now())
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing sources")
             throw e
         }
@@ -165,6 +167,7 @@ class JulesRepository @Inject constructor(
                         val source = julesApi.getSource(sourceId)
                         source.toEntity()
                     } catch (e: Exception) {
+                        if (e is CancellationException) throw e
                         Timber.tag(TAG).e(e, "Failed to retrieve missing source $sourceId")
                         null
                     }
@@ -223,6 +226,7 @@ class JulesRepository @Inject constructor(
                 saveSessions(entities, isBackground = isBackground)
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing sessions")
             throw e
         }
@@ -249,6 +253,7 @@ class JulesRepository @Inject constructor(
                             val state = gitHubApi.getPullRequestState(prUrl)
                             PullRequestEntity(sessionId = sessionId, url = prUrl, state = state)
                         } catch (e: Exception) {
+                            if (e is CancellationException) throw e
                             Timber.tag(TAG).e(e, "Failed to sync pull request state for $prUrl")
                             null
                         }
@@ -260,6 +265,7 @@ class JulesRepository @Inject constructor(
                 pullRequestDao.upsertPullRequests(prEntities)
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing pull requests")
             throw e
         }
@@ -301,6 +307,7 @@ class JulesRepository @Inject constructor(
                                 val session = julesApi.getSession(missingId)
                                 session.toEntity()
                             } catch (e: Exception) {
+                                if (e is CancellationException) throw e
                                 Timber.tag(TAG).e(e, "Failed to fetch missing archived session $missingId")
                                 null
                             }
@@ -311,6 +318,7 @@ class JulesRepository @Inject constructor(
             }
             syncMetadataRepository.saveLastArchivedSessionsSyncedAt(Instant.now())
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing archived sessions")
             throw e
         }
@@ -321,6 +329,7 @@ class JulesRepository @Inject constructor(
             julesApi.deleteSession(sessionId)
             sessionDao.deleteSession(sessionId)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Failed to delete session $sessionId")
             throw e
         }
@@ -331,6 +340,7 @@ class JulesRepository @Inject constructor(
             julesApi.archiveSession(sessionId)
             sessionDao.updateArchived(sessionId, isArchived = true)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Failed to archive session $sessionId")
             throw e
         }
@@ -341,6 +351,7 @@ class JulesRepository @Inject constructor(
             julesApi.unarchiveSession(sessionId)
             sessionDao.updateArchived(sessionId, isArchived = false)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Failed to unarchive session $sessionId")
             throw e
         }

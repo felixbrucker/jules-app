@@ -3,6 +3,7 @@ package com.felixbrucker.jules.data.logging
 import android.util.Log
 import com.felixbrucker.jules.data.database.LogEntity
 import com.felixbrucker.jules.data.repository.LogRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +16,7 @@ class AppLogTree(
 ) : Timber.Tree() {
 
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+        if (t is CancellationException) return
         val stackTrace = t?.let { Log.getStackTraceString(it) }
         val entry = LogEntity(
             timestamp = System.currentTimeMillis(),

@@ -1,5 +1,6 @@
 package com.felixbrucker.jules.network.api
 
+import kotlinx.coroutines.CancellationException
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
@@ -26,10 +27,12 @@ class LoggingInterceptor @Inject constructor() : Interceptor {
         val response = try {
             loggingInterceptor.intercept(chain)
         } catch (e: Exception) {
-            if (logBuffer.isNotEmpty()) {
-                Timber.tag(TAG).e(e, logBuffer.toString())
-            } else {
-                Timber.tag(TAG).e(e, "Network request failed: ${request.method} $url")
+            if (e !is CancellationException) {
+                if (logBuffer.isNotEmpty()) {
+                    Timber.tag(TAG).e(e, logBuffer.toString())
+                } else {
+                    Timber.tag(TAG).e(e, "Network request failed: ${request.method} $url")
+                }
             }
             throw e
         }

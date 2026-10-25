@@ -53,7 +53,10 @@ class JulesSyncWorker @AssistedInject constructor(
             val workRequest = PeriodicWorkRequestBuilder<JulesSyncWorker>(
                 intervalMinutes,
                 TimeUnit.MINUTES
-            ).setConstraints(constraints).build()
+            )
+                .setConstraints(constraints)
+                .setInitialDelay(intervalMinutes, TimeUnit.MINUTES)
+                .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 PERIODIC_WORK_NAME,
