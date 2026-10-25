@@ -261,6 +261,21 @@ class JulesRepository @Inject constructor(
         if (toInsert.isNotEmpty()) {
             ensureSourcesExist(toInsert)
             sessionDao.insertSessions(toInsert)
+            val initialActivities = toInsert.mapNotNull { session ->
+                if (session.prompt.isNotBlank()) {
+                    val initialActivity = Activity.UserMessaged(
+                        name = "sessions/${session.id}/activities/init_prompt_${session.id}",
+                        id = "init_prompt_${session.id}",
+                        createTime = session.createTime,
+                        originator = com.felixbrucker.jules.network.api.model.Originator.USER,
+                        userMessage = session.prompt
+                    )
+                    initialActivity.toEntity(session.id, moshi)
+                } else null
+            }
+            if (initialActivities.isNotEmpty()) {
+                activityDao.upsertActivities(initialActivities)
+            }
         }
         if (toUpdate.isNotEmpty()) {
             sessionDao.updateSessions(toUpdate)

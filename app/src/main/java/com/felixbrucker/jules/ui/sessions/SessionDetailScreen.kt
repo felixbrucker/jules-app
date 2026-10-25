@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -56,6 +57,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -512,6 +514,7 @@ private fun ChatWindowView(
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(
@@ -614,10 +617,14 @@ private fun ActivityBubbleContainer(
                 AgentThinkingBubble()
             }
         }
-        is Activity.ProgressUpdated -> ProgressUpdatedBubble(
-            title = activity.title,
-            description = activity.description
-        )
+        is Activity.ProgressUpdated -> {
+            if (!activity.title.isNullOrBlank() || !activity.description.isNullOrBlank()) {
+                ProgressUpdatedBubble(
+                    title = activity.title,
+                    description = activity.description
+                )
+            }
+        }
         is Activity.PlanGenerated -> PlanGeneratedCard(planSteps = activity.plan.steps)
         is Activity.PlanApproved -> PlanApprovedPill()
         is Activity.SessionFailed -> SessionFailedBox(reason = activity.reason)
@@ -1507,16 +1514,69 @@ private fun FormattedMarkdownText(
     markdown: String,
     style: androidx.compose.ui.text.TextStyle
 ) {
-    val annotatedString = remember(markdown) {
-        parseSimpleMarkdown(markdown)
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        val lines = markdown.lines()
+        lines.forEach { line ->
+            val trimmed = line.trimStart()
+            val indentSpaces = line.length - trimmed.length
+            val indentLevel = indentSpaces / 2
+
+            when {
+                trimmed == "---" || trimmed == "***" -> {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                }
+                trimmed.startsWith("#") && trimmed.contains(" ") -> {
+                    val headerLevel = trimmed.takeWhile { it == '#' }.length
+                    val headerText = trimmed.drop(headerLevel).trimStart()
+                    val headerFontSize = when (headerLevel) {
+                        1 -> 20.sp
+                        2 -> 18.sp
+                        3 -> 16.sp
+                        else -> 14.sp
+                    }
+                    Text(
+                        text = parseInlineMarkdown(headerText),
+                        style = style.copy(
+                            fontSize = headerFontSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+                trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("+ ") -> {
+                    val bulletContent = trimmed.drop(2)
+                    val indentPrefix = "  ".repeat(indentLevel)
+                    Row(
+                        modifier = Modifier.padding(start = (indentLevel * 12).dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "•",
+                            style = style.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = parseInlineMarkdown(bulletContent),
+                            style = style
+                        )
+                    }
+                }
+                else -> {
+                    if (line.isNotBlank()) {
+                        Text(
+                            text = parseInlineMarkdown(line),
+                            style = style
+                        )
+                    }
+                }
+            }
+        }
     }
-    Text(
-        text = annotatedString,
-        style = style
-    )
 }
 
-private fun parseSimpleMarkdown(text: String): AnnotatedString {
+private fun parseInlineMarkdown(text: String): AnnotatedString {
     return buildAnnotatedString {
         var i = 0
         while (i < text.length) {
@@ -1527,6 +1587,15 @@ private fun parseSimpleMarkdown(text: String): AnnotatedString {
                         append(text.substring(i + 2, end))
                     }
                     i = end + 2
+                    continue
+                }
+            } else if (text.startsWith("*", i)) {
+                val end = text.indexOf("*", i + 1)
+                if (end != -1) {
+                    withStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) {
+                        append(text.substring(i + 1, end))
+                    }
+                    i = end + 1
                     continue
                 }
             } else if (text.startsWith("`", i)) {
