@@ -82,7 +82,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import kotlinx.coroutines.CancellationException
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
@@ -110,6 +112,14 @@ fun LogViewerScreen(
     val selectedPriorities by viewModel.selectedPriorities.collectAsState()
     val filteredCount by viewModel.filteredCount.collectAsState()
     val totalCount by viewModel.totalCount.collectAsState()
+
+    PredictiveBackHandler { progressFlow ->
+        try {
+            progressFlow.collect { }
+            onNavigateBack()
+        } catch (_: CancellationException) {
+        }
+    }
 
     var showClearDialog by remember { mutableStateOf(false) }
     var topControlsHeightPx by remember { mutableFloatStateOf(0f) }

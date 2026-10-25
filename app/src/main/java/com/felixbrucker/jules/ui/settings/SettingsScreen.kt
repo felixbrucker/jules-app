@@ -19,8 +19,10 @@ import androidx.compose.material3.OutlinedButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.CancellationException
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.DropdownMenuItem
@@ -68,6 +70,14 @@ fun SettingsScreen(
     val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
     val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
     val selectedPlan by viewModel.selectedPlan.collectAsState()
+
+    PredictiveBackHandler { progressFlow ->
+        try {
+            progressFlow.collect { }
+            onBackClick()
+        } catch (_: CancellationException) {
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
