@@ -27,7 +27,6 @@ enum class FileChangeType {
 @JsonClass(generateAdapter = true)
 data class PlanStep(
     @Json(name = "id") val id: String,
-    @Json(name = "index") val index: Int? = null,
     @Json(name = "title") val title: String,
     @Json(name = "description") val description: String? = null
 )

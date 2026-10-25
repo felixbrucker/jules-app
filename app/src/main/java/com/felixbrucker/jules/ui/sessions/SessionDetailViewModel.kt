@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
@@ -112,8 +113,7 @@ class SessionDetailViewModel @Inject constructor(
 
     val activitiesPagingDataFlow: Flow<PagingData<ActivityUiItem>> =
         julesRepository.getActivitiesPagingDataFlow(sessionId)
-            .cachedIn(viewModelScope)
-            .combine(sessionWithPullRequestFlow) { pagingData, sessionWithPr ->
+            .map { pagingData ->
                 pagingData.map { activity ->
                     ActivityUiItem.ActivityItem(
                         id = activity.id,

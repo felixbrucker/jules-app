@@ -420,13 +420,11 @@ private fun SessionDetailSplitContent(
                 }
             }
 
-            if (splitRatio > 0.0f && splitRatio < 1.0f) {
-                SplitDividerHandle(
-                    containerWidthPx = containerWidthPx,
-                    splitRatio = splitRatio,
-                    onSplitRatioChange = onSplitRatioChange
-                )
-            }
+            SplitDividerHandle(
+                containerWidthPx = containerWidthPx,
+                splitRatio = splitRatio,
+                onSplitRatioChange = onSplitRatioChange
+            )
 
             if (splitRatio < 1.0f) {
                 Box(modifier = Modifier.weight((1.0f - splitRatio).coerceAtLeast(0.01f))) {
@@ -711,7 +709,7 @@ private fun PlanGeneratedCard(planSteps: List<PlanStep>) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             planSteps.forEachIndexed { idx, step ->
-                PlanStepItemRow(stepIndex = step.index ?: (idx + 1), step = step)
+                PlanStepItemRow(stepIndex = idx + 1, step = step)
             }
         }
     }
@@ -1160,7 +1158,25 @@ private fun extractFileDiffLines(path: String, unidiffPatch: String): List<Strin
     val blocks = unidiffPatch.split(Regex("^diff --git ", RegexOption.MULTILINE))
     for (block in blocks) {
         if (block.contains("a/$path") || block.contains("b/$path")) {
-            return block.lines().take(300)
+            val lines = block.lines()
+            val hunkStartIndex = lines.indexOfFirst { it.startsWith("@@ ") }
+            return if (hunkStartIndex != -1) {
+                lines.subList(hunkStartIndex, lines.size).take(300)
+            } else {
+                lines.filterNot { line ->
+                    line.startsWith("diff ") ||
+                    line.startsWith("index ") ||
+                    line.startsWith("--- ") ||
+                    line.startsWith("+++ ") ||
+                    line.startsWith("old mode ") ||
+                    line.startsWith("new mode ") ||
+                    line.startsWith("deleted file mode ") ||
+                    line.startsWith("new file mode ") ||
+                    line.startsWith("similarity index ") ||
+                    line.contains("a/$path") ||
+                    line.contains("b/$path")
+                }.take(300)
+            }
         }
     }
     return emptyList()
