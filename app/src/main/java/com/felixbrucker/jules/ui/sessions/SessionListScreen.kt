@@ -4,6 +4,7 @@ import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,7 +15,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -193,6 +196,8 @@ fun SessionListScreen(
         )
     }
 
+    var isFabVisible by remember { mutableStateOf(true) }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -208,12 +213,18 @@ fun SessionListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.openCreateDialog() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+            AnimatedVisibility(
+                visible = isFabVisible,
+                enter = slideInVertically(initialOffsetY = { it * 2 }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it * 2 }) + fadeOut()
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Create Session")
+                FloatingActionButton(
+                    onClick = { viewModel.openCreateDialog() },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Create Session")
+                }
             }
         }
     ) { innerPadding ->
@@ -224,7 +235,8 @@ fun SessionListScreen(
             includeArchived = includeArchived,
             includeDrafts = includeDrafts,
             drafts = drafts,
-            sessions = sessions
+            sessions = sessions,
+            onFabVisibilityChanged = { isFabVisible = it }
         )
     }
 }
@@ -467,7 +479,8 @@ private fun SessionListContent(
     includeArchived: Boolean,
     includeDrafts: Boolean,
     drafts: List<SessionDraftWithSource>,
-    sessions: List<SessionWithPullRequest>
+    sessions: List<SessionWithPullRequest>,
+    onFabVisibilityChanged: (Boolean) -> Unit
 ) {
     val listState = rememberLazyListState()
     var filterBarHeightPx by remember { mutableFloatStateOf(0f) }
@@ -477,6 +490,11 @@ private fun SessionListContent(
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
+                if (delta < -10f) {
+                    onFabVisibilityChanged(false)
+                } else if (delta > 10f) {
+                    onFabVisibilityChanged(true)
+                }
                 if (filterBarHeightPx <= 0f) return Offset.Zero
                 val oldOffset = filterBarOffsetPx
                 val newOffset = (oldOffset + delta).coerceIn(-filterBarHeightPx, 0f)
@@ -492,6 +510,7 @@ private fun SessionListContent(
             .collect { (index, offset) ->
                 if (index == 0 && offset == 0) {
                     filterBarOffsetPx = 0f
+                    onFabVisibilityChanged(true)
                 }
             }
     }

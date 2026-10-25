@@ -476,7 +476,11 @@ class JulesRepository @Inject constructor(
                 }.awaitAll()
             }
 
-            dispatchableWorkflowDao.deleteWorkflowsNotIn(allFetchedWorkflowIds)
+            if (allFetchedWorkflowIds.isNotEmpty()) {
+                dispatchableWorkflowDao.deleteWorkflowsNotIn(allFetchedWorkflowIds)
+            } else {
+                dispatchableWorkflowDao.deleteAllWorkflows()
+            }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing workflows")
