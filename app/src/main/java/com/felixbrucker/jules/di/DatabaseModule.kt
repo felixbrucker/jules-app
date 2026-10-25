@@ -9,7 +9,7 @@ import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.database.LogDao
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
-import com.felixbrucker.jules.data.database.WorkflowDispatchDao
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -64,8 +64,8 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideWorkflowDispatchDao(database: AppDatabase): WorkflowDispatchDao {
-        return database.workflowDispatchDao()
+    fun provideDispatchableWorkflowDao(database: AppDatabase): DispatchableWorkflowDao {
+        return database.dispatchableWorkflowDao()
     }
 
     @Provides

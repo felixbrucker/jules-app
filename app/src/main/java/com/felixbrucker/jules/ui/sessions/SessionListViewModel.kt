@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 enum class SessionFilterChip(val label: String) {
@@ -195,7 +194,6 @@ class SessionListViewModel @Inject constructor(
                 julesRepository.saveDraft(draft)
                 dismissCreateDialog()
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to save draft")
                 _userError.value = e.message ?: "Failed to save draft"
             }
         }
@@ -206,7 +204,6 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.deleteDraft(draftId)
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to delete draft")
                 _userError.value = e.message ?: "Failed to delete draft"
             }
         }
@@ -221,7 +218,6 @@ class SessionListViewModel @Inject constructor(
                 julesRepository.createSessionFromDraft(draft)
                 dismissCreateDialog()
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to create session from draft")
                 _createSessionError.value = e.message ?: "Failed to create session"
             } finally {
                 _isCreatingSession.value = false
@@ -235,7 +231,6 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.sync()
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Sync failed")
                 _userError.value = e.message ?: "Failed to sync"
             } finally {
                 isRefreshing = false
@@ -248,7 +243,6 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.deleteSession(sessionId)
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Delete session failed")
                 _userError.value = e.message ?: "Failed to delete session"
             }
         }
@@ -259,7 +253,6 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.archiveSession(sessionId)
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Archive session failed")
                 _userError.value = e.message ?: "Failed to archive session"
             }
         }
@@ -270,7 +263,6 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.unarchiveSession(sessionId)
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Unarchive session failed")
                 _userError.value = e.message ?: "Failed to unarchive session"
             }
         }
@@ -303,17 +295,12 @@ class SessionListViewModel @Inject constructor(
                 )
                 dismissDispatchDialog()
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to dispatch workflow ${workflow.name}")
                 _dispatchDialogState.value = _dispatchDialogState.value?.copy(
                     isDispatching = false,
                     errorMessage = e.message ?: "Failed to dispatch workflow"
                 )
             }
         }
-    }
-
-    companion object {
-        private const val TAG = "SessionListViewModel"
     }
 }
 

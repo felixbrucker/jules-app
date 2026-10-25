@@ -9,7 +9,7 @@ import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
-import com.felixbrucker.jules.data.database.WorkflowDispatchDao
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.notification.JulesNotificationManager
@@ -39,7 +39,7 @@ class JulesRepositoryTest {
     private lateinit var pullRequestDao: PullRequestDao
     private lateinit var sourceDao: SourceDao
     private lateinit var sessionDraftDao: SessionDraftDao
-    private lateinit var workflowDispatchDao: WorkflowDispatchDao
+    private lateinit var dispatchableWorkflowDao: DispatchableWorkflowDao
     private lateinit var sourceSyncMetadataDao: SourceSyncMetadataDao
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
@@ -54,7 +54,7 @@ class JulesRepositoryTest {
         pullRequestDao = mockk(relaxed = true)
         sourceDao = mockk(relaxed = true)
         sessionDraftDao = mockk(relaxed = true)
-        workflowDispatchDao = mockk(relaxed = true)
+        dispatchableWorkflowDao = mockk(relaxed = true)
         sourceSyncMetadataDao = mockk(relaxed = true)
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
@@ -74,7 +74,7 @@ class JulesRepositoryTest {
             pullRequestDao = pullRequestDao,
             sourceDao = sourceDao,
             sessionDraftDao = sessionDraftDao,
-            workflowDispatchDao = workflowDispatchDao,
+            dispatchableWorkflowDao = dispatchableWorkflowDao,
             sourceSyncMetadataDao = sourceSyncMetadataDao,
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,

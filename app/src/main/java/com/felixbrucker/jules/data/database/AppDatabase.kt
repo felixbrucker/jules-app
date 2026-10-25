@@ -28,7 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sourceDao(): SourceDao
     abstract fun logDao(): LogDao
     abstract fun sessionDraftDao(): SessionDraftDao
-    abstract fun workflowDispatchDao(): WorkflowDispatchDao
+    abstract fun dispatchableWorkflowDao(): DispatchableWorkflowDao
     abstract fun sourceSyncMetadataDao(): SourceSyncMetadataDao
 
     companion object {

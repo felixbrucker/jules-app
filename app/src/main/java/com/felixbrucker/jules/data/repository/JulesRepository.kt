@@ -12,7 +12,7 @@ import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceEntity
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataEntity
-import com.felixbrucker.jules.data.database.WorkflowDispatchDao
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.toEntity
 import com.felixbrucker.jules.network.api.util.WorkflowDispatchParser
@@ -53,7 +53,7 @@ class JulesRepository @Inject constructor(
     private val pullRequestDao: PullRequestDao,
     private val sourceDao: SourceDao,
     private val sessionDraftDao: SessionDraftDao,
-    private val workflowDispatchDao: WorkflowDispatchDao,
+    private val dispatchableWorkflowDao: DispatchableWorkflowDao,
     private val sourceSyncMetadataDao: SourceSyncMetadataDao,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
@@ -459,7 +459,7 @@ class JulesRepository @Inject constructor(
                                 }
 
                                 if (entitiesForSource.isNotEmpty()) {
-                                    workflowDispatchDao.upsertWorkflows(entitiesForSource)
+                                    dispatchableWorkflowDao.upsertWorkflows(entitiesForSource)
                                 }
                                 sourceSyncMetadataDao.updateLastWorkflowSyncedAtTargeted(
                                     sourceId = source.id,

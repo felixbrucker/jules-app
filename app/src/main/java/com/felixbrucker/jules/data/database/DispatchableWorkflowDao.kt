@@ -5,7 +5,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 
 @Dao
-interface WorkflowDispatchDao {
+interface DispatchableWorkflowDao {
     @Upsert
     suspend fun upsertWorkflows(workflows: List<DispatchableWorkflowEntity>)
 
