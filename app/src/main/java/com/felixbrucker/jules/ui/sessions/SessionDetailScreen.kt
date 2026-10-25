@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -35,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Check
@@ -44,7 +46,6 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AssistChip
@@ -70,6 +71,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -191,6 +193,7 @@ private fun SessionDetailTopBar(
         modifier = with(sharedTransitionScope) {
             Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .sharedBounds(
                     sharedContentState = rememberSharedContentState(key = "container_${session.id}"),
                     animatedVisibilityScope = animatedVisibilityScope
@@ -443,26 +446,32 @@ private fun SplitDividerHandle(
     splitRatio: Float,
     onSplitRatioChange: (Float) -> Unit
 ) {
+    val currentOnSplitRatioChange by rememberUpdatedState(onSplitRatioChange)
+
     Box(
         modifier = Modifier
             .fillMaxHeight()
-            .width(12.dp)
+            .width(20.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .pointerInput(containerWidthPx) {
-                detectHorizontalDragGestures { change, dragAmount ->
-                    change.consume()
-                    if (containerWidthPx > 0) {
-                        val deltaRatio = dragAmount / containerWidthPx.toFloat()
-                        onSplitRatioChange(splitRatio + deltaRatio)
+                var currentRatio = splitRatio
+                detectHorizontalDragGestures(
+                    onDragStart = { currentRatio = splitRatio },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        if (containerWidthPx > 0) {
+                            currentRatio += dragAmount / containerWidthPx.toFloat()
+                            currentOnSplitRatioChange(currentRatio)
+                        }
                     }
-                }
+                )
             },
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
                 .width(4.dp)
-                .height(32.dp)
+                .height(36.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
         )
@@ -702,7 +711,7 @@ private fun PlanGeneratedCard(planSteps: List<PlanStep>) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             planSteps.forEachIndexed { idx, step ->
-                PlanStepItemRow(stepIndex = idx + 1, step = step)
+                PlanStepItemRow(stepIndex = step.index ?: (idx + 1), step = step)
             }
         }
     }
