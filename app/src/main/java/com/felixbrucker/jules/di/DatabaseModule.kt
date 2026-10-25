@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.felixbrucker.jules.data.database.AppDatabase
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.SessionDao
+import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.database.LogDao
 import com.felixbrucker.jules.data.database.SourceDao
 import dagger.Module
@@ -51,5 +52,11 @@ object DatabaseModule {
     @Provides
     fun provideLogDao(database: AppDatabase): LogDao {
         return database.logDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSessionDraftDao(database: AppDatabase): SessionDraftDao {
+        return database.sessionDraftDao()
     }
 }

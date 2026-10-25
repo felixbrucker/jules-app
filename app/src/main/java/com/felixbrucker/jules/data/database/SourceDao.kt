@@ -16,6 +16,9 @@ interface SourceDao {
     @Query("SELECT * FROM sources")
     suspend fun getAllSources(): List<SourceEntity>
 
+    @Query("SELECT * FROM sources")
+    fun getAllSourcesFlow(): kotlinx.coroutines.flow.Flow<List<SourceEntity>>
+
     @Query("SELECT id FROM sources")
     suspend fun getAllSourceIds(): List<String>
 

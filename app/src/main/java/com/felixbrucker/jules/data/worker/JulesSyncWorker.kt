@@ -29,6 +29,7 @@ class JulesSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
+        Timber.tag(TAG).d("Starting sync in worker")
         return try {
             val settings = appSettingsRepository.appSettingsFlow.first()
             if (settings.apiKey.isNullOrBlank()) {
@@ -44,6 +45,7 @@ class JulesSyncWorker @AssistedInject constructor(
                 enqueueSyncWork(applicationContext, decision.intervalMinutes, isSelfEnqueue = true)
             }
 
+            Timber.tag(TAG).d("Finished sync in worker")
             Result.success()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -57,6 +59,7 @@ class JulesSyncWorker @AssistedInject constructor(
         const val WORK_NAME = "jules_sync_worker"
 
         fun enqueueSyncWork(context: Context, intervalMinutes: Long, isSelfEnqueue: Boolean = false) {
+            Timber.tag(TAG).d("Scheduling sync worker with interval %d minutes (isSelfEnqueue=%b)", intervalMinutes, isSelfEnqueue)
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
@@ -79,6 +82,7 @@ class JulesSyncWorker @AssistedInject constructor(
         }
 
         fun cancelSyncWork(context: Context) {
+            Timber.tag(TAG).d("Canceling sync worker")
             WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
         }
     }

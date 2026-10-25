@@ -27,6 +27,7 @@ class JulesApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         Timber.plant(AppLogTree(logRepository, applicationScope))
+        Timber.tag(TAG).d("Initializing Jules application")
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }

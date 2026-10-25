@@ -4,6 +4,8 @@ import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
 import com.felixbrucker.jules.data.database.SessionDao
+import com.felixbrucker.jules.data.database.SessionDraftDao
+import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
@@ -34,6 +36,7 @@ class JulesRepositoryTest {
     private lateinit var sessionDao: SessionDao
     private lateinit var pullRequestDao: PullRequestDao
     private lateinit var sourceDao: SourceDao
+    private lateinit var sessionDraftDao: SessionDraftDao
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
     private lateinit var notificationManager: JulesNotificationManager
@@ -46,6 +49,7 @@ class JulesRepositoryTest {
         sessionDao = mockk(relaxed = true)
         pullRequestDao = mockk(relaxed = true)
         sourceDao = mockk(relaxed = true)
+        sessionDraftDao = mockk(relaxed = true)
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
         notificationManager = mockk(relaxed = true)
@@ -63,12 +67,58 @@ class JulesRepositoryTest {
             sessionDao = sessionDao,
             pullRequestDao = pullRequestDao,
             sourceDao = sourceDao,
+            sessionDraftDao = sessionDraftDao,
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,
             notificationManager = notificationManager,
             julesApi = julesApi,
             gitHubApi = gitHubApi
         )
+    }
+
+    @Test
+    fun testSaveDraftAndDeleteDraft() = runBlocking {
+        val draft = SessionDraftEntity(id = "draft-1", title = "Draft 1", prompt = "Fix bug")
+
+        repository.saveDraft(draft)
+        coVerify { sessionDraftDao.upsertDraft(draft) }
+
+        repository.deleteDraft("draft-1")
+        coVerify { sessionDraftDao.deleteDraft("draft-1") }
+    }
+
+    @Test
+    fun testCreateSessionFromDraftCallsApiAndDeletesDraft() = runBlocking {
+        val draft = SessionDraftEntity(
+            id = "draft-10",
+            title = "New Session",
+            prompt = "Refactor code",
+            sourceId = "github/owner/repo",
+            branch = "main",
+            requirePlanApproval = true
+        )
+
+        val apiSession = Session(
+            name = "sessions/sess-100",
+            id = "sess-100",
+            title = "New Session",
+            prompt = "Refactor code",
+            state = SessionState.PLANNING,
+            createTime = Instant.now(),
+            sourceContext = SourceContext(source = "sources/github/owner/repo")
+        )
+
+        coEvery { julesApi.createSession(any()) } returns apiSession
+        coEvery { julesApi.getSession("sess-100") } returns apiSession
+
+        repository.createSessionFromDraft(draft)
+
+        coVerify {
+            julesApi.createSession(any())
+            julesApi.getSession("sess-100")
+            sessionDao.insertSessions(any())
+            sessionDraftDao.deleteDraft("draft-10")
+        }
     }
 
     @Test

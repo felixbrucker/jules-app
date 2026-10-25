@@ -3,10 +3,18 @@ package com.felixbrucker.jules.data.repository
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
 import com.felixbrucker.jules.data.database.SessionDao
+import com.felixbrucker.jules.data.database.SessionDraftDao
+import com.felixbrucker.jules.data.database.SessionDraftEntity
+import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
+import com.felixbrucker.jules.data.database.SourceEntity
 import com.felixbrucker.jules.data.database.toEntity
+import com.felixbrucker.jules.network.api.model.AutomationMode
+import com.felixbrucker.jules.network.api.model.CreateSessionRequest
+import com.felixbrucker.jules.network.api.model.GitHubRepoContext
+import com.felixbrucker.jules.network.api.model.SourceContext
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.notification.JulesNotificationManager
@@ -39,6 +47,7 @@ class JulesRepository @Inject constructor(
     private val sessionDao: SessionDao,
     private val pullRequestDao: PullRequestDao,
     private val sourceDao: SourceDao,
+    private val sessionDraftDao: SessionDraftDao,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val notificationManager: JulesNotificationManager,
@@ -65,6 +74,41 @@ class JulesRepository @Inject constructor(
             includeArchived = includeArchived
         )
     }
+
+    fun getDraftsFlow(searchQuery: String): Flow<List<SessionDraftWithSource>> {
+        val formattedQuery = if (searchQuery.isBlank()) "%%" else "%${searchQuery.trim()}%"
+        return sessionDraftDao.getDrafts(formattedQuery)
+    }
+
+    suspend fun saveDraft(draft: SessionDraftEntity) = withContext(Dispatchers.IO) {
+        sessionDraftDao.upsertDraft(draft)
+    }
+
+    suspend fun deleteDraft(draftId: String) = withContext(Dispatchers.IO) {
+        sessionDraftDao.deleteDraft(draftId)
+    }
+
+    suspend fun createSessionFromDraft(draft: SessionDraftEntity) = withContext(Dispatchers.IO) {
+        val sourceContext = draft.sourceId?.let { srcId ->
+            SourceContext(
+                source = if (srcId.startsWith("sources/")) srcId else "sources/$srcId",
+                githubRepoContext = draft.branch?.let { GitHubRepoContext(startingBranch = it) }
+            )
+        }
+        val request = CreateSessionRequest(
+            prompt = draft.prompt,
+            title = draft.title?.ifBlank { null },
+            sourceContext = sourceContext,
+            requirePlanApproval = draft.requirePlanApproval,
+            automationMode = AutomationMode.AUTOMATION_MODE_UNSPECIFIED
+        )
+        val created = julesApi.createSession(request)
+        val fetched = julesApi.getSession(created.id)
+        saveSessions(listOf(fetched.toEntity()), isBackground = false)
+        sessionDraftDao.deleteDraft(draft.id)
+    }
+
+    fun getSourcesFlow(): Flow<List<SourceEntity>> = sourceDao.getAllSourcesFlow()
 
     suspend fun validateApiKey(apiKey: String) = withContext(Dispatchers.IO) {
         julesApi.validateApiKey(apiKey = apiKey)
