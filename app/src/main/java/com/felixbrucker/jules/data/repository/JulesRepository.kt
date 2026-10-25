@@ -426,7 +426,7 @@ class JulesRepository @Inject constructor(
             }
 
             val semaphore = Semaphore(4)
-            val allFetchedWorkflowEntities = coroutineScope {
+            coroutineScope {
                 usableSources.map { source ->
                     async {
                         semaphore.withPermit {
@@ -456,25 +456,21 @@ class JulesRepository @Inject constructor(
                                         Timber.tag(TAG).e(e, "Failed to fetch/parse workflow content for ${wf.path} in ${source.id}")
                                     }
                                 }
-                                sourceSyncMetadataDao.upsertMetadata(
-                                    SourceSyncMetadataEntity(
-                                        sourceId = source.id,
-                                        lastWorkflowSyncedAt = Instant.now()
-                                    )
+
+                                if (entitiesForSource.isNotEmpty()) {
+                                    workflowDispatchDao.upsertWorkflows(entitiesForSource)
+                                }
+                                sourceSyncMetadataDao.updateLastWorkflowSyncedAtTargeted(
+                                    sourceId = source.id,
+                                    timestamp = Instant.now()
                                 )
-                                entitiesForSource
                             } catch (e: Exception) {
                                 if (e is CancellationException) throw e
                                 Timber.tag(TAG).e(e, "Failed to fetch workflows for source ${source.id}")
-                                emptyList()
                             }
                         }
                     }
-                }.awaitAll().flatten()
-            }
-
-            if (allFetchedWorkflowEntities.isNotEmpty()) {
-                workflowDispatchDao.upsertWorkflows(allFetchedWorkflowEntities)
+                }.awaitAll()
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
