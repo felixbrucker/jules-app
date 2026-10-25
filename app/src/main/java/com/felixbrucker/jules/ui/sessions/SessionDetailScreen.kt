@@ -533,27 +533,28 @@ private fun ChatWindowView(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            reverseLayout = true,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(
-                count = activities.itemCount,
-                key = activities.itemKey { it.id }
-            ) { index ->
-                val item = activities[index]
-                if (item != null) {
-                    ChatActivityRow(
-                        item = item,
-                        isBottomMost = (index == 0),
-                        session = session
-                    )
+        SelectionContainer(modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                state = listState,
+                reverseLayout = true,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(
+                    count = activities.itemCount,
+                    key = activities.itemKey { it.id }
+                ) { index ->
+                    val item = activities[index]
+                    if (item != null) {
+                        ChatActivityRow(
+                            item = item,
+                            isBottomMost = (index == 0),
+                            session = session
+                        )
+                    }
                 }
             }
         }
@@ -714,29 +715,61 @@ private fun ProgressUpdatedBubble(
     title: String?,
     description: String?
 ) {
+    val hasBoth = !title.isNullOrBlank() && !description.isNullOrBlank()
+    var isExpanded by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 2.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = if (hasBoth) {
+                Modifier
+                    .clip(RoundedCornerShape(16.dp, 16.dp, 16.dp, 2.dp))
+                    .clickable { isExpanded = !isExpanded }
+            } else Modifier
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                title?.let {
-                    FormattedMarkdownText(
-                        markdown = it,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
-                if (title != null && description != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-                description?.let {
-                    FormattedMarkdownText(
-                        markdown = it,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                if (hasBoth) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            FormattedMarkdownText(
+                                markdown = title,
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    if (isExpanded) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        FormattedMarkdownText(
+                            markdown = description,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                } else {
+                    title?.let {
+                        FormattedMarkdownText(
+                            markdown = it,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                    description?.let {
+                        FormattedMarkdownText(
+                            markdown = it,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
         }
