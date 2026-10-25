@@ -12,6 +12,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -126,5 +127,25 @@ class SessionListViewModelTest {
             )
         }
         assertNull(viewModel.dispatchDialogState.value)
+    }
+
+    @Test
+    fun testOpenCreateDialogUsesLastSelectedSource() = runTest {
+        val source1 = com.felixbrucker.jules.data.database.SourceEntity(id = "repo-1", name = "Repo 1", githubRepo = null)
+        val source2 = com.felixbrucker.jules.data.database.SourceEntity(id = "repo-2", name = "Repo 2", githubRepo = null)
+        coEvery { julesRepository.getSourcesFlow() } returns flowOf(listOf(source1, source2))
+        coEvery { appSettingsRepository.lastSelectedSourceIdFlow } returns flowOf("repo-2")
+
+        val vm = SessionListViewModel(julesRepository, appSettingsRepository)
+        val sourcesCollector = launch { vm.sources.collect {} }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.openCreateDialog()
+        testDispatcher.scheduler.advanceUntilIdle()
+        sourcesCollector.cancel()
+
+        val activeDraft = vm.activeDraft.value
+        assertNotNull(activeDraft)
+        assertEquals("repo-2", activeDraft?.sourceId)
     }
 }

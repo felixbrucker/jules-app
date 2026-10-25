@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -157,9 +158,20 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun openCreateDialog(draft: SessionDraftEntity? = null) {
-        _activeDraft.value = draft ?: SessionDraftEntity()
-        _createSessionError.value = null
-        _showCreateDialog.value = true
+        viewModelScope.launch {
+            val initialDraft = if (draft != null && draft.sourceId != null) {
+                draft
+            } else {
+                val lastSourceId = appSettingsRepository.lastSelectedSourceIdFlow.first()
+                val targetSourceId = lastSourceId?.takeIf { id ->
+                    sources.value.any { it.id == id || "sources/" + it.id == id }
+                } ?: sources.value.firstOrNull()?.id
+                (draft ?: SessionDraftEntity()).copy(sourceId = targetSourceId)
+            }
+            _activeDraft.value = initialDraft
+            _createSessionError.value = null
+            _showCreateDialog.value = true
+        }
     }
 
     fun dismissCreateDialog() {
@@ -172,6 +184,7 @@ class SessionListViewModel @Inject constructor(
     fun saveDraft(draft: SessionDraftEntity) {
         viewModelScope.launch {
             try {
+                draft.sourceId?.let { appSettingsRepository.saveLastSelectedSourceId(it) }
                 julesRepository.saveDraft(draft)
                 dismissCreateDialog()
             } catch (e: Exception) {
@@ -195,6 +208,7 @@ class SessionListViewModel @Inject constructor(
             _isCreatingSession.value = true
             _createSessionError.value = null
             try {
+                draft.sourceId?.let { appSettingsRepository.saveLastSelectedSourceId(it) }
                 julesRepository.createSessionFromDraft(draft)
                 dismissCreateDialog()
             } catch (e: Exception) {

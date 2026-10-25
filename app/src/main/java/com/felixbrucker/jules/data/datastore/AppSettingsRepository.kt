@@ -37,6 +37,7 @@ class AppSettingsRepository @Inject constructor(
         val DAILY_SESSION_LIMIT = intPreferencesKey("daily_session_limit")
         val FEEDBACK_NOTIFICATIONS_ENABLED = booleanPreferencesKey("feedback_notifications_enabled")
         val COMPLETION_NOTIFICATIONS_ENABLED = booleanPreferencesKey("completion_notifications_enabled")
+        val LAST_SELECTED_SOURCE_ID = stringPreferencesKey("last_selected_source_id")
     }
 
     val appSettingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -75,6 +76,9 @@ class AppSettingsRepository @Inject constructor(
 
     val completionNotificationsEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true }
+
+    val lastSelectedSourceIdFlow: Flow<String?> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.LAST_SELECTED_SOURCE_ID] }
 
     suspend fun saveApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
@@ -125,6 +129,16 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setCompletionNotificationsEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveLastSelectedSourceId(sourceId: String?) {
+        context.dataStore.edit { preferences ->
+            if (sourceId.isNullOrBlank()) {
+                preferences.remove(PreferencesKeys.LAST_SELECTED_SOURCE_ID)
+            } else {
+                preferences[PreferencesKeys.LAST_SELECTED_SOURCE_ID] = sourceId
+            }
         }
     }
 }
