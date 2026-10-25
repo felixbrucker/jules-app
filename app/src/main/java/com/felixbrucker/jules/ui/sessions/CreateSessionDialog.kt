@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SourceEntity
 import com.felixbrucker.jules.ui.components.LoadingStateButton
@@ -60,12 +61,13 @@ fun CreateSessionDialog(
     onCreateSession: (SessionDraftEntity) -> Unit
 ) {
     BasicAlertDialog(
-        onDismissRequest = onDismiss
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+                .fillMaxWidth(0.94f)
+                .padding(vertical = 16.dp),
             shape = RoundedCornerShape(16.dp)
         ) {
             CreateSessionDialogBody(
@@ -440,6 +442,7 @@ private fun CreateSessionDialogButtons(
         Spacer(modifier = Modifier.width(4.dp))
         LoadingStateButton(
             label = "Create",
+            loadingLabel = "Creating...",
             isLoading = isCreating,
             enabled = canCreate,
             onClick = onCreate

@@ -1,5 +1,6 @@
 package com.felixbrucker.jules.ui.sessions
 
+import android.content.Intent
 import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,11 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.felixbrucker.jules.R
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
 
@@ -193,6 +196,7 @@ private fun DraftActionDropdownMenu(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DraftCardFooter(draftWithSource: SessionDraftWithSource) {
+    val context = LocalContext.current
     val draft = draftWithSource.draft
     val source = draftWithSource.source
     val relativeTime = DateUtils.getRelativeTimeSpanString(
@@ -201,7 +205,9 @@ private fun DraftCardFooter(draftWithSource: SessionDraftWithSource) {
         DateUtils.MINUTE_IN_MILLIS
     ).toString()
 
-    val repoLabel = source?.githubRepo?.let { "${it.owner}/${it.repo}" } ?: source?.name
+    val repoOwnerAndName = source?.githubRepo?.let { "${it.owner}/${it.repo}" }
+        ?: source?.id?.removePrefix("sources/")?.removePrefix("github/")
+    val repoLabel = repoOwnerAndName ?: source?.name
 
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
@@ -215,9 +221,14 @@ private fun DraftCardFooter(draftWithSource: SessionDraftWithSource) {
         ) {
             repoLabel?.let { label ->
                 val fullLabel = draft.branch?.let { "$label:$it" } ?: label
+                val repoUrl = repoOwnerAndName?.let { "https://github.com/$it" }
                 AssistChip(
                     modifier = Modifier.height(28.dp),
-                    onClick = {},
+                    onClick = {
+                        repoUrl?.let { url ->
+                            context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                        }
+                    },
                     label = { Text(fullLabel, style = MaterialTheme.typography.labelSmall) },
                     leadingIcon = {
                         Icon(
