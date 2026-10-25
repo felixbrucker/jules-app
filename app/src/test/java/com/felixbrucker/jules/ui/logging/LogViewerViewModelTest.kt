@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -40,7 +41,7 @@ class LogViewerViewModelTest {
     @Test
     fun testInitialState() {
         assertEquals("", viewModel.searchQuery.value)
-        assertEquals(-1, viewModel.selectedPriority.value)
+        assertTrue(viewModel.selectedPriorities.value.isEmpty())
     }
 
     @Test
@@ -50,9 +51,16 @@ class LogViewerViewModelTest {
     }
 
     @Test
-    fun testSetSelectedPriorityUpdatesState() {
-        viewModel.setSelectedPriority(6)
-        assertEquals(6, viewModel.selectedPriority.value)
+    fun testTogglePriorityMultiSelect() {
+        viewModel.togglePriority(3)
+        viewModel.togglePriority(4)
+        assertEquals(setOf(3, 4), viewModel.selectedPriorities.value)
+
+        viewModel.togglePriority(3)
+        assertEquals(setOf(4), viewModel.selectedPriorities.value)
+
+        viewModel.togglePriority(-1)
+        assertTrue(viewModel.selectedPriorities.value.isEmpty())
     }
 
     @Test

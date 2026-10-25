@@ -5,7 +5,13 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,12 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -113,7 +113,7 @@ fun LogViewerScreen(
 
     val pagedLogs = viewModel.logsPaged.collectAsLazyPagingItems()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedPriority by viewModel.selectedPriority.collectAsState()
+    val selectedPriorities by viewModel.selectedPriorities.collectAsState()
     val filteredCount by viewModel.filteredCount.collectAsState()
     val totalCount by viewModel.totalCount.collectAsState()
 
@@ -193,8 +193,8 @@ fun LogViewerScreen(
             LogViewerTopControls(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                selectedPriority = selectedPriority,
-                onSelectPriority = { viewModel.setSelectedPriority(it) },
+                selectedPriorities = selectedPriorities,
+                onTogglePriority = { viewModel.togglePriority(it) },
                 filteredLogsCount = filteredCount,
                 totalLogsCount = totalCount,
                 onJumpToBottom = {
@@ -326,8 +326,8 @@ fun LogViewerPriorityFilterChip(
 
 @Composable
 fun LogViewerPriorityChips(
-    selectedPriority: Int,
-    onSelectPriority: (Int) -> Unit
+    selectedPriorities: Set<Int>,
+    onTogglePriority: (Int) -> Unit
 ) {
     val priorities = remember {
         listOf(
@@ -345,11 +345,12 @@ fun LogViewerPriorityChips(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         priorities.forEach { (priorityVal, label) ->
+            val isSelected = if (priorityVal == -1) selectedPriorities.isEmpty() else selectedPriorities.contains(priorityVal)
             LogViewerPriorityFilterChip(
                 priorityVal = priorityVal,
                 label = label,
-                isSelected = selectedPriority == priorityVal,
-                onSelectPriority = onSelectPriority
+                isSelected = isSelected,
+                onSelectPriority = onTogglePriority
             )
         }
     }
@@ -387,8 +388,8 @@ fun LogViewerCountHeader(
 fun LogViewerTopControls(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    selectedPriority: Int,
-    onSelectPriority: (Int) -> Unit,
+    selectedPriorities: Set<Int>,
+    onTogglePriority: (Int) -> Unit,
     filteredLogsCount: Int,
     totalLogsCount: Int,
     onJumpToBottom: () -> Unit,
@@ -399,7 +400,7 @@ fun LogViewerTopControls(
         modifier = modifier.fillMaxWidth().padding(bottom = 6.dp)
     ) {
         LogViewerSearchInput(searchQuery = searchQuery, onSearchQueryChange = onSearchQueryChange)
-        LogViewerPriorityChips(selectedPriority = selectedPriority, onSelectPriority = onSelectPriority)
+        LogViewerPriorityChips(selectedPriorities = selectedPriorities, onTogglePriority = onTogglePriority)
         LogViewerCountHeader(
             filteredLogsCount = filteredLogsCount,
             totalLogsCount = totalLogsCount,
@@ -525,7 +526,10 @@ fun LogViewerList(
         ) { index ->
             val entry = pagedLogs[index]
             if (entry != null) {
-                LogEntryCard(entry = entry)
+                LogEntryCard(
+                    modifier = Modifier.animateItem(),
+                    entry = entry
+                )
             }
         }
     }
@@ -651,7 +655,10 @@ fun LogEntryStackTrace(
 }
 
 @Composable
-fun LogEntryCard(entry: LogEntity) {
+fun LogEntryCard(
+    entry: LogEntity,
+    modifier: Modifier = Modifier
+) {
     var isExpanded by remember { mutableStateOf(false) }
 
     val isMessageLong = remember(entry.message) {
@@ -686,7 +693,7 @@ fun LogEntryCard(entry: LogEntity) {
         shape = RoundedCornerShape(8.dp),
         color = LogColors.SurfaceContainer,
         border = BorderStroke(1.dp, LogColors.SurfaceVariantGrey),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(
                 if (isExpandable) {

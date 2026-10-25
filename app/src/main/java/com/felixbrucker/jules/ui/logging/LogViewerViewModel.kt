@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,8 +27,8 @@ class LogViewerViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedPriority = MutableStateFlow(-1)
-    val selectedPriority: StateFlow<Int> = _selectedPriority.asStateFlow()
+    private val _selectedPriorities = MutableStateFlow<Set<Int>>(emptySet())
+    val selectedPriorities: StateFlow<Set<Int>> = _selectedPriorities.asStateFlow()
 
     val totalCount: StateFlow<Int> = logRepository.getTotalCountFlow()
         .stateIn(
@@ -40,10 +39,9 @@ class LogViewerViewModel @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val filteredCount: StateFlow<Int> = combine(
-        selectedPriority,
+        selectedPriorities,
         searchQuery
-    ) { priority, query ->
-        val priorities = if (priority == -1) emptySet() else setOf(priority)
+    ) { priorities, query ->
         priorities to query
     }.flatMapLatest { (priorities, query) ->
         logRepository.getFilteredCountFlow(priorities = priorities, searchQuery = query)
@@ -55,10 +53,9 @@ class LogViewerViewModel @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val logsPaged: Flow<PagingData<LogEntity>> = combine(
-        selectedPriority,
+        selectedPriorities,
         searchQuery
-    ) { priority, query ->
-        val priorities = if (priority == -1) emptySet() else setOf(priority)
+    ) { priorities, query ->
         priorities to query
     }.flatMapLatest { (priorities, query) ->
         logRepository.getLogsPaged(priorities = priorities, searchQuery = query)
@@ -68,8 +65,17 @@ class LogViewerViewModel @Inject constructor(
         _searchQuery.value = query
     }
 
-    fun setSelectedPriority(priority: Int) {
-        _selectedPriority.value = priority
+    fun togglePriority(priority: Int) {
+        if (priority == -1) {
+            _selectedPriorities.value = emptySet()
+        } else {
+            val current = _selectedPriorities.value
+            _selectedPriorities.value = if (current.contains(priority)) {
+                current - priority
+            } else {
+                current + priority
+            }
+        }
     }
 
     fun clearLogs() {
