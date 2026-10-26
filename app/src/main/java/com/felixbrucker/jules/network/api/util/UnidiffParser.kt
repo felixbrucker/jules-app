@@ -1,14 +1,27 @@
 package com.felixbrucker.jules.network.api.util
 
+import androidx.collection.LruCache
 import com.felixbrucker.jules.network.api.model.FileChangeType
 import com.felixbrucker.jules.network.api.model.ParsedFile
 
 object UnidiffParser {
 
+    private val cache = LruCache<String, List<ParsedFile>>(20)
+    private val diffGitRegex = Regex("^diff --git ", RegexOption.MULTILINE)
+
     fun parse(patch: String?): List<ParsedFile> {
         if (patch.isNullOrBlank()) return emptyList()
 
-        val rawBlocks = patch.split(Regex("^diff --git ", RegexOption.MULTILINE))
+        val cached = cache.get(patch)
+        if (cached != null) return cached
+
+        val parsed = parseInternal(patch)
+        cache.put(patch, parsed)
+        return parsed
+    }
+
+    private fun parseInternal(patch: String): List<ParsedFile> {
+        val rawBlocks = patch.split(diffGitRegex)
         val parsedFiles = mutableListOf<ParsedFile>()
 
         for (block in rawBlocks) {

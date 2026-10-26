@@ -38,6 +38,8 @@ import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.util.periodicTickerFlow
+import androidx.collection.LruCache
+import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import kotlinx.coroutines.CancellationException
@@ -78,6 +80,9 @@ class JulesRepository @Inject constructor(
     private val moshi: Moshi
 ) {
 
+    private val activityAdapter: JsonAdapter<Activity> by lazy { moshi.adapter(Activity::class.java) }
+    private val activityCache = LruCache<String, Activity>(200)
+
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getDailySessionCountFlow(): Flow<Int> {
         return periodicTickerFlow(10.minutes)
@@ -110,7 +115,7 @@ class JulesRepository @Inject constructor(
         ) {
             activityDao.getActivitiesPagingSource(sessionId)
         }.flow.map { pagingData ->
-            pagingData.map { entity -> entity.toActivity(moshi) }
+            pagingData.map { entity -> entity.toActivity(activityAdapter, activityCache) }
         }.flowOn(Dispatchers.Default)
     }
 
@@ -179,7 +184,7 @@ class JulesRepository @Inject constructor(
                     pageToken = pageToken
                 )
 
-                val entities = response.activities.map { it.toEntity(sessionId, moshi) }
+                val entities = response.activities.map { it.toEntity(sessionId, activityAdapter, activityCache, moshi) }
                 if (entities.isNotEmpty()) {
                     activityDao.upsertActivities(entities)
                 }
@@ -273,7 +278,7 @@ class JulesRepository @Inject constructor(
                         originator = com.felixbrucker.jules.network.api.model.Originator.USER,
                         userMessage = session.prompt
                     )
-                    initialActivity.toEntity(session.id, moshi)
+                    initialActivity.toEntity(session.id, activityAdapter, activityCache, moshi)
                 } else null
             }
             if (initialActivities.isNotEmpty()) {
@@ -601,7 +606,14 @@ class JulesRepository @Inject constructor(
     }
 }
 
-private fun Activity.toEntity(sessionId: String, moshi: Moshi): ActivityEntity {
+private fun Activity.toEntity(
+    sessionId: String,
+    activityAdapter: JsonAdapter<Activity>,
+    activityCache: LruCache<String, Activity>,
+    moshi: Moshi
+): ActivityEntity {
+    activityCache.put(id, this)
+
     val typeName = when (this) {
         is Activity.UserMessaged -> "USER_MESSAGED"
         is Activity.AgentMessaged -> "AGENT_MESSAGED"
@@ -621,7 +633,7 @@ private fun Activity.toEntity(sessionId: String, moshi: Moshi): ActivityEntity {
 
     val parsedFiles = unidiffPatch?.let { UnidiffParser.parse(it) }
 
-    val activityJson = moshi.adapter(Activity::class.java).toJson(this)
+    val activityJson = activityAdapter.toJson(this)
     val parsedFilesType = Types.newParameterizedType(List::class.java, ParsedFile::class.java)
     val changedFilesJson = parsedFiles?.let { moshi.adapter<List<ParsedFile>>(parsedFilesType).toJson(it) }
 
@@ -637,6 +649,11 @@ private fun Activity.toEntity(sessionId: String, moshi: Moshi): ActivityEntity {
     )
 }
 
-private fun ActivityEntity.toActivity(moshi: Moshi): Activity {
-    return moshi.adapter(Activity::class.java).fromJson(activityJson)!!
+private fun ActivityEntity.toActivity(
+    activityAdapter: JsonAdapter<Activity>,
+    activityCache: LruCache<String, Activity>
+): Activity {
+    return activityCache.get(id) ?: activityAdapter.fromJson(activityJson)!!.also {
+        activityCache.put(id, it)
+    }
 }
