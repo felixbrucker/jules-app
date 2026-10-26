@@ -15,6 +15,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -37,15 +39,14 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
@@ -81,6 +82,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -131,10 +133,17 @@ fun SessionDetailScreen(
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
     val errorEvent by viewModel.errorEvents.collectAsState(initial = null)
 
+    val isPhone = LocalConfiguration.current.screenWidthDp < 600
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.startPolling()
+    }
+
+    LaunchedEffect(isPhone) {
+        if (isPhone) {
+            viewModel.updateSplitRatio(1.0f)
+        }
     }
 
     LaunchedEffect(errorEvent) {
@@ -168,6 +177,12 @@ fun SessionDetailScreen(
                     activityBasedState = activityBasedState,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
+                    isPhone = isPhone,
+                    splitRatio = splitRatio,
+                    onToggleViewMode = {
+                        val nextRatio = if (splitRatio > 0.0f) 0.0f else 1.0f
+                        viewModel.updateSplitRatio(nextRatio)
+                    },
                     onBackClick = onBackClick,
                     onArchive = { viewModel.archiveSession() },
                     onUnarchive = { viewModel.unarchiveSession() },
@@ -191,6 +206,7 @@ fun SessionDetailScreen(
                     fileTree = fileTree,
                     fileDiffLinesMap = fileDiffLinesMap,
                     splitRatio = splitRatio,
+                    isPhone = isPhone,
                     isSendingMessage = isSendingMessage,
                     isApprovingPlan = isApprovingPlan,
                     onSplitRatioChange = { viewModel.updateSplitRatio(it) },
@@ -202,13 +218,16 @@ fun SessionDetailScreen(
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SessionDetailTopBar(
     sessionWithPr: SessionWithPullRequest,
     activityBasedState: ActivityBasedStateEntity?,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
+    isPhone: Boolean,
+    splitRatio: Float,
+    onToggleViewMode: () -> Unit,
     onBackClick: () -> Unit,
     onArchive: () -> Unit,
     onUnarchive: () -> Unit,
@@ -217,6 +236,11 @@ private fun SessionDetailTopBar(
 ) {
     val session = sessionWithPr.session
     var menuExpanded by remember { mutableStateOf(false) }
+
+    val parsedFiles = activityBasedState?.latestDiff?.parsedFilesMap?.values
+    val totalAdditions = parsedFiles?.sumOf { it.additions } ?: session.changeSet?.totalAdditions ?: 0
+    val totalDeletions = parsedFiles?.sumOf { it.deletions } ?: session.changeSet?.totalDeletions ?: 0
+    val context = LocalContext.current
 
     Surface(
         modifier = with(sharedTransitionScope) {
@@ -230,182 +254,132 @@ private fun SessionDetailTopBar(
         },
         tonalElevation = 2.dp
     ) {
-        Row(
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            SessionTopBarLeftSection(
-                session = session,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-                onBackClick = onBackClick
-            )
-            SessionTopBarRightSection(
-                sessionWithPr = sessionWithPr,
-                activityBasedState = activityBasedState,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-                menuExpanded = menuExpanded,
-                onMenuToggle = { menuExpanded = it },
-                onArchive = onArchive,
-                onUnarchive = onUnarchive,
-                onDelete = onDelete,
-                onSelectWorkflow = onSelectWorkflow
-            )
-        }
-    }
-}
+            IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun RowScope.SessionTopBarLeftSection(
-    session: SessionEntity,
-    sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope,
-    onBackClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier.weight(1f, fill = false),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
-            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-        }
-        SessionStateBadge(
-            state = session.state,
-            sessionId = session.id,
-            sharedTransitionScope = sharedTransitionScope,
-            animatedVisibilityScope = animatedVisibilityScope
-        )
-        session.repo?.let { repo ->
-            val context = LocalContext.current
-            Row(
+            SessionStateBadge(
+                state = session.state,
+                sessionId = session.id,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+
+            session.repo?.let { repo ->
+                Row(
+                    modifier = with(sharedTransitionScope) {
+                        Modifier
+                            .sharedElement(
+                                sharedContentState = rememberSharedContentState(key = "source_${session.id}"),
+                                animatedVisibilityScope = animatedVisibilityScope
+                            )
+                    }.clickable {
+                        val repoUrl = "https://github.com/${repo.owner}/${repo.name}"
+                        context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
+                    },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_github),
+                        contentDescription = "GitHub Repo",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = repo.label,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Text(
+                text = session.title ?: "Untitled",
                 modifier = with(sharedTransitionScope) {
                     Modifier
                         .sharedElement(
-                            sharedContentState = rememberSharedContentState(key = "source_${session.id}"),
+                            sharedContentState = rememberSharedContentState(key = "title_${session.id}"),
                             animatedVisibilityScope = animatedVisibilityScope
                         )
-                }.clickable {
-                    val repoUrl = "https://github.com/${repo.owner}/${repo.name}"
-                    context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
                 },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_github),
-                    contentDescription = "GitHub Repo",
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = repo.label,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
-                )
-            }
-            Text(
-                text = "•",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-        }
-        Text(
-            text = session.title ?: "Untitled",
-            modifier = with(sharedTransitionScope) {
-                Modifier
-                    .weight(1f, fill = false)
-                    .sharedElement(
-                        sharedContentState = rememberSharedContentState(key = "title_${session.id}"),
-                        animatedVisibilityScope = animatedVisibilityScope
+
+            session.pullRequest?.let { pr ->
+                Box(
+                    modifier = with(sharedTransitionScope) {
+                        Modifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "pr_badge_${session.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    }
+                ) {
+                    PullRequestChip(
+                        pr = pr,
+                        pullRequestState = sessionWithPr.pullRequestState,
+                        workflows = sessionWithPr.workflows,
+                        onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
+                        onWorkflowSelected = onSelectWorkflow
                     )
-            },
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
+                }
+            }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun SessionTopBarRightSection(
-    sessionWithPr: SessionWithPullRequest,
-    activityBasedState: ActivityBasedStateEntity?,
-    sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope,
-    menuExpanded: Boolean,
-    onMenuToggle: (Boolean) -> Unit,
-    onArchive: () -> Unit,
-    onUnarchive: () -> Unit,
-    onDelete: () -> Unit,
-    onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
-) {
-    val session = sessionWithPr.session
-    val context = LocalContext.current
+            if (totalAdditions > 0 || totalDeletions > 0) {
+                Box(
+                    modifier = with(sharedTransitionScope) {
+                        Modifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "changes_${session.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    }
+                ) {
+                    DiffBadges(additions = totalAdditions, deletions = totalDeletions)
+                }
+            }
 
-    val parsedFiles = activityBasedState?.latestDiff?.parsedFilesMap?.values
-    val totalAdditions = parsedFiles?.sumOf { it.additions } ?: session.changeSet?.totalAdditions ?: 0
-    val totalDeletions = parsedFiles?.sumOf { it.deletions } ?: session.changeSet?.totalDeletions ?: 0
+            if (isPhone) {
+                OutlinedButton(
+                    onClick = onToggleViewMode,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text(
+                        text = if (splitRatio > 0.0f) "Diffs" else "Chat",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        session.pullRequest?.let { pr ->
             Box(
                 modifier = with(sharedTransitionScope) {
                     Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState(key = "pr_badge_${session.id}"),
+                        sharedContentState = rememberSharedContentState(key = "menu_${session.id}"),
                         animatedVisibilityScope = animatedVisibilityScope
                     )
                 }
             ) {
-                PullRequestChip(
-                    pr = pr,
-                    pullRequestState = sessionWithPr.pullRequestState,
-                    workflows = sessionWithPr.workflows,
-                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
-                    onWorkflowSelected = onSelectWorkflow
-                )
-            }
-        }
-        if (totalAdditions > 0 || totalDeletions > 0) {
-            Box(
-                modifier = with(sharedTransitionScope) {
-                    Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState(key = "changes_${session.id}"),
-                        animatedVisibilityScope = animatedVisibilityScope
-                    )
+                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Actions")
                 }
-            ) {
-                DiffBadges(additions = totalAdditions, deletions = totalDeletions)
-            }
-        }
-        Box(
-            modifier = with(sharedTransitionScope) {
-                Modifier.sharedElement(
-                    sharedContentState = rememberSharedContentState(key = "menu_${session.id}"),
-                    animatedVisibilityScope = animatedVisibilityScope
+                SessionActionDropdown(
+                    expanded = menuExpanded,
+                    isArchived = session.isArchived,
+                    onDismiss = { menuExpanded = false },
+                    onArchive = onArchive,
+                    onUnarchive = onUnarchive,
+                    onDelete = onDelete
                 )
             }
-        ) {
-            IconButton(onClick = { onMenuToggle(true) }, modifier = Modifier.size(36.dp)) {
-                Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Actions")
-            }
-            SessionActionDropdown(
-                expanded = menuExpanded,
-                isArchived = session.isArchived,
-                onDismiss = { onMenuToggle(false) },
-                onArchive = onArchive,
-                onUnarchive = onUnarchive,
-                onDelete = onDelete
-            )
         }
     }
 }
@@ -450,6 +424,7 @@ private fun SessionDetailSplitContent(
     fileTree: List<FileTreeNode>,
     fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     splitRatio: Float,
+    isPhone: Boolean,
     isSendingMessage: Boolean,
     isApprovingPlan: Boolean,
     onSplitRatioChange: (Float) -> Unit,
@@ -463,36 +438,58 @@ private fun SessionDetailSplitContent(
             .fillMaxSize()
             .onGloballyPositioned { containerWidthPx = it.size.width }
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.weight(splitRatio.coerceAtLeast(0.0001f))) {
-                if (splitRatio > 0.0f) {
-                    ChatWindowView(
-                        session = session,
-                        chatElements = chatElements,
-                        chatState = chatState,
-                        activityBasedState = activityBasedState,
-                        isSendingMessage = isSendingMessage,
-                        isApprovingPlan = isApprovingPlan,
-                        onSendMessage = onSendMessage,
-                        onApprovePlan = onApprovePlan
-                    )
-                }
+        if (isPhone) {
+            if (splitRatio > 0.0f) {
+                ChatWindowView(
+                    session = session,
+                    chatElements = chatElements,
+                    chatState = chatState,
+                    activityBasedState = activityBasedState,
+                    isSendingMessage = isSendingMessage,
+                    isApprovingPlan = isApprovingPlan,
+                    onSendMessage = onSendMessage,
+                    onApprovePlan = onApprovePlan
+                )
+            } else {
+                FileDiffView(
+                    activityBasedState = activityBasedState,
+                    fileTree = fileTree,
+                    fileDiffLinesMap = fileDiffLinesMap,
+                    isFullScreen = false
+                )
             }
+        } else {
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.weight(splitRatio.coerceAtLeast(0.0001f))) {
+                    if (splitRatio > 0.0f) {
+                        ChatWindowView(
+                            session = session,
+                            chatElements = chatElements,
+                            chatState = chatState,
+                            activityBasedState = activityBasedState,
+                            isSendingMessage = isSendingMessage,
+                            isApprovingPlan = isApprovingPlan,
+                            onSendMessage = onSendMessage,
+                            onApprovePlan = onApprovePlan
+                        )
+                    }
+                }
 
-            SplitDividerHandle(
-                containerWidthPx = containerWidthPx,
-                splitRatio = splitRatio,
-                onSplitRatioChange = onSplitRatioChange
-            )
+                SplitDividerHandle(
+                    containerWidthPx = containerWidthPx,
+                    splitRatio = splitRatio,
+                    onSplitRatioChange = onSplitRatioChange
+                )
 
-            Box(modifier = Modifier.weight((1.0f - splitRatio).coerceAtLeast(0.0001f))) {
-                if (splitRatio < 1.0f) {
-                    FileDiffView(
-                        activityBasedState = activityBasedState,
-                        fileTree = fileTree,
-                        fileDiffLinesMap = fileDiffLinesMap,
-                        isFullScreen = (splitRatio == 0.0f)
-                    )
+                Box(modifier = Modifier.weight((1.0f - splitRatio).coerceAtLeast(0.0001f))) {
+                    if (splitRatio < 1.0f) {
+                        FileDiffView(
+                            activityBasedState = activityBasedState,
+                            fileTree = fileTree,
+                            fileDiffLinesMap = fileDiffLinesMap,
+                            isFullScreen = (splitRatio == 0.0f)
+                        )
+                    }
                 }
             }
         }
