@@ -260,127 +260,145 @@ private fun SessionDetailTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
 
-            SessionStateBadge(
-                state = session.state,
-                sessionId = session.id,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope
-            )
+                SessionStateBadge(
+                    state = session.state,
+                    sessionId = session.id,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
 
-            session.repo?.let { repo ->
-                Row(
+                session.repo?.let { repo ->
+                    Row(
+                        modifier = with(sharedTransitionScope) {
+                            Modifier
+                                .sharedElement(
+                                    sharedContentState = rememberSharedContentState(key = "source_${session.id}"),
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                )
+                        }.clickable {
+                            val repoUrl = "https://github.com/${repo.owner}/${repo.name}"
+                            context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
+                        },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_github),
+                            contentDescription = "GitHub Repo",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = repo.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Text(
+                    text = session.title ?: "Untitled",
                     modifier = with(sharedTransitionScope) {
                         Modifier
+                            .weight(1f, fill = false)
                             .sharedElement(
-                                sharedContentState = rememberSharedContentState(key = "source_${session.id}"),
+                                sharedContentState = rememberSharedContentState(key = "title_${session.id}"),
                                 animatedVisibilityScope = animatedVisibilityScope
                             )
-                    }.clickable {
-                        val repoUrl = "https://github.com/${repo.owner}/${repo.name}"
-                        context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
                     },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_github),
-                        contentDescription = "GitHub Repo",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = repo.label,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
-            }
-
-            Text(
-                text = session.title ?: "Untitled",
-                modifier = with(sharedTransitionScope) {
-                    Modifier
-                        .sharedElement(
-                            sharedContentState = rememberSharedContentState(key = "title_${session.id}"),
-                            animatedVisibilityScope = animatedVisibilityScope
-                        )
-                },
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            session.pullRequest?.let { pr ->
-                Box(
-                    modifier = with(sharedTransitionScope) {
-                        Modifier.sharedElement(
-                            sharedContentState = rememberSharedContentState(key = "pr_badge_${session.id}"),
-                            animatedVisibilityScope = animatedVisibilityScope
-                        )
-                    }
-                ) {
-                    PullRequestChip(
-                        pr = pr,
-                        pullRequestState = sessionWithPr.pullRequestState,
-                        workflows = sessionWithPr.workflows,
-                        onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
-                        onWorkflowSelected = onSelectWorkflow
-                    )
-                }
-            }
-
-            if (totalAdditions > 0 || totalDeletions > 0) {
-                Box(
-                    modifier = with(sharedTransitionScope) {
-                        Modifier.sharedElement(
-                            sharedContentState = rememberSharedContentState(key = "changes_${session.id}"),
-                            animatedVisibilityScope = animatedVisibilityScope
-                        )
-                    }
-                ) {
-                    DiffBadges(additions = totalAdditions, deletions = totalDeletions)
-                }
-            }
-
-            if (isPhone) {
-                OutlinedButton(
-                    onClick = onToggleViewMode,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Text(
-                        text = if (splitRatio > 0.0f) "Diffs" else "Chat",
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-            }
-
-            Box(
-                modifier = with(sharedTransitionScope) {
-                    Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState(key = "menu_${session.id}"),
-                        animatedVisibilityScope = animatedVisibilityScope
-                    )
-                }
-            ) {
-                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
-                    Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Actions")
-                }
-                SessionActionDropdown(
-                    expanded = menuExpanded,
-                    isArchived = session.isArchived,
-                    onDismiss = { menuExpanded = false },
-                    onArchive = onArchive,
-                    onUnarchive = onUnarchive,
-                    onDelete = onDelete
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                session.pullRequest?.let { pr ->
+                    Box(
+                        modifier = with(sharedTransitionScope) {
+                            Modifier.sharedElement(
+                                sharedContentState = rememberSharedContentState(key = "pr_badge_${session.id}"),
+                                animatedVisibilityScope = animatedVisibilityScope
+                            )
+                        }
+                    ) {
+                        PullRequestChip(
+                            pr = pr,
+                            pullRequestState = sessionWithPr.pullRequestState,
+                            workflows = sessionWithPr.workflows,
+                            onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
+                            onWorkflowSelected = onSelectWorkflow
+                        )
+                    }
+                }
+
+                if (totalAdditions > 0 || totalDeletions > 0) {
+                    Box(
+                        modifier = with(sharedTransitionScope) {
+                            Modifier.sharedElement(
+                                sharedContentState = rememberSharedContentState(key = "changes_${session.id}"),
+                                animatedVisibilityScope = animatedVisibilityScope
+                            )
+                        }
+                    ) {
+                        DiffBadges(additions = totalAdditions, deletions = totalDeletions)
+                    }
+                }
+
+                if (isPhone) {
+                    OutlinedButton(
+                        onClick = onToggleViewMode,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text(
+                            text = if (splitRatio > 0.0f) "Diffs" else "Chat",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = with(sharedTransitionScope) {
+                        Modifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "menu_${session.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    }
+                ) {
+                    IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Actions")
+                    }
+                    SessionActionDropdown(
+                        expanded = menuExpanded,
+                        isArchived = session.isArchived,
+                        onDismiss = { menuExpanded = false },
+                        onArchive = onArchive,
+                        onUnarchive = onUnarchive,
+                        onDelete = onDelete
+                    )
+                }
             }
         }
     }
