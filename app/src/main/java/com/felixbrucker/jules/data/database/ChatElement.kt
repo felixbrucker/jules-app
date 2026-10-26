@@ -45,8 +45,9 @@ sealed class ChatElement {
     data class SessionFailedElement(val reason: String) : ChatElement()
 
     @JsonClass(generateAdapter = true)
-    class SessionCompletedElement : ChatElement() {
-        override fun equals(other: Any?): Boolean = other is SessionCompletedElement
-        override fun hashCode(): Int = javaClass.hashCode()
-    }
+    data class SessionCompletedElement(
+        val totalAdditions: Int,
+        val totalDeletions: Int,
+        val suggestedCommitMessage: String?
+    ) : ChatElement()
 }

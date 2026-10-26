@@ -680,7 +680,7 @@ private fun ChatElementBubbleContainer(
         is ChatElement.SessionFailedElement -> SessionFailedBox(reason = element.reason)
         is ChatElement.SessionCompletedElement -> SessionCompletedSummaryBox(
             session = session,
-            activityBasedState = activityBasedState
+            element = element
         )
     }
 }
@@ -1010,12 +1010,8 @@ private fun SessionFailedBox(reason: String) {
 @Composable
 private fun SessionCompletedSummaryBox(
     session: SessionEntity,
-    activityBasedState: ActivityBasedStateEntity?
+    element: ChatElement.SessionCompletedElement
 ) {
-    val parsedFiles = activityBasedState?.latestDiff?.parsedFilesMap?.values
-    val totalAdditions = parsedFiles?.sumOf { it.additions } ?: session.changeSet?.totalAdditions ?: 0
-    val totalDeletions = parsedFiles?.sumOf { it.deletions } ?: session.changeSet?.totalDeletions ?: 0
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
@@ -1032,8 +1028,8 @@ private fun SessionCompletedSummaryBox(
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF86EFAC)
                 )
-                if (totalAdditions > 0 || totalDeletions > 0) {
-                    DiffBadges(additions = totalAdditions, deletions = totalDeletions)
+                if (element.totalAdditions > 0 || element.totalDeletions > 0) {
+                    DiffBadges(additions = element.totalAdditions, deletions = element.totalDeletions)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -1060,6 +1056,21 @@ private fun SessionCompletedSummaryBox(
                             fontFamily = FontFamily.Monospace
                         )
                     }
+                }
+            }
+            element.suggestedCommitMessage?.let { commitMsg ->
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = commitMsg,
+                        modifier = Modifier.padding(8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
             }
         }

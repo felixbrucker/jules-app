@@ -186,12 +186,12 @@ class JulesRepository @Inject constructor(
             var activityBasedState = activityBasedStateDao.getActivityBasedState(sessionId)
                 ?: ActivityBasedStateEntity(sessionId = sessionId)
 
+            val initialFilter = activityBasedState.latestActivityCreatedAt?.let { ActivityFilter.CreatedAfter(it) }
             var pageToken: String? = null
             do {
-                val filter = activityBasedState.latestActivityCreatedAt?.let { ActivityFilter.CreatedAfter(it) }
                 val response = julesApi.getActivities(
                     sessionId = sessionId,
-                    filter = filter,
+                    filter = initialFilter,
                     pageSize = pageSize,
                     pageToken = pageToken
                 )
@@ -280,12 +280,24 @@ class JulesRepository @Inject constructor(
                             )
                         }
                         is Activity.SessionCompleted -> {
+                            val cs = activity.artifacts.firstNotNullOfOrNull { it.changeSet }
+                            val gitPatch = cs?.gitPatch
+                            val unidiff = gitPatch?.unidiffPatch
+                            val parsedFiles = UnidiffParser.parse(unidiff)
+                            val totalAdditions = parsedFiles.sumOf { it.additions }
+                            val totalDeletions = parsedFiles.sumOf { it.deletions }
+                            val commitMsg = gitPatch?.suggestedCommitMessage
+
                             newChatElements.add(
                                 ChatElementEntity(
                                     id = activity.id,
                                     sessionId = sessionId,
                                     createdAt = actTime,
-                                    element = ChatElement.SessionCompletedElement()
+                                    element = ChatElement.SessionCompletedElement(
+                                        totalAdditions = totalAdditions,
+                                        totalDeletions = totalDeletions,
+                                        suggestedCommitMessage = commitMsg
+                                    )
                                 )
                             )
                         }
