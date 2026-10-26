@@ -188,12 +188,7 @@ class JulesRepository @Inject constructor(
                 ?: ActivityBasedStateEntity(sessionId = sessionId)
 
             val initialFilter = activityBasedState.latestActivityCreatedAt?.let { instant ->
-                val roundedUpInstant = if (instant.nano > 0) {
-                    instant.plusSeconds(1).truncatedTo(ChronoUnit.SECONDS)
-                } else {
-                    instant
-                }
-                ActivityFilter.CreatedAfter(roundedUpInstant)
+                ActivityFilter.CreatedAfter(instant.plusMillis(100))
             }
             var pageToken: String? = null
             do {
@@ -207,7 +202,7 @@ class JulesRepository @Inject constructor(
                 val newChatElements = mutableListOf<ChatElementEntity>()
                 var updatedUnidiffAt: Instant? = null
 
-                for (activity in response.activities) {
+                for (activity in response.activitiesList) {
                     val actTime = activity.createTime
                     val lastActTime = activityBasedState.latestActivityCreatedAt
 

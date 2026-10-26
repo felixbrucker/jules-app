@@ -265,6 +265,9 @@ fun Activity.toRestActivity(): RestActivity = when (this) {
 
 @JsonClass(generateAdapter = true)
 data class ActivitiesListResponse(
-    @Json(name = "activities") val activities: List<Activity>,
+    @Json(name = "activities") val activities: List<Activity>? = null,
     @Json(name = "nextPageToken") val nextPageToken: String? = null
-)
+) {
+    val activitiesList: List<Activity>
+        get() = activities.orEmpty()
+}

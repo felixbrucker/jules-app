@@ -254,8 +254,8 @@ class JulesApiTest {
         assertTrue("Activities path mismatch", recordedRequest.path?.contains("/sessions/session-456/activities") == true)
         assertTrue("Filter parameter mismatch", recordedRequest.path?.contains("filter=create_time") == true)
 
-        assertEquals(1, activitiesResponse.activities.size)
-        val activity = activitiesResponse.activities.first() as Activity.ProgressUpdated
+        assertEquals(1, activitiesResponse.activitiesList.size)
+        val activity = activitiesResponse.activitiesList.first() as Activity.ProgressUpdated
         assertEquals("act-1", activity.id)
         assertEquals(Originator.AGENT, activity.originator)
         assertEquals("Making progress", activity.title)
@@ -283,6 +283,13 @@ class JulesApiTest {
         assertEquals(ArtifactType.MEDIA, mediaArtifact.type)
         assertEquals("image/png", mediaArtifact.media?.mimeType)
         assertTrue("Data URL mismatch", mediaArtifact.media?.dataUrl?.startsWith("data:image/png;base64,") == true)
+    }
+
+    @Test
+    fun testEmptyActivitiesResponseParsing() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        val response = julesApi.getActivities(sessionId = "session-empty")
+        assertTrue("Expected empty activities list for empty JSON object response", response.activitiesList.isEmpty())
     }
 
     @Test
@@ -320,14 +327,14 @@ class JulesApiTest {
 
         mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(responseBody))
         val response = julesApi.getActivities(sessionId = "session-1")
-        assertEquals(2, response.activities.size)
+        assertEquals(2, response.activitiesList.size)
 
-        val planActivity = response.activities[0] as Activity.PlanGenerated
+        val planActivity = response.activitiesList[0] as Activity.PlanGenerated
         assertEquals("plan-1", planActivity.plan.id)
         assertEquals(1, planActivity.plan.steps.size)
         assertEquals("Step 1", planActivity.plan.steps.first().title)
 
-        val failedActivity = response.activities[1] as Activity.SessionFailed
+        val failedActivity = response.activitiesList[1] as Activity.SessionFailed
         assertEquals("Out of memory", failedActivity.reason)
     }
 
