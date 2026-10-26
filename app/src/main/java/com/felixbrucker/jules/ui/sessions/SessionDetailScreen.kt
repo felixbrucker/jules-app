@@ -41,7 +41,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -1119,7 +1119,6 @@ private fun FileDiffView(
     val expandedFolders = remember { mutableStateMapOf<String, Boolean>() }
     val listState = rememberLazyListState()
     var selectedFilePath by remember { mutableStateOf<String?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
 
     if (currentDiff == null || currentDiff.parsedFiles.isEmpty()) {
         Box(
@@ -1131,22 +1130,9 @@ private fun FileDiffView(
         return
     }
 
-    val filteredFiles = remember(currentDiff.parsedFiles, currentDiff.unidiffPatch, searchQuery) {
-        if (searchQuery.isBlank()) {
-            currentDiff.parsedFiles
-        } else {
-            currentDiff.parsedFiles.filter { file ->
-                file.path.contains(searchQuery, ignoreCase = true) ||
-                    extractFileDiffLines(file.path, currentDiff.unidiffPatch).any { line ->
-                        line.content.contains(searchQuery, ignoreCase = true)
-                    }
-            }
-        }
-    }
-
     LaunchedEffect(selectedFilePath) {
         val path = selectedFilePath ?: return@LaunchedEffect
-        val fileIndex = filteredFiles.indexOfFirst { it.path == path }
+        val fileIndex = currentDiff.parsedFiles.indexOfFirst { it.path == path }
         if (fileIndex >= 0) {
             kotlinx.coroutines.yield()
             listState.animateScrollToItem(fileIndex)
@@ -1154,129 +1140,27 @@ private fun FileDiffView(
     }
 
     Row(modifier = Modifier.fillMaxSize()) {
-        Column(
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(8.dp)
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    placeholder = { Text("Search files or diffs...", style = MaterialTheme.typography.bodySmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Clear",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall,
-                    shape = RoundedCornerShape(8.dp)
+            items(currentDiff.parsedFiles.size, key = { currentDiff.parsedFiles[it].path }) { index ->
+                val file = currentDiff.parsedFiles[index]
+                val isExpanded = expandedCards[file.path] ?: false
+                FileDiffCard(
+                    file = file,
+                    unidiffPatch = currentDiff.unidiffPatch,
+                    isExpanded = isExpanded,
+                    onToggleExpand = { expandedCards[file.path] = !isExpanded }
                 )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(
-                        onClick = {
-                            filteredFiles.forEach { file ->
-                                expandedCards[file.path] = true
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.UnfoldMore,
-                            contentDescription = "Expand All Cards",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            filteredFiles.forEach { file ->
-                                expandedCards[file.path] = false
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.UnfoldLess,
-                            contentDescription = "Collapse All Cards",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            if (filteredFiles.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No files match \"$searchQuery\"",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filteredFiles.size, key = { filteredFiles[it].path }) { index ->
-                        val file = filteredFiles[index]
-                        val isExpanded = expandedCards[file.path] ?: false
-                        FileDiffCard(
-                            file = file,
-                            unidiffPatch = currentDiff.unidiffPatch,
-                            isExpanded = isExpanded,
-                            onToggleExpand = { expandedCards[file.path] = !isExpanded }
-                        )
-                    }
-                }
             }
         }
 
         if (isFullScreen) {
-            val allFolderPaths = remember(currentDiff.parsedFiles) {
-                fun collectFolders(nodes: List<FileTreeNode>): List<String> {
-                    val result = mutableListOf<String>()
-                    for (node in nodes) {
-                        if (node is FileTreeNode.Directory) {
-                            result.add(node.fullPath)
-                            result.addAll(collectFolders(node.children))
-                        }
-                    }
-                    return result
-                }
-                collectFolders(buildFileTree(currentDiff.parsedFiles))
-            }
-
             Box(
                 modifier = Modifier
                     .width(260.dp)
@@ -1290,11 +1174,15 @@ private fun FileDiffView(
                     onToggleFolder = { folder ->
                         expandedFolders[folder] = !(expandedFolders[folder] ?: true)
                     },
-                    onExpandAllFolders = {
-                        allFolderPaths.forEach { expandedFolders[it] = true }
+                    onExpandAllCards = {
+                        currentDiff.parsedFiles.forEach { file ->
+                            expandedCards[file.path] = true
+                        }
                     },
-                    onCollapseAllFolders = {
-                        allFolderPaths.forEach { expandedFolders[it] = false }
+                    onCollapseAllCards = {
+                        currentDiff.parsedFiles.forEach { file ->
+                            expandedCards[file.path] = false
+                        }
                     },
                     onSelectFile = { path ->
                         expandedCards[path] = true
@@ -1603,8 +1491,8 @@ private fun ScrollableFileTree(
     parsedFiles: List<ParsedFile>,
     expandedFolders: Map<String, Boolean>,
     onToggleFolder: (String) -> Unit,
-    onExpandAllFolders: () -> Unit,
-    onCollapseAllFolders: () -> Unit,
+    onExpandAllCards: () -> Unit,
+    onCollapseAllCards: () -> Unit,
     onSelectFile: (String) -> Unit
 ) {
     val rootNodes = remember(parsedFiles) { buildFileTree(parsedFiles) }
@@ -1622,20 +1510,18 @@ private fun ScrollableFileTree(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
-            Row {
-                IconButton(onClick = onExpandAllFolders, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.UnfoldMore,
-                        contentDescription = "Expand All Folders",
-                        modifier = Modifier.size(16.dp)
-                    )
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextButton(
+                    onClick = onExpandAllCards,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text("Expand", style = MaterialTheme.typography.labelMedium)
                 }
-                IconButton(onClick = onCollapseAllFolders, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.UnfoldLess,
-                        contentDescription = "Collapse All Folders",
-                        modifier = Modifier.size(16.dp)
-                    )
+                TextButton(
+                    onClick = onCollapseAllCards,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text("Collapse", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
