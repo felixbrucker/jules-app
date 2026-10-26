@@ -137,6 +137,8 @@ fun SessionDetailScreen(
 ) {
     val sessionWithPr by viewModel.sessionWithPullRequestFlow.collectAsState(initial = null)
     val currentDiff by viewModel.currentChangesetDiffFlow.collectAsState(initial = null)
+    val fileTree by viewModel.fileTreeFlow.collectAsState()
+    val fileDiffLinesMap by viewModel.fileDiffLinesMapFlow.collectAsState()
     val activities = viewModel.activitiesPagingDataFlow.collectAsLazyPagingItems()
     val splitRatio by viewModel.splitRatio.collectAsState()
     val isSendingMessage by viewModel.isSendingMessage.collectAsState()
@@ -199,6 +201,8 @@ fun SessionDetailScreen(
                     session = session,
                     activities = activities,
                     currentDiff = currentDiff,
+                    fileTree = fileTree,
+                    fileDiffLinesMap = fileDiffLinesMap,
                     splitRatio = splitRatio,
                     isSendingMessage = isSendingMessage,
                     isApprovingPlan = isApprovingPlan,
@@ -448,6 +452,8 @@ private fun SessionDetailSplitContent(
     session: SessionEntity,
     activities: LazyPagingItems<ActivityUiItem>,
     currentDiff: CurrentChangesetDiff?,
+    fileTree: List<FileTreeNode>,
+    fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     splitRatio: Float,
     isSendingMessage: Boolean,
     isApprovingPlan: Boolean,
@@ -486,6 +492,8 @@ private fun SessionDetailSplitContent(
                 if (splitRatio < 1.0f) {
                     FileDiffView(
                         currentDiff = currentDiff,
+                        fileTree = fileTree,
+                        fileDiffLinesMap = fileDiffLinesMap,
                         isFullScreen = (splitRatio == 0.0f)
                     )
                 }
@@ -1113,6 +1121,8 @@ private fun ChatInputBottomBar(
 @Composable
 private fun FileDiffView(
     currentDiff: CurrentChangesetDiff?,
+    fileTree: List<FileTreeNode>,
+    fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     isFullScreen: Boolean
 ) {
     val expandedCards = remember { mutableStateMapOf<String, Boolean>() }
@@ -1153,7 +1163,7 @@ private fun FileDiffView(
                 val isExpanded = expandedCards[file.path] ?: false
                 FileDiffCard(
                     file = file,
-                    unidiffPatch = currentDiff.unidiffPatch,
+                    fileDiffLinesMap = fileDiffLinesMap,
                     isExpanded = isExpanded,
                     onToggleExpand = { expandedCards[file.path] = !isExpanded }
                 )
@@ -1169,7 +1179,7 @@ private fun FileDiffView(
                     .padding(8.dp)
             ) {
                 ScrollableFileTree(
-                    parsedFiles = currentDiff.parsedFiles,
+                    fileTree = fileTree,
                     expandedFolders = expandedFolders,
                     onToggleFolder = { folder ->
                         expandedFolders[folder] = !(expandedFolders[folder] ?: true)
@@ -1197,7 +1207,7 @@ private fun FileDiffView(
 @Composable
 private fun FileDiffCard(
     file: ParsedFile,
-    unidiffPatch: String,
+    fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit
 ) {
@@ -1233,7 +1243,7 @@ private fun FileDiffCard(
             ) {
                 Column {
                     Spacer(modifier = Modifier.height(8.dp))
-                    ColorCodedDiffBody(file = file, unidiffPatch = unidiffPatch)
+                    ColorCodedDiffBody(file = file, fileDiffLinesMap = fileDiffLinesMap)
                 }
             }
         }
@@ -1259,24 +1269,9 @@ private fun ChangeTypeBadge(changeType: FileChangeType) {
     }
 }
 
-enum class DiffLineType {
-    CONTEXT,
-    ADDITION,
-    DELETION
-}
-
-data class ParsedDiffLine(
-    val oldLineNumber: Int?,
-    val newLineNumber: Int?,
-    val content: String,
-    val type: DiffLineType
-)
-
 @Composable
-private fun ColorCodedDiffBody(file: ParsedFile, unidiffPatch: String) {
-    val fileLines = remember(file.path, unidiffPatch) {
-        extractFileDiffLines(file.path, unidiffPatch)
-    }
+private fun ColorCodedDiffBody(file: ParsedFile, fileDiffLinesMap: Map<String, List<ParsedDiffLine>>) {
+    val fileLines = fileDiffLinesMap[file.path] ?: emptyList()
 
     SelectionContainer {
         Surface(
@@ -1338,165 +1333,15 @@ private fun ColorCodedDiffBody(file: ParsedFile, unidiffPatch: String) {
     }
 }
 
-private fun extractFileDiffLines(path: String, unidiffPatch: String): List<ParsedDiffLine> {
-    val blocks = unidiffPatch.split(Regex("^diff --git ", RegexOption.MULTILINE))
-    val result = mutableListOf<ParsedDiffLine>()
-
-    for (block in blocks) {
-        if (block.contains("a/$path") || block.contains("b/$path")) {
-            val lines = block.lines()
-            var oldLine = 1
-            var newLine = 1
-            var inHunk = false
-
-            for (line in lines) {
-                if (line.startsWith("@@ ")) {
-                    inHunk = true
-                    val match = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""").find(line)
-                    if (match != null) {
-                        oldLine = match.groupValues[1].toInt()
-                        newLine = match.groupValues[2].toInt()
-                    }
-                    continue
-                }
-
-                if (!inHunk) continue
-
-                when {
-                    line.startsWith("+") && !line.startsWith("+++") -> {
-                        result.add(
-                            ParsedDiffLine(
-                                oldLineNumber = null,
-                                newLineNumber = newLine,
-                                content = line,
-                                type = DiffLineType.ADDITION
-                            )
-                        )
-                        newLine++
-                    }
-                    line.startsWith("-") && !line.startsWith("---") -> {
-                        result.add(
-                            ParsedDiffLine(
-                                oldLineNumber = oldLine,
-                                newLineNumber = null,
-                                content = line,
-                                type = DiffLineType.DELETION
-                            )
-                        )
-                        oldLine++
-                    }
-                    line.startsWith(" ") || line.isEmpty() -> {
-                        result.add(
-                            ParsedDiffLine(
-                                oldLineNumber = oldLine,
-                                newLineNumber = newLine,
-                                content = line,
-                                type = DiffLineType.CONTEXT
-                            )
-                        )
-                        oldLine++
-                        newLine++
-                    }
-                }
-            }
-            return result.take(300)
-        }
-    }
-    return emptyList()
-}
-
-private sealed interface FileTreeNode {
-    val name: String
-    val fullPath: String
-
-    data class Directory(
-        override val name: String,
-        override val fullPath: String,
-        val children: List<FileTreeNode>
-    ) : FileTreeNode
-
-    data class File(
-        override val name: String,
-        override val fullPath: String,
-        val parsedFile: ParsedFile
-    ) : FileTreeNode
-}
-
-private fun buildFileTree(parsedFiles: List<ParsedFile>): List<FileTreeNode> {
-    class DirBuilder(val name: String, val fullPath: String) {
-        val subDirs = mutableMapOf<String, DirBuilder>()
-        val files = mutableListOf<ParsedFile>()
-
-        fun toTreeNode(): FileTreeNode.Directory {
-            val childrenList = mutableListOf<FileTreeNode>()
-            subDirs.values.sortedBy { it.name }.forEach { dir ->
-                childrenList.add(dir.toTreeNode())
-            }
-            files.sortedBy { it.path.substringAfterLast('/') }.forEach { file ->
-                childrenList.add(
-                    FileTreeNode.File(
-                        name = file.path.substringAfterLast('/'),
-                        fullPath = file.path,
-                        parsedFile = file
-                    )
-                )
-            }
-            return FileTreeNode.Directory(name, fullPath, childrenList)
-        }
-    }
-
-    val rootDirs = mutableMapOf<String, DirBuilder>()
-    val rootFiles = mutableListOf<ParsedFile>()
-
-    for (file in parsedFiles) {
-        val parts = file.path.split('/')
-        if (parts.size == 1) {
-            rootFiles.add(file)
-        } else {
-            val topLevelDirName = parts[0]
-            val topLevelDir = rootDirs.getOrPut(topLevelDirName) {
-                DirBuilder(topLevelDirName, topLevelDirName)
-            }
-            var currentDir = topLevelDir
-            var currentPath = topLevelDirName
-            for (i in 1 until parts.size - 1) {
-                val dirName = parts[i]
-                currentPath = "$currentPath/$dirName"
-                currentDir = currentDir.subDirs.getOrPut(dirName) {
-                    DirBuilder(dirName, currentPath)
-                }
-            }
-            currentDir.files.add(file)
-        }
-    }
-
-    val result = mutableListOf<FileTreeNode>()
-    rootDirs.values.sortedBy { it.name }.forEach { dir ->
-        result.add(dir.toTreeNode())
-    }
-    rootFiles.sortedBy { it.path }.forEach { file ->
-        result.add(
-            FileTreeNode.File(
-                name = file.path,
-                fullPath = file.path,
-                parsedFile = file
-            )
-        )
-    }
-    return result
-}
-
 @Composable
 private fun ScrollableFileTree(
-    parsedFiles: List<ParsedFile>,
+    fileTree: List<FileTreeNode>,
     expandedFolders: Map<String, Boolean>,
     onToggleFolder: (String) -> Unit,
     onExpandAllCards: () -> Unit,
     onCollapseAllCards: () -> Unit,
     onSelectFile: (String) -> Unit
 ) {
-    val rootNodes = remember(parsedFiles) { buildFileTree(parsedFiles) }
-
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -1531,7 +1376,7 @@ private fun ScrollableFileTree(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            rootNodes.forEach { rootNode ->
+            fileTree.forEach { rootNode ->
                 FileTreeNodeItem(
                     node = rootNode,
                     depth = 0,

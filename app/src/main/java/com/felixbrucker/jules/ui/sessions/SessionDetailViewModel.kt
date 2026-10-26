@@ -14,23 +14,24 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.Activity
 import com.felixbrucker.jules.network.api.model.ParsedFile
-import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.network.api.util.UnidiffParser
 import com.felixbrucker.jules.util.periodicTickerFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
@@ -60,6 +61,36 @@ data class CurrentChangesetDiff(
     val totalAdditions: Int,
     val totalDeletions: Int
 )
+
+enum class DiffLineType {
+    CONTEXT,
+    ADDITION,
+    DELETION
+}
+
+data class ParsedDiffLine(
+    val oldLineNumber: Int?,
+    val newLineNumber: Int?,
+    val content: String,
+    val type: DiffLineType
+)
+
+sealed interface FileTreeNode {
+    val name: String
+    val fullPath: String
+
+    data class Directory(
+        override val name: String,
+        override val fullPath: String,
+        val children: List<FileTreeNode>
+    ) : FileTreeNode
+
+    data class File(
+        override val name: String,
+        override val fullPath: String,
+        val parsedFile: ParsedFile
+    ) : FileTreeNode
+}
 
 @HiltViewModel
 class SessionDetailViewModel @Inject constructor(
@@ -114,6 +145,26 @@ class SessionDetailViewModel @Inject constructor(
             null
         }
     }.flowOn(Dispatchers.Default)
+
+    val fileTreeFlow: StateFlow<List<FileTreeNode>> = currentChangesetDiffFlow
+        .map { diff ->
+            if (diff == null || diff.parsedFiles.isEmpty()) emptyList()
+            else buildFileTree(diff.parsedFiles)
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val fileDiffLinesMapFlow: StateFlow<Map<String, List<ParsedDiffLine>>> = currentChangesetDiffFlow
+        .map { diff ->
+            if (diff == null || diff.parsedFiles.isEmpty() || diff.unidiffPatch.isBlank()) emptyMap()
+            else {
+                diff.parsedFiles.associate { file ->
+                    file.path to extractFileDiffLines(file.path, diff.unidiffPatch)
+                }
+            }
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     val activitiesPagingDataFlow: Flow<PagingData<ActivityUiItem>> =
         julesRepository.getActivitiesPagingDataFlow(sessionId)
@@ -216,18 +267,6 @@ class SessionDetailViewModel @Inject constructor(
             periodicTickerFlow(10.seconds).collect {
                 try {
                     julesRepository.syncActivities(sessionId, pageSize = 5)
-
-                    val currentSession = sessionWithPullRequestFlow.first()?.session
-                    if (currentSession != null && currentSession.state in listOf(
-                            SessionState.QUEUED,
-                            SessionState.PLANNING,
-                            SessionState.IN_PROGRESS,
-                            SessionState.AWAITING_PLAN_APPROVAL,
-                            SessionState.AWAITING_USER_FEEDBACK
-                        )
-                    ) {
-                        julesRepository.syncSession(sessionId)
-                    }
                 } catch (_: Exception) {
                 }
             }
@@ -254,6 +293,8 @@ class SessionDetailViewModel @Inject constructor(
             _isSendingMessage.value = true
             try {
                 julesRepository.sendMessage(sessionId, prompt)
+                julesRepository.syncSession(sessionId)
+                julesRepository.syncActivities(sessionId, pageSize = 5)
             } catch (e: Exception) {
                 _errorEvents.emit(e.message ?: "Failed to send message")
             } finally {
@@ -268,6 +309,8 @@ class SessionDetailViewModel @Inject constructor(
             _isApprovingPlan.value = true
             try {
                 julesRepository.approvePlan(sessionId)
+                julesRepository.syncSession(sessionId)
+                julesRepository.syncActivities(sessionId, pageSize = 5)
             } catch (e: Exception) {
                 _errorEvents.emit(e.message ?: "Failed to approve plan")
             } finally {
@@ -318,5 +361,136 @@ class SessionDetailViewModel @Inject constructor(
                 .withZone(ZoneId.systemDefault())
                 .format(instant)
         }
+    }
+
+    private fun buildFileTree(parsedFiles: List<ParsedFile>): List<FileTreeNode> {
+        class DirBuilder(val name: String, val fullPath: String) {
+            val subDirs = mutableMapOf<String, DirBuilder>()
+            val files = mutableListOf<ParsedFile>()
+
+            fun toTreeNode(): FileTreeNode.Directory {
+                val childrenList = mutableListOf<FileTreeNode>()
+                subDirs.values.sortedBy { it.name }.forEach { dir ->
+                    childrenList.add(dir.toTreeNode())
+                }
+                files.sortedBy { it.path.substringAfterLast('/') }.forEach { file ->
+                    childrenList.add(
+                        FileTreeNode.File(
+                            name = file.path.substringAfterLast('/'),
+                            fullPath = file.path,
+                            parsedFile = file
+                        )
+                    )
+                }
+                return FileTreeNode.Directory(name, fullPath, childrenList)
+            }
+        }
+
+        val rootDirs = mutableMapOf<String, DirBuilder>()
+        val rootFiles = mutableListOf<ParsedFile>()
+
+        for (file in parsedFiles) {
+            val parts = file.path.split('/')
+            if (parts.size == 1) {
+                rootFiles.add(file)
+            } else {
+                val topLevelDirName = parts[0]
+                val topLevelDir = rootDirs.getOrPut(topLevelDirName) {
+                    DirBuilder(topLevelDirName, topLevelDirName)
+                }
+                var currentDir = topLevelDir
+                var currentPath = topLevelDirName
+                for (i in 1 until parts.size - 1) {
+                    val dirName = parts[i]
+                    currentPath = "$currentPath/$dirName"
+                    currentDir = currentDir.subDirs.getOrPut(dirName) {
+                        DirBuilder(dirName, currentPath)
+                    }
+                }
+                currentDir.files.add(file)
+            }
+        }
+
+        val result = mutableListOf<FileTreeNode>()
+        rootDirs.values.sortedBy { it.name }.forEach { dir ->
+            result.add(dir.toTreeNode())
+        }
+        rootFiles.sortedBy { it.path }.forEach { file ->
+            result.add(
+                FileTreeNode.File(
+                    name = file.path,
+                    fullPath = file.path,
+                    parsedFile = file
+                )
+            )
+        }
+        return result
+    }
+
+    private fun extractFileDiffLines(path: String, unidiffPatch: String): List<ParsedDiffLine> {
+        val blocks = unidiffPatch.split(Regex("^diff --git ", RegexOption.MULTILINE))
+        val result = mutableListOf<ParsedDiffLine>()
+
+        for (block in blocks) {
+            if (block.contains("a/$path") || block.contains("b/$path")) {
+                val lines = block.lines()
+                var oldLine = 1
+                var newLine = 1
+                var inHunk = false
+
+                for (line in lines) {
+                    if (line.startsWith("@@ ")) {
+                        inHunk = true
+                        val match = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""").find(line)
+                        if (match != null) {
+                            oldLine = match.groupValues[1].toInt()
+                            newLine = match.groupValues[2].toInt()
+                        }
+                        continue
+                    }
+
+                    if (!inHunk) continue
+
+                    when {
+                        line.startsWith("+") && !line.startsWith("+++") -> {
+                            result.add(
+                                ParsedDiffLine(
+                                    oldLineNumber = null,
+                                    newLineNumber = newLine,
+                                    content = line,
+                                    type = DiffLineType.ADDITION
+                                )
+                            )
+                            newLine++
+                        }
+                        line.startsWith("-") && !line.startsWith("---") -> {
+                            result.add(
+                                ParsedDiffLine(
+                                    oldLineNumber = oldLine,
+                                    newLineNumber = null,
+                                    content = line,
+                                    type = DiffLineType.DELETION
+                                )
+                            )
+                            oldLine++
+                        }
+                        line.startsWith(" ") || line.isEmpty() -> {
+                            result.add(
+                                ParsedDiffLine(
+                                    oldLineNumber = oldLine,
+                                    newLineNumber = newLine,
+                                    content = line,
+                                    type = DiffLineType.CONTEXT
+                                )
+                            )
+                            oldLine++
+                            newLine++
+                        }
+                    }
+                }
+                return result // Full diff lines, NO take(300) limitation!
+            }
+        }
+        return emptyList()
     }
 }
