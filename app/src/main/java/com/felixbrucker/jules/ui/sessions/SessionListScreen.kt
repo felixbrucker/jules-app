@@ -158,6 +158,10 @@ fun SessionListScreen(
     val dailyLimit by viewModel.dailySessionLimit.collectAsState()
 
     val showCreateDialog by viewModel.showCreateDialog.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.startPeriodicSync()
+    }
     val activeDraft by viewModel.activeDraft.collectAsState()
     val isCreatingSession by viewModel.isCreatingSession.collectAsState()
     val createSessionError by viewModel.createSessionError.collectAsState()

@@ -7,17 +7,19 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.insertSeparators
 import androidx.paging.map
-import com.felixbrucker.jules.data.database.ActivityEntity
+import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
+import com.felixbrucker.jules.data.database.AgentState
+import com.felixbrucker.jules.data.database.ChatElementEntity
+import com.felixbrucker.jules.data.database.ChatStateEntity
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.repository.JulesRepository
-import com.felixbrucker.jules.network.api.model.Activity
 import com.felixbrucker.jules.network.api.model.ParsedFile
-import com.felixbrucker.jules.network.api.util.UnidiffParser
 import com.felixbrucker.jules.util.periodicTickerFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -27,8 +29,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -40,27 +42,19 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 
-sealed interface ActivityUiItem {
+sealed interface ChatElementUiItem {
     val id: String
 
-    data class ActivityItem(
+    data class ElementItem(
         override val id: String,
-        val activity: Activity,
-        val isLatest: Boolean
-    ) : ActivityUiItem
+        val elementEntity: ChatElementEntity
+    ) : ChatElementUiItem
 
     data class RelativeTimeDivider(
         override val id: String,
         val relativeTimeText: String
-    ) : ActivityUiItem
+    ) : ChatElementUiItem
 }
-
-data class CurrentChangesetDiff(
-    val unidiffPatch: String,
-    val parsedFiles: List<ParsedFile>,
-    val totalAdditions: Int,
-    val totalDeletions: Int
-)
 
 enum class DiffLineType {
     CONTEXT,
@@ -103,90 +97,51 @@ class SessionDetailViewModel @Inject constructor(
     val sessionWithPullRequestFlow: Flow<SessionWithPullRequest?> =
         julesRepository.getSessionFlow(sessionId)
 
-    private val latestActivityWithChangesetFlow: Flow<ActivityEntity?> =
-        julesRepository.getLatestActivityWithChangesetFlow(sessionId)
+    val chatStateFlow: StateFlow<ChatStateEntity?> = julesRepository.getChatStateFlow(sessionId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val currentChangesetDiffFlow: Flow<CurrentChangesetDiff?> = combine(
-        sessionWithPullRequestFlow,
-        latestActivityWithChangesetFlow
-    ) { sessionWithPr, latestActivityEntity ->
-        val sessionEntity = sessionWithPr?.session
-        val sessionChangeSet = sessionEntity?.changeSet
-        val sessionUpdateTime = sessionEntity?.updateTime ?: sessionEntity?.createTime
+    val activityBasedStateFlow: StateFlow<ActivityBasedStateEntity?> = julesRepository.getActivityBasedStateFlow(sessionId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-        val activityPatch = latestActivityEntity?.unidiffPatch
-        val activityTime = latestActivityEntity?.createTime
-
-        if (activityPatch != null && (sessionUpdateTime == null || activityTime?.isAfter(sessionUpdateTime) == true)) {
-            val parsed = UnidiffParser.parse(activityPatch)
-            CurrentChangesetDiff(
-                unidiffPatch = activityPatch,
-                parsedFiles = parsed,
-                totalAdditions = parsed.sumOf { it.additions },
-                totalDeletions = parsed.sumOf { it.deletions }
-            )
-        } else if (sessionChangeSet != null && sessionChangeSet.unidiffPatch.isNotBlank()) {
-            val parsed = UnidiffParser.parse(sessionChangeSet.unidiffPatch)
-            CurrentChangesetDiff(
-                unidiffPatch = sessionChangeSet.unidiffPatch,
-                parsedFiles = parsed,
-                totalAdditions = sessionChangeSet.totalAdditions,
-                totalDeletions = sessionChangeSet.totalDeletions
-            )
-        } else if (activityPatch != null) {
-            val parsed = UnidiffParser.parse(activityPatch)
-            CurrentChangesetDiff(
-                unidiffPatch = activityPatch,
-                parsedFiles = parsed,
-                totalAdditions = parsed.sumOf { it.additions },
-                totalDeletions = parsed.sumOf { it.deletions }
-            )
-        } else {
-            null
-        }
-    }.flowOn(Dispatchers.Default)
-
-    val fileTreeFlow: StateFlow<List<FileTreeNode>> = currentChangesetDiffFlow
-        .map { diff ->
-            if (diff == null || diff.parsedFiles.isEmpty()) emptyList()
-            else buildFileTree(diff.parsedFiles)
+    val fileTreeFlow: StateFlow<List<FileTreeNode>> = activityBasedStateFlow
+        .map { state ->
+            val parsedFiles = state?.latestDiff?.parsedFilesMap?.values?.toList() ?: emptyList()
+            if (parsedFiles.isEmpty()) emptyList() else buildFileTree(parsedFiles)
         }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val fileDiffLinesMapFlow: StateFlow<Map<String, List<ParsedDiffLine>>> = currentChangesetDiffFlow
-        .map { diff ->
-            if (diff == null || diff.unidiffPatch.isBlank()) emptyMap()
-            else extractAllFileDiffLines(diff.unidiffPatch)
+    val fileDiffLinesMapFlow: StateFlow<Map<String, List<ParsedDiffLine>>> = activityBasedStateFlow
+        .map { state ->
+            state?.latestDiff?.fileDiffLinesMap ?: emptyMap()
         }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    val activitiesPagingDataFlow: Flow<PagingData<ActivityUiItem>> =
-        julesRepository.getActivitiesPagingDataFlow(sessionId)
+    val chatElementsPagingDataFlow: Flow<PagingData<ChatElementUiItem>> =
+        julesRepository.getChatElementsPagingDataFlow(sessionId)
             .map { pagingData ->
-                pagingData.map { activity ->
-                    ActivityUiItem.ActivityItem(
-                        id = activity.id,
-                        activity = activity,
-                        isLatest = false
+                pagingData.map { entity ->
+                    ChatElementUiItem.ElementItem(
+                        id = entity.id,
+                        elementEntity = entity
                     )
-                }.insertSeparators { before: ActivityUiItem.ActivityItem?, after: ActivityUiItem.ActivityItem? ->
-                    val beforeTime = before?.activity?.createTime
-                    val afterTime = after?.activity?.createTime
+                }.insertSeparators { before: ChatElementUiItem.ElementItem?, after: ChatElementUiItem.ElementItem? ->
+                    val beforeTime = before?.elementEntity?.createdAt
+                    val afterTime = after?.elementEntity?.createdAt
 
                     if (beforeTime != null && afterTime != null) {
                         val gapMinutes = Duration.between(afterTime, beforeTime).abs().toMinutes()
                         if (gapMinutes >= 15) {
                             val timeStr = formatRelativeOrAbsoluteTime(beforeTime)
-                            ActivityUiItem.RelativeTimeDivider(
+                            ChatElementUiItem.RelativeTimeDivider(
                                 id = "time_sep_${before.id}_${after.id}",
                                 relativeTimeText = timeStr
                             )
                         } else null
                     } else if (beforeTime != null && after == null) {
                         val timeStr = formatRelativeOrAbsoluteTime(beforeTime)
-                        ActivityUiItem.RelativeTimeDivider(
+                        ChatElementUiItem.RelativeTimeDivider(
                             id = "time_sep_top_${before.id}",
                             relativeTimeText = timeStr
                         )
@@ -257,15 +212,22 @@ class SessionDetailViewModel @Inject constructor(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun startPolling() {
         if (pollingJob != null) return
         pollingJob = viewModelScope.launch {
-            periodicTickerFlow(10.seconds).collect {
-                try {
-                    julesRepository.syncActivities(sessionId, pageSize = 5)
-                } catch (_: Exception) {
+            chatStateFlow.map { it?.agentState ?: AgentState.Idle }
+                .distinctUntilChanged()
+                .flatMapLatest { agentState ->
+                    val interval = if (agentState != AgentState.Idle) 5.seconds else 15.seconds
+                    periodicTickerFlow(interval)
                 }
-            }
+                .collect {
+                    try {
+                        julesRepository.syncActivities(sessionId, pageSize = 30)
+                    } catch (_: Exception) {
+                    }
+                }
         }
     }
 
@@ -290,7 +252,7 @@ class SessionDetailViewModel @Inject constructor(
             try {
                 julesRepository.sendMessage(sessionId, prompt)
                 julesRepository.syncSession(sessionId)
-                julesRepository.syncActivities(sessionId, pageSize = 5)
+                julesRepository.syncActivities(sessionId, pageSize = 30)
             } catch (e: Exception) {
                 _errorEvents.emit(e.message ?: "Failed to send message")
             } finally {
@@ -306,7 +268,7 @@ class SessionDetailViewModel @Inject constructor(
             try {
                 julesRepository.approvePlan(sessionId)
                 julesRepository.syncSession(sessionId)
-                julesRepository.syncActivities(sessionId, pageSize = 5)
+                julesRepository.syncActivities(sessionId, pageSize = 30)
             } catch (e: Exception) {
                 _errorEvents.emit(e.message ?: "Failed to approve plan")
             } finally {
@@ -421,82 +383,5 @@ class SessionDetailViewModel @Inject constructor(
             )
         }
         return result
-    }
-
-    private fun extractAllFileDiffLines(unidiffPatch: String): Map<String, List<ParsedDiffLine>> {
-        val blocks = unidiffPatch.split(DIFF_GIT_REGEX)
-        val resultMap = mutableMapOf<String, List<ParsedDiffLine>>()
-
-        for (block in blocks) {
-            if (block.isBlank()) continue
-            val lines = block.lines()
-            val headerLine = lines.firstOrNull() ?: continue
-            val match = PATH_REGEX.find(headerLine)
-            val path = match?.groupValues?.get(1) ?: continue
-
-            val fileLines = mutableListOf<ParsedDiffLine>()
-            var oldLine = 1
-            var newLine = 1
-            var inHunk = false
-
-            for (line in lines) {
-                if (line.startsWith("@@ ")) {
-                    inHunk = true
-                    val hunkMatch = HUNK_REGEX.find(line)
-                    if (hunkMatch != null) {
-                        oldLine = hunkMatch.groupValues[1].toInt()
-                        newLine = hunkMatch.groupValues[2].toInt()
-                    }
-                    continue
-                }
-
-                if (!inHunk) continue
-
-                when {
-                    line.startsWith("+") && !line.startsWith("+++") -> {
-                        fileLines.add(
-                            ParsedDiffLine(
-                                oldLineNumber = null,
-                                newLineNumber = newLine,
-                                content = line,
-                                type = DiffLineType.ADDITION
-                            )
-                        )
-                        newLine++
-                    }
-                    line.startsWith("-") && !line.startsWith("---") -> {
-                        fileLines.add(
-                            ParsedDiffLine(
-                                oldLineNumber = oldLine,
-                                newLineNumber = null,
-                                content = line,
-                                type = DiffLineType.DELETION
-                            )
-                        )
-                        oldLine++
-                    }
-                    line.startsWith(" ") || line.isEmpty() -> {
-                        fileLines.add(
-                            ParsedDiffLine(
-                                oldLineNumber = oldLine,
-                                newLineNumber = newLine,
-                                content = line,
-                                type = DiffLineType.CONTEXT
-                            )
-                        )
-                        oldLine++
-                        newLine++
-                    }
-                }
-            }
-            resultMap[path] = fileLines
-        }
-        return resultMap
-    }
-
-    companion object {
-        private val DIFF_GIT_REGEX = Regex("^diff --git ", RegexOption.MULTILINE)
-        private val PATH_REGEX = Regex("""b/([^\s]+)""")
-        private val HUNK_REGEX = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
     }
 }

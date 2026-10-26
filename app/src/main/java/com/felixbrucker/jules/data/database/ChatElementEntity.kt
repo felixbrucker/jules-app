@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 import java.time.Instant
 
 @Entity(
-    tableName = "activities",
+    tableName = "chat_elements",
     foreignKeys = [
         ForeignKey(
             entity = SessionEntity::class,
@@ -18,19 +18,13 @@ import java.time.Instant
         )
     ],
     indices = [
-        Index(value = ["sessionId"]),
-        Index(value = ["sessionId", "createTime"]),
-        Index(value = ["sessionId", "unidiffPatch"])
+        Index("sessionId"),
+        Index(value = ["sessionId", "createdAt"])
     ]
 )
-data class ActivityEntity(
-    @PrimaryKey
-    val id: String,
+data class ChatElementEntity(
+    @PrimaryKey val id: String,
     val sessionId: String,
-    val originator: String,
-    val createTime: Instant,
-    val type: String,
-    val activityJson: String,
-    val unidiffPatch: String? = null,
-    val changedFilesJson: String? = null
+    val createdAt: Instant,
+    val element: ChatElement
 )

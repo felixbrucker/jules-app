@@ -3,9 +3,17 @@ package com.felixbrucker.jules.data.repository
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import androidx.paging.map
-import com.felixbrucker.jules.data.database.ActivityDao
-import com.felixbrucker.jules.data.database.ActivityEntity
+import com.felixbrucker.jules.data.database.ActivityBasedStateDao
+import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
+import com.felixbrucker.jules.data.database.AgentState
+import com.felixbrucker.jules.data.database.ChatElement
+import com.felixbrucker.jules.data.database.ChatElementDao
+import com.felixbrucker.jules.data.database.ChatElementEntity
+import com.felixbrucker.jules.data.database.ChatStateDao
+import com.felixbrucker.jules.data.database.ChatStateEntity
+import com.felixbrucker.jules.data.database.ComputedDiff
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
 import com.felixbrucker.jules.data.database.SessionDao
@@ -17,31 +25,26 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceEntity
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
-import com.felixbrucker.jules.data.database.SourceSyncMetadataEntity
-import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
-import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.toEntity
-import com.felixbrucker.jules.network.api.util.WorkflowDispatchParser
-import com.felixbrucker.jules.network.api.util.UnidiffParser
+import com.felixbrucker.jules.data.datastore.AppSettingsRepository
+import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
+import com.felixbrucker.jules.network.api.GitHubApi
+import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.filter.ActivityFilter
 import com.felixbrucker.jules.network.api.model.Activity
 import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.CreateSessionRequest
 import com.felixbrucker.jules.network.api.model.GitHubRepoContext
-import com.felixbrucker.jules.network.api.model.ParsedFile
-import com.felixbrucker.jules.network.api.model.SourceContext
-import com.felixbrucker.jules.data.datastore.AppSettingsRepository
-import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
-import com.felixbrucker.jules.notification.JulesNotificationManager
-import com.felixbrucker.jules.network.api.GitHubApi
-import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.JulesApiException
+import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.SessionState
+import com.felixbrucker.jules.network.api.model.SourceContext
+import com.felixbrucker.jules.network.api.util.UnidiffParser
+import com.felixbrucker.jules.network.api.util.WorkflowDispatchParser
+import com.felixbrucker.jules.notification.JulesNotificationManager
+import com.felixbrucker.jules.ui.sessions.DiffLineType
+import com.felixbrucker.jules.ui.sessions.ParsedDiffLine
 import com.felixbrucker.jules.util.periodicTickerFlow
-import androidx.collection.LruCache
-import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,15 +55,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
 @Singleton
@@ -71,17 +76,17 @@ class JulesRepository @Inject constructor(
     private val sessionDraftDao: SessionDraftDao,
     private val dispatchableWorkflowDao: DispatchableWorkflowDao,
     private val sourceSyncMetadataDao: SourceSyncMetadataDao,
-    private val activityDao: ActivityDao,
+    private val chatElementDao: ChatElementDao,
+    private val chatStateDao: ChatStateDao,
+    private val activityBasedStateDao: ActivityBasedStateDao,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val notificationManager: JulesNotificationManager,
     private val julesApi: JulesApi,
-    private val gitHubApi: GitHubApi,
-    private val moshi: Moshi
+    private val gitHubApi: GitHubApi
 ) {
 
-    private val activityAdapter: JsonAdapter<Activity> by lazy { moshi.adapter(Activity::class.java) }
-    private val activityCache = LruCache<String, Activity>(200)
+    private val sessionMutexes = ConcurrentHashMap<String, Mutex>()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getDailySessionCountFlow(): Flow<Int> {
@@ -106,18 +111,19 @@ class JulesRepository @Inject constructor(
     fun getSessionFlow(sessionId: String): Flow<SessionWithPullRequest?> =
         sessionDao.getSessionByIdFlow(sessionId)
 
-    fun getLatestActivityWithChangesetFlow(sessionId: String): Flow<ActivityEntity?> =
-        activityDao.getLatestActivityWithChangesetFlow(sessionId)
-
-    fun getActivitiesPagingDataFlow(sessionId: String): Flow<PagingData<Activity>> {
+    fun getChatElementsPagingDataFlow(sessionId: String): Flow<PagingData<ChatElementEntity>> {
         return Pager(
             config = PagingConfig(pageSize = 30, enablePlaceholders = false)
         ) {
-            activityDao.getActivitiesPagingSource(sessionId)
-        }.flow.map { pagingData ->
-            pagingData.map { entity -> entity.toActivity(activityAdapter, activityCache) }
-        }.flowOn(Dispatchers.Default)
+            chatElementDao.getChatElementsPagingSource(sessionId)
+        }.flow.flowOn(Dispatchers.Default)
     }
+
+    fun getChatStateFlow(sessionId: String): Flow<ChatStateEntity?> =
+        chatStateDao.getChatStateFlow(sessionId)
+
+    fun getActivityBasedStateFlow(sessionId: String): Flow<ActivityBasedStateEntity?> =
+        activityBasedStateDao.getActivityBasedStateFlow(sessionId)
 
     fun getDraftsFlow(searchQuery: String): Flow<List<SessionDraftWithSource>> {
         val formattedQuery = if (searchQuery.isBlank()) "%%" else "%${searchQuery.trim()}%"
@@ -171,29 +177,179 @@ class JulesRepository @Inject constructor(
     }
 
     suspend fun syncActivities(sessionId: String, pageSize: Int = 30) = withContext(Dispatchers.IO) {
+        val mutex = sessionMutexes.getOrPut(sessionId) { Mutex() }
+        if (!mutex.tryLock()) return@withContext
+
         try {
-            val latestActivity = activityDao.getLatestActivityForSession(sessionId)
-            val createTimeFilter = latestActivity?.createTime?.let { ActivityFilter.CreatedAfter(it) }
+            var chatState = chatStateDao.getChatState(sessionId)
+                ?: ChatStateEntity(sessionId = sessionId, agentState = AgentState.Idle)
+            var activityBasedState = activityBasedStateDao.getActivityBasedState(sessionId)
+                ?: ActivityBasedStateEntity(sessionId = sessionId)
 
             var pageToken: String? = null
             do {
+                val filter = activityBasedState.latestActivityCreatedAt?.let { ActivityFilter.CreatedAfter(it) }
                 val response = julesApi.getActivities(
                     sessionId = sessionId,
-                    filter = createTimeFilter,
+                    filter = filter,
                     pageSize = pageSize,
                     pageToken = pageToken
                 )
 
-                val entities = response.activities.map { it.toEntity(sessionId, activityAdapter, activityCache, moshi) }
-                if (entities.isNotEmpty()) {
-                    activityDao.upsertActivities(entities)
+                val newChatElements = mutableListOf<ChatElementEntity>()
+                var updatedUnidiffAt: Instant? = null
+
+                for (activity in response.activities) {
+                    val actTime = activity.createTime
+                    val lastActTime = activityBasedState.latestActivityCreatedAt
+
+                    when (activity) {
+                        is Activity.UserMessaged -> {
+                            chatState = chatState.copy(agentState = AgentState.Thinking)
+                            newChatElements.add(
+                                ChatElementEntity(
+                                    id = activity.id,
+                                    sessionId = sessionId,
+                                    createdAt = actTime,
+                                    element = ChatElement.UserMessageElement(activity.userMessage)
+                                )
+                            )
+                        }
+                        is Activity.AgentMessaged -> {
+                            val prevTime = lastActTime ?: actTime
+                            val durationMillis = Duration.between(prevTime, actTime).toMillis().coerceAtLeast(0)
+                            newChatElements.add(
+                                ChatElementEntity(
+                                    id = activity.id,
+                                    sessionId = sessionId,
+                                    createdAt = actTime,
+                                    element = ChatElement.AgentThoughtElement(
+                                        thoughts = activity.agentMessage,
+                                        thoughtDurationMillis = durationMillis
+                                    )
+                                )
+                            )
+                        }
+                        is Activity.ProgressUpdated -> {
+                            val title = activity.title
+                            val desc = activity.description
+                            val element = when {
+                                !title.isNullOrBlank() -> ChatElement.AgentMessageBlockElement(title, desc)
+                                !desc.isNullOrBlank() -> ChatElement.AgentMessageBlockElement("Progress Update", desc)
+                                else -> null
+                            }
+                            if (element != null) {
+                                newChatElements.add(
+                                    ChatElementEntity(
+                                        id = activity.id,
+                                        sessionId = sessionId,
+                                        createdAt = actTime,
+                                        element = element
+                                    )
+                                )
+                            }
+                        }
+                        is Activity.PlanGenerated -> {
+                            newChatElements.add(
+                                ChatElementEntity(
+                                    id = activity.id,
+                                    sessionId = sessionId,
+                                    createdAt = actTime,
+                                    element = ChatElement.PlanElement(activity.plan.steps)
+                                )
+                            )
+                        }
+                        is Activity.PlanApproved -> {
+                            newChatElements.add(
+                                ChatElementEntity(
+                                    id = activity.id,
+                                    sessionId = sessionId,
+                                    createdAt = actTime,
+                                    element = ChatElement.PlanApprovedElement()
+                                )
+                            )
+                        }
+                        is Activity.SessionFailed -> {
+                            newChatElements.add(
+                                ChatElementEntity(
+                                    id = activity.id,
+                                    sessionId = sessionId,
+                                    createdAt = actTime,
+                                    element = ChatElement.SessionFailedElement(activity.reason ?: "Session failed")
+                                )
+                            )
+                        }
+                        is Activity.SessionCompleted -> {
+                            newChatElements.add(
+                                ChatElementEntity(
+                                    id = activity.id,
+                                    sessionId = sessionId,
+                                    createdAt = actTime,
+                                    element = ChatElement.SessionCompletedElement()
+                                )
+                            )
+                        }
+                    }
+
+                    if (activity is Activity.SessionCompleted || activity is Activity.SessionFailed || activity is Activity.PlanGenerated) {
+                        chatState = chatState.copy(agentState = AgentState.Idle)
+                    } else if (activity !is Activity.UserMessaged) {
+                        chatState = chatState.copy(agentState = AgentState.Working)
+                    }
+
+                    val patch = when (activity) {
+                        is Activity.ProgressUpdated -> activity.artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
+                        is Activity.SessionCompleted -> activity.artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
+                        is Activity.SessionFailed -> activity.artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
+                        else -> null
+                    }
+
+                    if (!patch.isNullOrBlank()) {
+                        val changedFiles = computeChangedFiles(activityBasedState.latestUnidiff, patch)
+                        if (changedFiles.isNotEmpty()) {
+                            newChatElements.add(
+                                ChatElementEntity(
+                                    id = "cf_${activity.id}",
+                                    sessionId = sessionId,
+                                    createdAt = actTime,
+                                    element = ChatElement.ChangedFilesElement(changedFiles)
+                                )
+                            )
+                        }
+                        activityBasedState = activityBasedState.copy(latestUnidiff = patch)
+                        updatedUnidiffAt = actTime
+                    }
+
+                    activityBasedState = activityBasedState.copy(latestActivityCreatedAt = actTime)
                 }
+
+                if (updatedUnidiffAt != null) {
+                    val patch = activityBasedState.latestUnidiff ?: ""
+                    val parsedFiles = UnidiffParser.parse(patch)
+                    val fileDiffLinesMap = extractAllFileDiffLines(patch)
+                    val parsedFilesMap = parsedFiles.associateBy { it.path }
+                    val computedDiff = ComputedDiff(
+                        fileDiffLinesMap = fileDiffLinesMap,
+                        parsedFilesMap = parsedFilesMap,
+                        updatedAt = updatedUnidiffAt
+                    )
+                    activityBasedState = activityBasedState.copy(latestDiff = computedDiff)
+                }
+
+                chatStateDao.upsertChatState(chatState)
+                activityBasedStateDao.upsertState(activityBasedState)
+                if (newChatElements.isNotEmpty()) {
+                    chatElementDao.upsertElements(newChatElements)
+                }
+
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing activities for session $sessionId")
             throw e
+        } finally {
+            mutex.unlock()
         }
     }
 
@@ -201,6 +357,31 @@ class JulesRepository @Inject constructor(
         try {
             val fetched = julesApi.getSession(sessionId)
             saveSessions(listOf(fetched.toEntity()), isBackground = false)
+
+            val patch = fetched.changeSets.firstOrNull()?.gitPatch?.unidiffPatch
+            if (!patch.isNullOrBlank()) {
+                val activityBasedState = activityBasedStateDao.getActivityBasedState(sessionId)
+                    ?: ActivityBasedStateEntity(sessionId = sessionId)
+                val updateTime = fetched.updateTime ?: fetched.createTime ?: Instant.now()
+
+                if (activityBasedState.latestDiff == null || updateTime.isAfter(activityBasedState.latestDiff.updatedAt)) {
+                    val parsedFiles = UnidiffParser.parse(patch)
+                    val fileDiffLinesMap = extractAllFileDiffLines(patch)
+                    val parsedFilesMap = parsedFiles.associateBy { it.path }
+                    val computedDiff = ComputedDiff(
+                        fileDiffLinesMap = fileDiffLinesMap,
+                        parsedFilesMap = parsedFilesMap,
+                        updatedAt = updateTime
+                    )
+                    activityBasedStateDao.upsertState(
+                        activityBasedState.copy(
+                            latestUnidiff = patch,
+                            latestDiff = computedDiff
+                        )
+                    )
+                }
+            }
+
             syncPullRequests()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -269,20 +450,18 @@ class JulesRepository @Inject constructor(
 
         if (toInsert.isNotEmpty()) {
             sessionDao.insertSessions(toInsert)
-            val initialActivities = toInsert.mapNotNull { session ->
+            val initialElements = toInsert.mapNotNull { session ->
                 if (session.prompt.isNotBlank()) {
-                    val initialActivity = Activity.UserMessaged(
-                        name = "sessions/${session.id}/activities/init_prompt_${session.id}",
+                    ChatElementEntity(
                         id = "init_prompt_${session.id}",
-                        createTime = session.createTime,
-                        originator = com.felixbrucker.jules.network.api.model.Originator.USER,
-                        userMessage = session.prompt
+                        sessionId = session.id,
+                        createdAt = session.createTime ?: Instant.now(),
+                        element = ChatElement.UserMessageElement(session.prompt)
                     )
-                    initialActivity.toEntity(session.id, activityAdapter, activityCache, moshi)
                 } else null
             }
-            if (initialActivities.isNotEmpty()) {
-                activityDao.upsertActivities(initialActivities)
+            if (initialElements.isNotEmpty()) {
+                chatElementDao.upsertElements(initialElements)
             }
         }
         if (toUpdate.isNotEmpty()) {
@@ -343,7 +522,6 @@ class JulesRepository @Inject constructor(
         val pageSize = 30
 
         try {
-            // Step 1: Paginate through regular (non-archived) sessions
             do {
                 val response = julesApi.getSessions(
                     pageSize = pageSize,
@@ -355,7 +533,6 @@ class JulesRepository @Inject constructor(
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
 
-            // Step 2: Check local active session IDs not returned in sync and fetch them in parallel (max 4)
             val localActiveIds = sessionDao.getAllActiveSessionIds()
             val missingIds = localActiveIds.filter { !fetchedSessionIds.contains(it) }
 
@@ -366,10 +543,8 @@ class JulesRepository @Inject constructor(
                         semaphore.withPermit {
                             try {
                                 val session = julesApi.getSession(missingId)
-
                                 session.toEntity()
                             } catch (e: JulesApiException) {
-                                // The session was deleted remotely, remove from local cache
                                 if (e.httpStatusCode == 404) {
                                     sessionDao.deleteSession(missingId)
                                 } else {
@@ -601,59 +776,94 @@ class JulesRepository @Inject constructor(
         )
     }
 
+    private fun computeChangedFiles(unidiff1: String?, unidiff2: String): List<String> {
+        val files2 = UnidiffParser.parse(unidiff2)
+        if (unidiff1.isNullOrBlank()) {
+            return files2.map { it.path }
+        }
+        val files1Map = UnidiffParser.parse(unidiff1).associateBy { it.path }
+        return files2.filter { file2 ->
+            val file1 = files1Map[file2.path]
+            file1 == null || file1.additions != file2.additions || file1.deletions != file2.deletions || file1.changeType != file2.changeType
+        }.map { it.path }
+    }
+
+    private fun extractAllFileDiffLines(unidiffPatch: String): Map<String, List<ParsedDiffLine>> {
+        if (unidiffPatch.isBlank()) return emptyMap()
+        val blocks = unidiffPatch.split(DIFF_GIT_REGEX)
+        val resultMap = mutableMapOf<String, List<ParsedDiffLine>>()
+
+        for (block in blocks) {
+            if (block.isBlank()) continue
+            val lines = block.lines()
+            val headerLine = lines.firstOrNull() ?: continue
+            val match = PATH_REGEX.find(headerLine)
+            val path = match?.groupValues?.get(1) ?: continue
+
+            val fileLines = mutableListOf<ParsedDiffLine>()
+            var oldLine = 1
+            var newLine = 1
+            var inHunk = false
+
+            for (line in lines) {
+                if (line.startsWith("@@ ")) {
+                    inHunk = true
+                    val hunkMatch = HUNK_REGEX.find(line)
+                    if (hunkMatch != null) {
+                        oldLine = hunkMatch.groupValues[1].toInt()
+                        newLine = hunkMatch.groupValues[2].toInt()
+                    }
+                    continue
+                }
+
+                if (!inHunk) continue
+
+                when {
+                    line.startsWith("+") && !line.startsWith("+++") -> {
+                        fileLines.add(
+                            ParsedDiffLine(
+                                oldLineNumber = null,
+                                newLineNumber = newLine,
+                                content = line,
+                                type = DiffLineType.ADDITION
+                            )
+                        )
+                        newLine++
+                    }
+                    line.startsWith("-") && !line.startsWith("---") -> {
+                        fileLines.add(
+                            ParsedDiffLine(
+                                oldLineNumber = oldLine,
+                                newLineNumber = null,
+                                content = line,
+                                type = DiffLineType.DELETION
+                            )
+                        )
+                        oldLine++
+                    }
+                    line.startsWith(" ") || line.isEmpty() -> {
+                        fileLines.add(
+                            ParsedDiffLine(
+                                oldLineNumber = oldLine,
+                                newLineNumber = newLine,
+                                content = line,
+                                type = DiffLineType.CONTEXT
+                            )
+                        )
+                        oldLine++
+                        newLine++
+                    }
+                }
+            }
+            resultMap[path] = fileLines
+        }
+        return resultMap
+    }
+
     companion object {
         private const val TAG = "JulesRepository"
-    }
-}
-
-private fun Activity.toEntity(
-    sessionId: String,
-    activityAdapter: JsonAdapter<Activity>,
-    activityCache: LruCache<String, Activity>,
-    moshi: Moshi
-): ActivityEntity {
-    activityCache.put(id, this)
-
-    val typeName = when (this) {
-        is Activity.UserMessaged -> "USER_MESSAGED"
-        is Activity.AgentMessaged -> "AGENT_MESSAGED"
-        is Activity.PlanGenerated -> "PLAN_GENERATED"
-        is Activity.PlanApproved -> "PLAN_APPROVED"
-        is Activity.ProgressUpdated -> "PROGRESS_UPDATED"
-        is Activity.SessionCompleted -> "SESSION_COMPLETED"
-        is Activity.SessionFailed -> "SESSION_FAILED"
-    }
-
-    val unidiffPatch = when (this) {
-        is Activity.ProgressUpdated -> artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
-        is Activity.SessionCompleted -> artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
-        is Activity.SessionFailed -> artifacts.firstNotNullOfOrNull { it.changeSet }?.gitPatch?.unidiffPatch
-        else -> null
-    }
-
-    val parsedFiles = unidiffPatch?.let { UnidiffParser.parse(it) }
-
-    val activityJson = activityAdapter.toJson(this)
-    val parsedFilesType = Types.newParameterizedType(List::class.java, ParsedFile::class.java)
-    val changedFilesJson = parsedFiles?.let { moshi.adapter<List<ParsedFile>>(parsedFilesType).toJson(it) }
-
-    return ActivityEntity(
-        id = id,
-        sessionId = sessionId,
-        originator = originator.name,
-        createTime = createTime,
-        type = typeName,
-        activityJson = activityJson,
-        unidiffPatch = unidiffPatch,
-        changedFilesJson = changedFilesJson
-    )
-}
-
-private fun ActivityEntity.toActivity(
-    activityAdapter: JsonAdapter<Activity>,
-    activityCache: LruCache<String, Activity>
-): Activity {
-    return activityCache.get(id) ?: activityAdapter.fromJson(activityJson)!!.also {
-        activityCache.put(id, it)
+        private val DIFF_GIT_REGEX = Regex("^diff --git ", RegexOption.MULTILINE)
+        private val PATH_REGEX = Regex("""b/([^\s]+)""")
+        private val HUNK_REGEX = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
     }
 }

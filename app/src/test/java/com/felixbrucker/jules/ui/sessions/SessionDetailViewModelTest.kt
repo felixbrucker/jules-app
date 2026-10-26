@@ -55,8 +55,9 @@ class SessionDetailViewModelTest {
                 workflows = emptyList()
             )
         )
-        coEvery { repository.getLatestActivityWithChangesetFlow("sess-123") } returns flowOf(null)
-        coEvery { repository.getActivitiesPagingDataFlow("sess-123") } returns flowOf(androidx.paging.PagingData.empty())
+        coEvery { repository.getChatStateFlow("sess-123") } returns flowOf(null)
+        coEvery { repository.getActivityBasedStateFlow("sess-123") } returns flowOf(null)
+        coEvery { repository.getChatElementsPagingDataFlow("sess-123") } returns flowOf(androidx.paging.PagingData.empty())
     }
 
     @After
