@@ -62,6 +62,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -186,7 +187,14 @@ class JulesRepository @Inject constructor(
             var activityBasedState = activityBasedStateDao.getActivityBasedState(sessionId)
                 ?: ActivityBasedStateEntity(sessionId = sessionId)
 
-            val initialFilter = activityBasedState.latestActivityCreatedAt?.let { ActivityFilter.CreatedAfter(it) }
+            val initialFilter = activityBasedState.latestActivityCreatedAt?.let { instant ->
+                val roundedUpInstant = if (instant.nano > 0) {
+                    instant.plusSeconds(1).truncatedTo(ChronoUnit.SECONDS)
+                } else {
+                    instant
+                }
+                ActivityFilter.CreatedAfter(roundedUpInstant)
+            }
             var pageToken: String? = null
             do {
                 val response = julesApi.getActivities(

@@ -128,6 +128,7 @@ fun SessionDetailScreen(
     val fileDiffLinesMap by viewModel.fileDiffLinesMapFlow.collectAsState()
     val chatElements = viewModel.chatElementsPagingDataFlow.collectAsLazyPagingItems()
     val splitRatio by viewModel.splitRatio.collectAsState()
+    val isInitialSyncing by viewModel.isInitialSyncing.collectAsState()
     val isSendingMessage by viewModel.isSendingMessage.collectAsState()
     val isApprovingPlan by viewModel.isApprovingPlan.collectAsState()
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
@@ -207,6 +208,7 @@ fun SessionDetailScreen(
                     fileDiffLinesMap = fileDiffLinesMap,
                     splitRatio = splitRatio,
                     isPhone = isPhone,
+                    isInitialSyncing = isInitialSyncing,
                     isSendingMessage = isSendingMessage,
                     isApprovingPlan = isApprovingPlan,
                     onSplitRatioChange = { viewModel.updateSplitRatio(it) },
@@ -425,6 +427,7 @@ private fun SessionDetailSplitContent(
     fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     splitRatio: Float,
     isPhone: Boolean,
+    isInitialSyncing: Boolean,
     isSendingMessage: Boolean,
     isApprovingPlan: Boolean,
     onSplitRatioChange: (Float) -> Unit,
@@ -445,6 +448,7 @@ private fun SessionDetailSplitContent(
                     chatElements = chatElements,
                     chatState = chatState,
                     activityBasedState = activityBasedState,
+                    isInitialSyncing = isInitialSyncing,
                     isSendingMessage = isSendingMessage,
                     isApprovingPlan = isApprovingPlan,
                     onSendMessage = onSendMessage,
@@ -467,6 +471,7 @@ private fun SessionDetailSplitContent(
                             chatElements = chatElements,
                             chatState = chatState,
                             activityBasedState = activityBasedState,
+                            isInitialSyncing = isInitialSyncing,
                             isSendingMessage = isSendingMessage,
                             isApprovingPlan = isApprovingPlan,
                             onSendMessage = onSendMessage,
@@ -541,6 +546,7 @@ private fun ChatWindowView(
     chatElements: LazyPagingItems<ChatElementUiItem>,
     chatState: ChatStateEntity?,
     activityBasedState: ActivityBasedStateEntity?,
+    isInitialSyncing: Boolean,
     isSendingMessage: Boolean,
     isApprovingPlan: Boolean,
     onSendMessage: (String) -> Unit,
@@ -550,66 +556,93 @@ private fun ChatWindowView(
     var initialScrolledSessionId by remember { mutableStateOf<String?>(null) }
 
     val latestItemId = chatElements.itemSnapshotList.items.firstOrNull()?.id
+    val itemCount = chatElements.itemCount
 
-    LaunchedEffect(session.id, latestItemId) {
-        if (chatElements.itemCount > 0) {
+    LaunchedEffect(session.id, latestItemId, itemCount) {
+        if (itemCount > 0) {
             if (initialScrolledSessionId != session.id) {
                 initialScrolledSessionId = session.id
                 listState.scrollToItem(0)
-            } else if (listState.firstVisibleItemIndex <= 2) {
+            } else {
                 listState.animateScrollToItem(0)
             }
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        SelectionContainer(modifier = Modifier.weight(1f)) {
-            LazyColumn(
-                state = listState,
-                reverseLayout = true,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (chatState?.agentState == AgentState.Thinking) {
-                    item(key = "agent_thinking_indicator") {
-                        AgentStatusBubble(label = "Thinking")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            SelectionContainer(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    state = listState,
+                    reverseLayout = true,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (chatState?.agentState == AgentState.Thinking) {
+                        item(key = "agent_thinking_indicator") {
+                            AgentStatusBubble(label = "Thinking")
+                        }
+                    } else if (chatState?.agentState == AgentState.Working) {
+                        item(key = "agent_working_indicator") {
+                            AgentStatusBubble(label = "Working")
+                        }
                     }
-                } else if (chatState?.agentState == AgentState.Working) {
-                    item(key = "agent_working_indicator") {
-                        AgentStatusBubble(label = "Working")
+
+                    items(
+                        count = chatElements.itemCount,
+                        key = chatElements.itemKey { it.id }
+                    ) { index ->
+                        val item = chatElements[index]
+                        if (item != null) {
+                            ChatElementRow(
+                                item = item,
+                                session = session,
+                                activityBasedState = activityBasedState
+                            )
+                        }
                     }
                 }
+            }
 
-                items(
-                    count = chatElements.itemCount,
-                    key = chatElements.itemKey { it.id }
-                ) { index ->
-                    val item = chatElements[index]
-                    if (item != null) {
-                        ChatElementRow(
-                            item = item,
-                            session = session,
-                            activityBasedState = activityBasedState
+            if (session.state == SessionState.AWAITING_PLAN_APPROVAL) {
+                ApprovePlanBottomBar(
+                    isApprovingPlan = isApprovingPlan,
+                    onApprovePlan = onApprovePlan
+                )
+            }
+
+            ChatInputBottomBar(
+                isSending = isSendingMessage,
+                onSendMessage = onSendMessage
+            )
+        }
+
+        if (isInitialSyncing) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background.copy(alpha = 0.85f)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = "Loading session activities...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
         }
-
-        if (session.state == SessionState.AWAITING_PLAN_APPROVAL) {
-            ApprovePlanBottomBar(
-                isApprovingPlan = isApprovingPlan,
-                onApprovePlan = onApprovePlan
-            )
-        }
-
-        ChatInputBottomBar(
-            isSending = isSendingMessage,
-            onSendMessage = onSendMessage
-        )
     }
 }
 

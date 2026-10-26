@@ -17,6 +17,8 @@ fun ChatMarkdown(
     MarkdownText(
         markdown = markdown,
         modifier = modifier,
-        style = style.copy(color = color)
+        style = style.copy(color = color),
+        syntaxHighlightColor = Color.Transparent,
+        syntaxHighlightTextColor = Color.White
     )
 }

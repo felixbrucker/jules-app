@@ -200,6 +200,9 @@ class SessionDetailViewModel @Inject constructor(
         }
     }
 
+    private val _isInitialSyncing = MutableStateFlow(true)
+    val isInitialSyncing: StateFlow<Boolean> = _isInitialSyncing.asStateFlow()
+
     private var pollingJob: Job? = null
 
     init {
@@ -208,6 +211,8 @@ class SessionDetailViewModel @Inject constructor(
                 julesRepository.syncActivities(sessionId, pageSize = 30)
                 julesRepository.syncSession(sessionId)
             } catch (_: Exception) {
+            } finally {
+                _isInitialSyncing.value = false
             }
         }
     }
