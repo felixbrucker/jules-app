@@ -817,9 +817,7 @@ private fun ChangedFilesBubble(changedFiles: List<String>) {
             changedFiles.forEach { path ->
                 Text(
                     text = path,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                 )
             }
         }
@@ -882,7 +880,7 @@ private fun ProgressUpdatedBubble(
                     ) {
                         Box(modifier = Modifier.weight(1f)) {
                             ChatMarkdown(
-                                markdown = title!!,
+                                markdown = title ?: "",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
@@ -900,7 +898,7 @@ private fun ProgressUpdatedBubble(
                         Column {
                             Spacer(modifier = Modifier.height(6.dp))
                             ChatMarkdown(
-                                markdown = description!!,
+                                markdown = description ?: "",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -1223,6 +1221,15 @@ private fun ChatInputBottomBar(
     }
 }
 
+private val diffAdditionBg = Color(0xFF163B21)
+private val diffAdditionFg = Color(0xFF7EE787)
+private val diffDeletionBg = Color(0xFF3C1E1E)
+private val diffDeletionFg = Color(0xFFFF7B72)
+private val diffContextBg = Color.Transparent
+private val diffContextFg = Color(0xFFC9D1D9)
+private val diffLineNumFg = Color(0xFF6E7681)
+private val diffCodeDarkBg = Color(0xFF0D1117)
+
 @Composable
 private fun FileDiffView(
     activityBasedState: ActivityBasedStateEntity?,
@@ -1249,31 +1256,53 @@ private fun FileDiffView(
 
     LaunchedEffect(selectedFilePath) {
         val path = selectedFilePath ?: return@LaunchedEffect
-        val fileIndex = parsedFiles.indexOfFirst { it.path == path }
-        if (fileIndex >= 0) {
-            kotlinx.coroutines.yield()
-            listState.animateScrollToItem(fileIndex)
+        var targetIndex = 0
+        for (file in parsedFiles) {
+            if (file.path == path) break
+            targetIndex += 1
+            if (expandedCards[file.path] == true) {
+                targetIndex += (fileDiffLinesMap[file.path]?.size ?: 0)
+            }
         }
+        kotlinx.coroutines.yield()
+        listState.animateScrollToItem(targetIndex)
     }
 
     Row(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(parsedFiles.size, key = { parsedFiles[it].path }) { index ->
-                val file = parsedFiles[index]
-                val isExpanded = expandedCards[file.path] ?: false
-                FileDiffCard(
-                    file = file,
-                    fileDiffLinesMap = fileDiffLinesMap,
-                    isExpanded = isExpanded,
-                    onToggleExpand = { expandedCards[file.path] = !isExpanded }
-                )
+        SelectionContainer(modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                parsedFiles.forEach { file ->
+                    val isExpanded = expandedCards[file.path] ?: false
+                    val lines = fileDiffLinesMap[file.path] ?: emptyList()
+
+                    item(key = "header_${file.path}") {
+                        Box(modifier = Modifier.padding(top = 8.dp)) {
+                            FileDiffHeaderCard(
+                                file = file,
+                                isExpanded = isExpanded,
+                                onToggleExpand = { expandedCards[file.path] = !isExpanded }
+                            )
+                        }
+                    }
+
+                    if (isExpanded && lines.isNotEmpty()) {
+                        items(
+                            count = lines.size,
+                            key = { index -> "line_${file.path}_$index" }
+                        ) { index ->
+                            DiffLineRow(
+                                line = lines[index],
+                                isLast = index == lines.size - 1
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -1310,47 +1339,38 @@ private fun FileDiffView(
 }
 
 @Composable
-private fun FileDiffCard(
+private fun FileDiffHeaderCard(
     file: ParsedFile,
-    fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onToggleExpand() }
-                .padding(10.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ChangeTypeBadge(changeType = file.changeType)
-                Text(
-                    text = file.path,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                DiffBadges(additions = file.additions, deletions = file.deletions)
-            }
+    val shape = if (isExpanded) {
+        RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
+    } else {
+        RoundedCornerShape(12.dp)
+    }
 
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ColorCodedDiffBody(file = file, fileDiffLinesMap = fileDiffLinesMap)
-                }
-            }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleExpand() },
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ChangeTypeBadge(changeType = file.changeType)
+            Text(
+                text = file.path,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            DiffBadges(additions = file.additions, deletions = file.deletions)
         }
     }
 }
@@ -1375,65 +1395,59 @@ private fun ChangeTypeBadge(changeType: FileChangeType) {
 }
 
 @Composable
-private fun ColorCodedDiffBody(file: ParsedFile, fileDiffLinesMap: Map<String, List<ParsedDiffLine>>) {
-    val fileLines = fileDiffLinesMap[file.path] ?: emptyList()
+private fun DiffLineRow(
+    line: ParsedDiffLine,
+    isLast: Boolean
+) {
+    val (bgColor, textColor) = when (line.type) {
+        DiffLineType.ADDITION -> diffAdditionBg to diffAdditionFg
+        DiffLineType.DELETION -> diffDeletionBg to diffDeletionFg
+        DiffLineType.CONTEXT -> diffContextBg to diffContextFg
+    }
 
-    SelectionContainer {
-        Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = Color(0xFF0D1117)
+    val shape = if (isLast) RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp) else RoundedCornerShape(0.dp)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        color = diffCodeDarkBg
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(bgColor)
+                .padding(horizontal = 6.dp, vertical = 1.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-            ) {
-                fileLines.forEach { line ->
-                    val (bgColor, textColor) = when (line.type) {
-                        DiffLineType.ADDITION -> Color(0xFF163B21) to Color(0xFF7EE787)
-                        DiffLineType.DELETION -> Color(0xFF3C1E1E) to Color(0xFFFF7B72)
-                        DiffLineType.CONTEXT -> Color.Transparent to Color(0xFFC9D1D9)
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(bgColor)
-                            .padding(vertical = 1.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = line.oldLineNumber?.toString() ?: "",
-                            modifier = Modifier.width(32.dp).padding(end = 4.dp),
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.End
-                            ),
-                            color = Color(0xFF6E7681)
-                        )
-                        Text(
-                            text = line.newLineNumber?.toString() ?: "",
-                            modifier = Modifier.width(32.dp).padding(end = 8.dp),
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.End
-                            ),
-                            color = Color(0xFF6E7681)
-                        )
-                        Text(
-                            text = line.content,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp
-                            ),
-                            color = textColor
-                        )
-                    }
-                }
-            }
+            Text(
+                text = line.oldLineNumber?.toString().orEmpty(),
+                modifier = Modifier.width(32.dp).padding(end = 4.dp),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                ),
+                color = diffLineNumFg
+            )
+            Text(
+                text = line.newLineNumber?.toString().orEmpty(),
+                modifier = Modifier.width(32.dp).padding(end = 8.dp),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                ),
+                color = diffLineNumFg
+            )
+            Text(
+                text = line.content,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp
+                ),
+                color = textColor
+            )
         }
     }
 }
