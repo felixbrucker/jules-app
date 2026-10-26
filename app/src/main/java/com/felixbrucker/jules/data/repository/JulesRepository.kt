@@ -253,6 +253,9 @@ class JulesRepository @Inject constructor(
 
     private suspend fun saveSessions(entities: List<SessionEntity>, isBackground: Boolean = false) {
         if (entities.isEmpty()) return
+
+        ensureSourcesExist(entities)
+
         val sessionIds = entities.map { it.id }
         val previousSessionsMap = sessionDao.getSessionsByIds(sessionIds).associateBy { it.id }
         val existingSessionIds = previousSessionsMap.keys
@@ -260,7 +263,6 @@ class JulesRepository @Inject constructor(
         val (toInsert, toUpdate) = entities.partition { !existingSessionIds.contains(it.id) }
 
         if (toInsert.isNotEmpty()) {
-            ensureSourcesExist(toInsert)
             sessionDao.insertSessions(toInsert)
             val initialActivities = toInsert.mapNotNull { session ->
                 if (session.prompt.isNotBlank()) {
