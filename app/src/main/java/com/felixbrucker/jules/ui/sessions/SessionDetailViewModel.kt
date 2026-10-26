@@ -156,12 +156,8 @@ class SessionDetailViewModel @Inject constructor(
 
     val fileDiffLinesMapFlow: StateFlow<Map<String, List<ParsedDiffLine>>> = currentChangesetDiffFlow
         .map { diff ->
-            if (diff == null || diff.parsedFiles.isEmpty() || diff.unidiffPatch.isBlank()) emptyMap()
-            else {
-                diff.parsedFiles.associate { file ->
-                    file.path to extractFileDiffLines(file.path, diff.unidiffPatch)
-                }
-            }
+            if (diff == null || diff.unidiffPatch.isBlank()) emptyMap()
+            else extractAllFileDiffLines(diff.unidiffPatch)
         }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
@@ -427,70 +423,80 @@ class SessionDetailViewModel @Inject constructor(
         return result
     }
 
-    private fun extractFileDiffLines(path: String, unidiffPatch: String): List<ParsedDiffLine> {
-        val blocks = unidiffPatch.split(Regex("^diff --git ", RegexOption.MULTILINE))
-        val result = mutableListOf<ParsedDiffLine>()
+    private fun extractAllFileDiffLines(unidiffPatch: String): Map<String, List<ParsedDiffLine>> {
+        val blocks = unidiffPatch.split(DIFF_GIT_REGEX)
+        val resultMap = mutableMapOf<String, List<ParsedDiffLine>>()
 
         for (block in blocks) {
-            if (block.contains("a/$path") || block.contains("b/$path")) {
-                val lines = block.lines()
-                var oldLine = 1
-                var newLine = 1
-                var inHunk = false
+            if (block.isBlank()) continue
+            val lines = block.lines()
+            val headerLine = lines.firstOrNull() ?: continue
+            val match = PATH_REGEX.find(headerLine)
+            val path = match?.groupValues?.get(1) ?: continue
 
-                for (line in lines) {
-                    if (line.startsWith("@@ ")) {
-                        inHunk = true
-                        val match = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""").find(line)
-                        if (match != null) {
-                            oldLine = match.groupValues[1].toInt()
-                            newLine = match.groupValues[2].toInt()
-                        }
-                        continue
+            val fileLines = mutableListOf<ParsedDiffLine>()
+            var oldLine = 1
+            var newLine = 1
+            var inHunk = false
+
+            for (line in lines) {
+                if (line.startsWith("@@ ")) {
+                    inHunk = true
+                    val hunkMatch = HUNK_REGEX.find(line)
+                    if (hunkMatch != null) {
+                        oldLine = hunkMatch.groupValues[1].toInt()
+                        newLine = hunkMatch.groupValues[2].toInt()
                     }
+                    continue
+                }
 
-                    if (!inHunk) continue
+                if (!inHunk) continue
 
-                    when {
-                        line.startsWith("+") && !line.startsWith("+++") -> {
-                            result.add(
-                                ParsedDiffLine(
-                                    oldLineNumber = null,
-                                    newLineNumber = newLine,
-                                    content = line,
-                                    type = DiffLineType.ADDITION
-                                )
+                when {
+                    line.startsWith("+") && !line.startsWith("+++") -> {
+                        fileLines.add(
+                            ParsedDiffLine(
+                                oldLineNumber = null,
+                                newLineNumber = newLine,
+                                content = line,
+                                type = DiffLineType.ADDITION
                             )
-                            newLine++
-                        }
-                        line.startsWith("-") && !line.startsWith("---") -> {
-                            result.add(
-                                ParsedDiffLine(
-                                    oldLineNumber = oldLine,
-                                    newLineNumber = null,
-                                    content = line,
-                                    type = DiffLineType.DELETION
-                                )
+                        )
+                        newLine++
+                    }
+                    line.startsWith("-") && !line.startsWith("---") -> {
+                        fileLines.add(
+                            ParsedDiffLine(
+                                oldLineNumber = oldLine,
+                                newLineNumber = null,
+                                content = line,
+                                type = DiffLineType.DELETION
                             )
-                            oldLine++
-                        }
-                        line.startsWith(" ") || line.isEmpty() -> {
-                            result.add(
-                                ParsedDiffLine(
-                                    oldLineNumber = oldLine,
-                                    newLineNumber = newLine,
-                                    content = line,
-                                    type = DiffLineType.CONTEXT
-                                )
+                        )
+                        oldLine++
+                    }
+                    line.startsWith(" ") || line.isEmpty() -> {
+                        fileLines.add(
+                            ParsedDiffLine(
+                                oldLineNumber = oldLine,
+                                newLineNumber = newLine,
+                                content = line,
+                                type = DiffLineType.CONTEXT
                             )
-                            oldLine++
-                            newLine++
-                        }
+                        )
+                        oldLine++
+                        newLine++
                     }
                 }
-                return result // Full diff lines, NO take(300) limitation!
             }
+            resultMap[path] = fileLines
         }
-        return emptyList()
+        return resultMap
+    }
+
+    companion object {
+        private val DIFF_GIT_REGEX = Regex("^diff --git ", RegexOption.MULTILINE)
+        private val PATH_REGEX = Regex("""b/([^\s]+)""")
+        private val HUNK_REGEX = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
     }
 }

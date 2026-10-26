@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -553,7 +554,7 @@ private fun ChatWindowView(
     val listState = rememberLazyListState()
     var initialScrolledSessionId by remember { mutableStateOf<String?>(null) }
 
-    val latestItemId = if (activities.itemCount > 0) activities[0]?.id else null
+    val latestItemId = activities.itemSnapshotList.items.firstOrNull()?.id
 
     LaunchedEffect(session.id, latestItemId) {
         if (activities.itemCount > 0) {
@@ -1171,6 +1172,7 @@ private fun FileDiffView(
         }
 
         if (isFullScreen) {
+            val hasExpandedDiffs = currentDiff.parsedFiles.any { expandedCards[it.path] == true }
             Box(
                 modifier = Modifier
                     .width(260.dp)
@@ -1181,17 +1183,14 @@ private fun FileDiffView(
                 ScrollableFileTree(
                     fileTree = fileTree,
                     expandedFolders = expandedFolders,
+                    hasExpandedDiffs = hasExpandedDiffs,
                     onToggleFolder = { folder ->
                         expandedFolders[folder] = !(expandedFolders[folder] ?: true)
                     },
-                    onExpandAllCards = {
+                    onToggleAllCards = {
+                        val targetState = !hasExpandedDiffs
                         currentDiff.parsedFiles.forEach { file ->
-                            expandedCards[file.path] = true
-                        }
-                    },
-                    onCollapseAllCards = {
-                        currentDiff.parsedFiles.forEach { file ->
-                            expandedCards[file.path] = false
+                            expandedCards[file.path] = targetState
                         }
                     },
                     onSelectFile = { path ->
@@ -1337,9 +1336,9 @@ private fun ColorCodedDiffBody(file: ParsedFile, fileDiffLinesMap: Map<String, L
 private fun ScrollableFileTree(
     fileTree: List<FileTreeNode>,
     expandedFolders: Map<String, Boolean>,
+    hasExpandedDiffs: Boolean,
     onToggleFolder: (String) -> Unit,
-    onExpandAllCards: () -> Unit,
-    onCollapseAllCards: () -> Unit,
+    onToggleAllCards: () -> Unit,
     onSelectFile: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -1355,19 +1354,14 @@ private fun ScrollableFileTree(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                TextButton(
-                    onClick = onExpandAllCards,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("Expand", style = MaterialTheme.typography.labelMedium)
-                }
-                TextButton(
-                    onClick = onCollapseAllCards,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("Collapse", style = MaterialTheme.typography.labelMedium)
-                }
+            OutlinedButton(
+                onClick = onToggleAllCards,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = if (hasExpandedDiffs) "Collapse All" else "Expand All",
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
         }
         Column(
