@@ -881,10 +881,7 @@ private fun AgentThoughtBubble(thoughts: String, durationText: String) {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(6.dp))
-                        ChatMarkdown(
-                            markdown = thoughts,
-                            onClick = { isExpanded = !isExpanded }
-                        )
+                        ChatMarkdown(markdown = thoughts)
                     }
                 }
             }
@@ -973,8 +970,7 @@ private fun ProgressUpdatedBubble(
                         Box(modifier = Modifier.weight(1f)) {
                             ChatMarkdown(
                                 markdown = title ?: "",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                onClick = { isExpanded = !isExpanded }
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
                         Icon(
@@ -992,8 +988,7 @@ private fun ProgressUpdatedBubble(
                             Spacer(modifier = Modifier.height(6.dp))
                             ChatMarkdown(
                                 markdown = description ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                onClick = { isExpanded = !isExpanded }
+                                style = MaterialTheme.typography.bodyMedium
                             )
                         }
                     }
@@ -1068,8 +1063,7 @@ private fun PlanStepItemRow(stepIndex: Int, step: PlanStep) {
             Box(modifier = Modifier.weight(1f)) {
                 ChatMarkdown(
                     markdown = step.title,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    onClick = if (hasDesc) { { isExpanded = !isExpanded } } else null
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
                 )
             }
             if (hasDesc) {
@@ -1091,8 +1085,7 @@ private fun PlanStepItemRow(stepIndex: Int, step: PlanStep) {
                     Box(modifier = Modifier.padding(start = 32.dp)) {
                         ChatMarkdown(
                             markdown = step.description.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
-                            onClick = { isExpanded = !isExpanded }
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
@@ -1515,23 +1508,27 @@ private fun DiffLineRow(
         ) {
             Text(
                 text = line.oldLineNumber?.toString().orEmpty(),
-                modifier = Modifier.width(32.dp).padding(end = 4.dp),
+                modifier = Modifier.width(40.dp).padding(end = 4.dp),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
-                                textAlign = TextAlign.End
+                    textAlign = TextAlign.End
                 ),
-                color = diffLineNumFg
+                color = diffLineNumFg,
+                maxLines = 1,
+                softWrap = false
             )
             Text(
                 text = line.newLineNumber?.toString().orEmpty(),
-                modifier = Modifier.width(32.dp).padding(end = 8.dp),
+                modifier = Modifier.width(40.dp).padding(end = 8.dp),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
-                                textAlign = TextAlign.End
+                    textAlign = TextAlign.End
                 ),
-                color = diffLineNumFg
+                color = diffLineNumFg,
+                maxLines = 1,
+                softWrap = false
             )
             Text(
                 text = line.content,
