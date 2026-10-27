@@ -12,7 +12,9 @@ fun ChatMarkdown(
     markdown: String,
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.onSurface,
-    style: TextStyle = MaterialTheme.typography.bodyMedium
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+    isTextSelectable: Boolean = true,
+    onClick: (() -> Unit)? = null
 ) {
     MarkdownText(
         markdown = markdown,
@@ -20,6 +22,7 @@ fun ChatMarkdown(
         style = style.copy(color = color),
         syntaxHighlightColor = Color.Transparent,
         syntaxHighlightTextColor = Color.White,
-        isTextSelectable = true
+        isTextSelectable = isTextSelectable,
+        onClick = onClick
     )
 }
