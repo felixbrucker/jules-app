@@ -9,6 +9,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -69,13 +71,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -586,18 +591,38 @@ private fun ChatWindowView(
     onApprovePlan: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     var initialScrolledSessionId by remember { mutableStateOf<String?>(null) }
 
     val latestItemId = chatElements.itemSnapshotList.items.firstOrNull()?.id
     val itemCount = chatElements.itemCount
 
+    val isAtBottom by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex <= 1
+        }
+    }
+
+    var hasUnreadNewElements by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isAtBottom) {
+        if (isAtBottom) {
+            hasUnreadNewElements = false
+        }
+    }
+
     LaunchedEffect(session.id, latestItemId, itemCount) {
         if (itemCount > 0) {
             if (initialScrolledSessionId != session.id) {
                 initialScrolledSessionId = session.id
+                hasUnreadNewElements = false
                 listState.scrollToItem(0)
-            } else {
-                listState.animateScrollToItem(0)
+            } else if (latestItemId != null) {
+                if (isAtBottom) {
+                    listState.animateScrollToItem(0)
+                } else {
+                    hasUnreadNewElements = true
+                }
             }
         }
     }
@@ -653,6 +678,47 @@ private fun ChatWindowView(
                 isSending = isSendingMessage,
                 onSendMessage = onSendMessage
             )
+        }
+
+        AnimatedVisibility(
+            visible = hasUnreadNewElements && !isAtBottom,
+            enter = slideInVertically() + fadeIn(),
+            exit = slideOutVertically() + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 10.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable {
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(0)
+                            hasUnreadNewElements = false
+                        }
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "New messages",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Scroll to bottom",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
 
         if (isInitialSyncing) {
