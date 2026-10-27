@@ -40,6 +40,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 sealed interface ChatElementUiItem {
@@ -224,7 +225,7 @@ class SessionDetailViewModel @Inject constructor(
             chatStateFlow.map { it?.agentState ?: AgentState.Idle }
                 .distinctUntilChanged()
                 .flatMapLatest { agentState ->
-                    val interval = if (agentState != AgentState.Idle) 5.seconds else 15.seconds
+                    val interval = if (agentState != AgentState.Idle) 10.seconds else 1.minutes
                     periodicTickerFlow(interval)
                 }
                 .collect {
