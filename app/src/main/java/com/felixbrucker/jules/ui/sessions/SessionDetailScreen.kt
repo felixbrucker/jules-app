@@ -670,9 +670,7 @@ private fun ChatWindowView(
                 }
             }
 
-            val latestElement = chatElements.itemSnapshotList.items
-                .filterIsInstance<ChatElementUiItem.ElementItem>()
-                .firstOrNull()
+            val latestElement = (chatElements.itemSnapshotList.items.firstOrNull() as? ChatElementUiItem.ElementItem)
                 ?.elementEntity
                 ?.element
 
