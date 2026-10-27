@@ -96,6 +96,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -168,7 +169,7 @@ fun SessionListScreen(
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
     val userError by viewModel.userError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var isSearchActive by remember { mutableStateOf(false) }
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(userError) {
         userError?.let { message ->

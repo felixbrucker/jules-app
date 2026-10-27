@@ -86,6 +86,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -226,6 +228,137 @@ fun SessionDetailScreen(
         }
     }
 }
+
+private var _differenceIcon: ImageVector? = null
+val DifferenceIcon: ImageVector
+    get() {
+        if (_differenceIcon != null) return _differenceIcon!!
+        _differenceIcon = ImageVector.Builder(
+            name = "difference",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(12.5f, 11f)
+                horizontalLineToRelative(2f)
+                verticalLineTo(9f)
+                horizontalLineToRelative(2f)
+                verticalLineTo(7f)
+                horizontalLineToRelative(-2f)
+                verticalLineTo(5f)
+                horizontalLineToRelative(-2f)
+                verticalLineTo(7f)
+                horizontalLineToRelative(-2f)
+                verticalLineTo(9f)
+                horizontalLineToRelative(2f)
+                verticalLineToRelative(2f)
+                close()
+                moveToRelative(-2f, 4f)
+                horizontalLineToRelative(6f)
+                verticalLineTo(13f)
+                horizontalLineToRelative(-6f)
+                verticalLineToRelative(2f)
+                close()
+                moveTo(8f, 19f)
+                quadTo(7.18f, 19f, 6.59f, 18.41f)
+                reflectiveQuadTo(6f, 17f)
+                verticalLineTo(3f)
+                quadTo(6f, 2.17f, 6.59f, 1.59f)
+                reflectiveQuadTo(8f, 1f)
+                horizontalLineToRelative(7f)
+                lineToRelative(6f, 6f)
+                verticalLineTo(17f)
+                quadToRelative(0f, 0.82f, -0.59f, 1.41f)
+                reflectiveQuadTo(19f, 19f)
+                horizontalLineTo(8f)
+                close()
+                moveTo(8f, 17f)
+                horizontalLineTo(19f)
+                verticalLineTo(8f)
+                lineTo(14f, 3f)
+                horizontalLineTo(8f)
+                verticalLineTo(17f)
+                close()
+                moveTo(4f, 23f)
+                quadTo(3.18f, 23f, 2.59f, 22.41f)
+                reflectiveQuadTo(2f, 21f)
+                verticalLineTo(7f)
+                horizontalLineTo(4f)
+                verticalLineTo(21f)
+                horizontalLineTo(15f)
+                verticalLineToRelative(2f)
+                horizontalLineTo(4f)
+                close()
+                moveTo(8f, 17f)
+                verticalLineTo(3f)
+                verticalLineTo(8f)
+                verticalLineToRelative(9f)
+                close()
+            }
+        }.build()
+        return _differenceIcon!!
+    }
+
+private var _chatIcon: ImageVector? = null
+val ChatIcon: ImageVector
+    get() {
+        if (_chatIcon != null) return _chatIcon!!
+        _chatIcon = ImageVector.Builder(
+            name = "chat",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(6f, 14f)
+                horizontalLineToRelative(8f)
+                verticalLineTo(12f)
+                horizontalLineTo(6f)
+                verticalLineToRelative(2f)
+                close()
+                moveTo(6f, 11f)
+                horizontalLineTo(18f)
+                verticalLineTo(9f)
+                horizontalLineTo(6f)
+                verticalLineToRelative(2f)
+                close()
+                moveTo(6f, 8f)
+                horizontalLineTo(18f)
+                verticalLineTo(6f)
+                horizontalLineTo(6f)
+                verticalLineTo(8f)
+                close()
+                moveTo(2f, 22f)
+                verticalLineTo(4f)
+                quadTo(2f, 3.17f, 2.59f, 2.59f)
+                reflectiveQuadTo(4f, 2f)
+                horizontalLineTo(20f)
+                quadToRelative(0.83f, 0f, 1.41f, 0.59f)
+                reflectiveQuadTo(22f, 4f)
+                verticalLineTo(16f)
+                quadToRelative(0f, 0.82f, -0.59f, 1.41f)
+                reflectiveQuadTo(20f, 18f)
+                horizontalLineTo(6f)
+                lineTo(2f, 22f)
+                close()
+                moveTo(5.15f, 16f)
+                horizontalLineTo(20f)
+                verticalLineTo(4f)
+                horizontalLineTo(4f)
+                verticalLineTo(17.13f)
+                lineTo(5.15f, 16f)
+                close()
+                moveTo(4f, 16f)
+                verticalLineTo(4f)
+                verticalLineTo(16f)
+                close()
+            }
+        }.build()
+        return _chatIcon!!
+    }
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -374,14 +507,13 @@ private fun SessionDetailTopBar(
                 }
 
                 if (isPhone) {
-                    OutlinedButton(
+                    IconButton(
                         onClick = onToggleViewMode,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(36.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        Text(
-                            text = if (splitRatio > 0.0f) "Diffs" else "Chat",
-                            style = MaterialTheme.typography.labelSmall
+                        Icon(
+                            imageVector = if (splitRatio > 0.0f) DifferenceIcon else ChatIcon,
+                            contentDescription = if (splitRatio > 0.0f) "Show diffs" else "Show chat"
                         )
                     }
                 }
