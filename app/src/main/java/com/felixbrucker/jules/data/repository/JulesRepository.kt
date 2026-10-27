@@ -191,6 +191,7 @@ class JulesRepository @Inject constructor(
                 ActivityFilter.CreatedAfter(instant.plusMillis(1))
             }
             var pageToken: String? = null
+            var lastSyncedActivity: Activity? = null
             do {
                 val response = julesApi.getActivities(
                     sessionId = sessionId,
@@ -203,6 +204,7 @@ class JulesRepository @Inject constructor(
                 var updatedUnidiffAt: Instant? = null
 
                 for (activity in response.activitiesList) {
+                    lastSyncedActivity = activity
                     val actTime = activity.createTime
                     val lastActTime = activityBasedState.latestActivityCreatedAt
 
@@ -373,6 +375,15 @@ class JulesRepository @Inject constructor(
 
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
+
+            val shouldTriggerSessionSync = when (lastSyncedActivity) {
+                is Activity.SessionCompleted, is Activity.SessionFailed -> true
+                is Activity.PlanGenerated -> !chatState.hasApprovedPlan
+                else -> false
+            }
+            if (shouldTriggerSessionSync) {
+                syncSession(sessionId = sessionId)
+            }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing activities for session $sessionId")
@@ -483,6 +494,10 @@ class JulesRepository @Inject constructor(
         if (toInsert.isNotEmpty()) {
             sessionDao.insertSessions(toInsert)
             val initialElements = toInsert.mapNotNull { session ->
+                val chatState = chatStateDao.getChatState(session.id)
+                    ?: ChatStateEntity(sessionId = session.id, agentState = AgentState.Thinking)
+                chatStateDao.upsertChatState(chatState.copy(agentState = AgentState.Thinking))
+
                 if (session.prompt.isNotBlank()) {
                     ChatElementEntity(
                         id = "init_prompt_${session.id}",

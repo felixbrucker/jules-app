@@ -133,7 +133,7 @@ class SessionDetailViewModel @Inject constructor(
 
                     if (beforeTime != null && afterTime != null) {
                         val gapMinutes = Duration.between(afterTime, beforeTime).abs().toMinutes()
-                        if (gapMinutes >= 15) {
+                        if (gapMinutes >= 5) {
                             val timeStr = formatRelativeOrAbsoluteTime(beforeTime)
                             ChatElementUiItem.RelativeTimeDivider(
                                 id = "time_sep_${before.id}_${after.id}",
