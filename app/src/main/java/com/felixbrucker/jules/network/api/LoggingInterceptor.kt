@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.IOException
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
@@ -63,7 +64,8 @@ class LoggingInterceptor @Inject constructor(
         val response = try {
             loggingInterceptor.intercept(chain)
         } catch (e: Exception) {
-            if (e !is CancellationException) {
+            val isCanceled = e is CancellationException || (e is IOException && e.message?.equals("Canceled", ignoreCase = true) == true)
+            if (!isCanceled) {
                 val sanitizedLog = sanitizeLog(logBuffer.toString(), currentApiKey, currentGithubToken)
                 if (sanitizedLog.isNotEmpty()) {
                     Timber.tag(TAG).e(e, sanitizedLog)
