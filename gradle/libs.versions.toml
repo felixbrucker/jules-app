@@ -24,7 +24,7 @@ paging = "3.5.3"
 ksp = "2.3.12"
 kotlin = "2.4.21"
 kaml = "0.72.0"
-composeMarkdown = "0.5.6"
+composeMarkdown = "0.7.3"
 
 [libraries]
 kaml = { group = "com.charleskorn.kaml", name = "kaml", version.ref = "kaml" }

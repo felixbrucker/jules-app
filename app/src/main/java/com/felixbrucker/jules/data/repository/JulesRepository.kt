@@ -570,6 +570,7 @@ class JulesRepository @Inject constructor(
         val pageSize = 30
 
         try {
+            // Step 1: Paginate through regular (non-archived) sessions
             do {
                 val response = julesApi.getSessions(
                     pageSize = pageSize,
@@ -581,6 +582,7 @@ class JulesRepository @Inject constructor(
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
 
+            // Step 2: Check local active session IDs not returned in sync and fetch them in parallel (max 4)
             val localActiveIds = sessionDao.getAllActiveSessionIds()
             val missingIds = localActiveIds.filter { !fetchedSessionIds.contains(it) }
 
@@ -593,6 +595,7 @@ class JulesRepository @Inject constructor(
                                 val session = julesApi.getSession(missingId)
                                 session.toEntity()
                             } catch (e: JulesApiException) {
+                                // The session was deleted remotely, remove from local cache
                                 if (e.httpStatusCode == 404) {
                                     sessionDao.deleteSession(missingId)
                                 } else {
