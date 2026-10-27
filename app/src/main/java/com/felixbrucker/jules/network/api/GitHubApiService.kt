@@ -3,6 +3,8 @@ package com.felixbrucker.jules.network.api
 import com.felixbrucker.jules.network.api.model.GitHubContentResponse
 import com.felixbrucker.jules.network.api.model.GitHubPullRequestResponse
 import com.felixbrucker.jules.network.api.model.GitHubWorkflowDispatchRequest
+import com.felixbrucker.jules.network.api.model.GitHubWorkflowDispatchResponse
+import com.felixbrucker.jules.network.api.model.GitHubWorkflowRunResponse
 import com.felixbrucker.jules.network.api.model.GitHubWorkflowsResponse
 import retrofit2.Response
 import retrofit2.http.Body
@@ -44,5 +46,12 @@ interface GitHubApiService {
         @Path("repo") repo: String,
         @Path("workflowId") workflowId: String,
         @Body request: GitHubWorkflowDispatchRequest
-    ): Response<Unit>
+    ): Response<GitHubWorkflowDispatchResponse>
+
+    @GET("repos/{owner}/{repo}/actions/runs/{runId}")
+    suspend fun getWorkflowRun(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("runId") runId: Long
+    ): GitHubWorkflowRunResponse
 }

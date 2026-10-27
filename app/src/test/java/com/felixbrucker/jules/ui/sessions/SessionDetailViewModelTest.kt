@@ -1,11 +1,13 @@
 package com.felixbrucker.jules.ui.sessions
 
 import androidx.lifecycle.SavedStateHandle
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
 import com.felixbrucker.jules.data.database.ComputedDiff
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.felixbrucker.jules.network.api.model.Repo
 import com.felixbrucker.jules.network.api.model.FileChangeType
 import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.SessionState
@@ -52,7 +54,7 @@ class SessionDetailViewModelTest {
                     createTime = Instant.now(),
                     updateTime = null,
                     url = null,
-                    repo = null,
+                    repo = Repo(host = "github", owner = "octocat", name = "Hello-World"),
                     pullRequest = null,
                     changeSet = null
                 ),
@@ -113,5 +115,59 @@ class SessionDetailViewModelTest {
 
         vm.updateFileSearchQuery("   ")
         assertEquals("   ", vm.fileSearchQuery.value)
+    }
+
+    @Test
+    fun testDispatchWorkflowSuccess() = runTest(UnconfinedTestDispatcher()) {
+        val vm = SessionDetailViewModel(repository, savedStateHandle)
+        viewModel = vm
+
+        val session = SessionEntity(
+            id = "sess-123",
+            name = "sessions/sess-123",
+            title = "Test Session",
+            prompt = "Fix bug",
+            state = SessionState.IN_PROGRESS,
+            isArchived = false,
+            createTime = Instant.now(),
+            updateTime = null,
+            url = null,
+            repo = Repo(host = "github", owner = "octocat", name = "Hello-World"),
+            pullRequest = null,
+            changeSet = null
+        )
+        val workflow = DispatchableWorkflowEntity(
+            id = "github/octocat/Hello-World_123",
+            sourceId = "github/octocat/Hello-World",
+            workflowId = 123L,
+            name = "CI",
+            inputs = emptyList()
+        )
+
+        coEvery {
+            repository.dispatchWorkflow(
+                sessionId = "sess-123",
+                owner = "octocat",
+                repo = "Hello-World",
+                workflowId = "123",
+                workflowName = "CI",
+                ref = "main",
+                inputs = emptyMap()
+            )
+        } returns 98765L
+
+        vm.dispatchWorkflow(session, workflow, "main", emptyMap())
+
+        coVerify {
+            repository.dispatchWorkflow(
+                sessionId = "sess-123",
+                owner = "octocat",
+                repo = "Hello-World",
+                workflowId = "123",
+                workflowName = "CI",
+                ref = "main",
+                inputs = emptyMap()
+            )
+        }
     }
 }

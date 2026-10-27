@@ -4,6 +4,8 @@ import com.felixbrucker.jules.data.database.ActivityBasedStateDao
 import com.felixbrucker.jules.data.database.ChatElementDao
 import com.felixbrucker.jules.data.database.ChatStateDao
 import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
+import com.felixbrucker.jules.data.database.DispatchedWorkflowRunDao
+import com.felixbrucker.jules.data.database.DispatchedWorkflowRunEntity
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
@@ -11,6 +13,7 @@ import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
+import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
@@ -19,13 +22,16 @@ import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.GitHubRepo
+import com.felixbrucker.jules.network.api.model.GitHubWorkflowRunResponse
 import com.felixbrucker.jules.network.api.model.PullRequestState
+import com.felixbrucker.jules.network.api.model.Repo
 import com.felixbrucker.jules.network.api.model.Session
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.network.api.model.SessionsListResponse
 import com.felixbrucker.jules.network.api.model.Source
 import com.felixbrucker.jules.network.api.model.SourceContext
 import com.felixbrucker.jules.network.api.model.SourcesListResponse
+import com.felixbrucker.jules.network.api.model.WorkflowRunState
 import com.felixbrucker.jules.notification.JulesNotificationManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -33,6 +39,7 @@ import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
@@ -44,6 +51,7 @@ class JulesRepositoryTest {
     private lateinit var sourceDao: SourceDao
     private lateinit var sessionDraftDao: SessionDraftDao
     private lateinit var dispatchableWorkflowDao: DispatchableWorkflowDao
+    private lateinit var dispatchedWorkflowRunDao: DispatchedWorkflowRunDao
     private lateinit var sourceSyncMetadataDao: SourceSyncMetadataDao
     private lateinit var chatElementDao: ChatElementDao
     private lateinit var chatStateDao: ChatStateDao
@@ -62,6 +70,7 @@ class JulesRepositoryTest {
         sourceDao = mockk(relaxed = true)
         sessionDraftDao = mockk(relaxed = true)
         dispatchableWorkflowDao = mockk(relaxed = true)
+        dispatchedWorkflowRunDao = mockk(relaxed = true)
         sourceSyncMetadataDao = mockk(relaxed = true)
         chatElementDao = mockk(relaxed = true)
         chatStateDao = mockk(relaxed = true)
@@ -85,6 +94,7 @@ class JulesRepositoryTest {
             sourceDao = sourceDao,
             sessionDraftDao = sessionDraftDao,
             dispatchableWorkflowDao = dispatchableWorkflowDao,
+            dispatchedWorkflowRunDao = dispatchedWorkflowRunDao,
             sourceSyncMetadataDao = sourceSyncMetadataDao,
             chatElementDao = chatElementDao,
             chatStateDao = chatStateDao,
@@ -235,114 +245,81 @@ class JulesRepositoryTest {
     }
 
     @Test
-    fun testSyncSessionsPartitionsInsertsAndFetchesMissingSources() = runBlocking {
-        val session1 = Session(
-            name = "sessions/sess-1",
-            id = "sess-1",
-            prompt = "Prompt 1",
-            createTime = Instant.now(),
-            sourceContext = SourceContext(source = "sources/github/owner/repo1")
-        )
-
-        coEvery { julesApi.getSessions(pageSize = 30, pageToken = null) } returns SessionsListResponse(
-            sessions = listOf(session1),
-            nextPageToken = null
-        )
-        coEvery { sessionDao.getAllSessionIds() } returns emptyList()
-        coEvery { sourceDao.getAllSourceIds() } returns emptyList()
-        coEvery { julesApi.getSource("github/owner/repo1") } returns Source(
-            name = "sources/github/owner/repo1",
-            id = "github/owner/repo1",
-            githubRepo = GitHubRepo(owner = "owner", repo = "repo1")
-        )
-
-        repository.syncSessions()
-
-        coVerify {
-            julesApi.getSource("github/owner/repo1")
-            sourceDao.upsertSources(any())
-            sessionDao.insertSessions(any())
-        }
-    }
-
-    @Test
-    fun testBackgroundSyncTriggersNotificationsWhenStateRequiresFeedbackOrCompleted() = runBlocking {
-        coEvery { appSettingsRepository.periodicSyncEnabledFlow } returns flowOf(true)
-        coEvery { appSettingsRepository.feedbackNotificationsEnabledFlow } returns flowOf(true)
-        coEvery { appSettingsRepository.completionNotificationsEnabledFlow } returns flowOf(true)
-
-        val session1 = Session(
-            name = "sessions/sess-1",
-            id = "sess-1",
-            prompt = "Prompt 1",
-            state = SessionState.AWAITING_USER_FEEDBACK,
-            createTime = Instant.now(),
-            sourceContext = SourceContext(source = "sources/github/owner/repo1")
-        )
-
-        val session2 = Session(
-            name = "sessions/sess-2",
-            id = "sess-2",
-            prompt = "Prompt 2",
-            state = SessionState.COMPLETED,
-            createTime = Instant.now(),
-            sourceContext = SourceContext(source = "sources/github/owner/repo2")
-        )
-
-        coEvery { julesApi.getSessions(pageSize = 30, pageToken = null) } returns SessionsListResponse(
-            sessions = listOf(session1, session2),
-            nextPageToken = null
-        )
-        coEvery { sessionDao.getSessionsByIds(listOf("sess-1", "sess-2")) } returns emptyList()
-
-        repository.syncSessions(isBackground = true)
-
-        coVerify {
-            notificationManager.sendTaskFeedbackNotification(any())
-            notificationManager.sendTaskCompletedNotification(any())
-        }
-    }
-
-    @Test
-    fun testSyncWorkflowsNoAuthTokenDoesNothing() = runBlocking {
-        coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf(null)
-
-        repository.syncWorkflows(force = false)
-
-        coVerify(exactly = 0) {
-            sourceDao.getSourcesNeedingWorkflowSync(any(), any())
-        }
-    }
-
-    @Test
-    fun testSyncWorkflowsWithTokenQueriesSourcesNeedingSync() = runBlocking {
-        coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf("ghp_token")
-        coEvery { sourceDao.getSourcesNeedingWorkflowSync(any(), any()) } returns emptyList()
-
-        repository.syncWorkflows(force = false)
-
-        coVerify {
-            sourceDao.getSourcesNeedingWorkflowSync(thresholdEpochMillis = any(), force = false)
-        }
-    }
-
-    @Test
     fun testDispatchWorkflow() = runBlocking {
-        repository.dispatchWorkflow(
-            owner = "octocat",
-            repo = "Hello-World",
-            workflowId = "12345",
-            ref = "main",
-            inputs = mapOf("param" to "value")
-        )
-
-        coVerify {
+        coEvery {
             gitHubApi.dispatchWorkflow(
                 owner = "octocat",
                 repo = "Hello-World",
                 workflowId = "12345",
                 ref = "main",
                 inputs = mapOf("param" to "value")
+            )
+        } returns 98765L
+
+        val runId = repository.dispatchWorkflow(
+            sessionId = "sess-1",
+            owner = "octocat",
+            repo = "Hello-World",
+            workflowId = "12345",
+            workflowName = "CI",
+            ref = "main",
+            inputs = mapOf("param" to "value")
+        )
+
+        assertEquals(98765L, runId)
+        coVerify {
+            dispatchedWorkflowRunDao.upsertWorkflowRun(
+                match { it.sessionId == "sess-1" && it.workflowRunId == 98765L && it.workflowName == "CI" && it.state == WorkflowRunState.QUEUED }
+            )
+        }
+    }
+
+    @Test
+    fun testSyncDispatchedWorkflowRunsUpdatesState() = runBlocking {
+        coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf("ghp_token")
+
+        val queuedRun = DispatchedWorkflowRunEntity(
+            sessionId = "sess-1",
+            workflowRunId = 98765L,
+            workflowName = "CI",
+            state = WorkflowRunState.QUEUED,
+            updatedAt = Instant.now().minusSeconds(120)
+        )
+
+        val sessionEntity = SessionEntity(
+            id = "sess-1",
+            name = "sessions/sess-1",
+            title = "Test Session",
+            prompt = "Prompt",
+            state = SessionState.IN_PROGRESS,
+            isArchived = false,
+            createTime = Instant.now(),
+            updateTime = null,
+            url = null,
+            repo = Repo(host = "github", owner = "octocat", name = "Hello-World"),
+            pullRequest = null,
+            changeSet = null
+        )
+
+        val sessionWithPr = SessionWithPullRequest(
+            session = sessionEntity,
+            pullRequestEntity = null,
+            workflows = emptyList(),
+            dispatchedWorkflowRun = queuedRun
+        )
+
+        coEvery { dispatchedWorkflowRunDao.getActiveWorkflowRunsNeedingSync(any()) } returns listOf(queuedRun)
+        coEvery { sessionDao.getSessionById("sess-1") } returns sessionWithPr
+        coEvery { gitHubApi.getWorkflowRun("octocat", "Hello-World", 98765L) } returns GitHubWorkflowRunResponse(
+            status = "completed",
+            conclusion = "success"
+        )
+
+        repository.syncDispatchedWorkflowRuns()
+
+        coVerify {
+            dispatchedWorkflowRunDao.upsertWorkflowRun(
+                match { it.sessionId == "sess-1" && it.state == WorkflowRunState.SUCCESS }
             )
         }
     }

@@ -123,6 +123,7 @@ import com.felixbrucker.jules.ui.components.ChatMarkdown
 import com.felixbrucker.jules.ui.components.DiffBadges
 import com.felixbrucker.jules.ui.components.PullRequestChip
 import com.felixbrucker.jules.ui.components.SessionStateBadge
+import com.felixbrucker.jules.ui.components.WorkflowCiButton
 import com.felixbrucker.jules.ui.icon.ChatIcon
 import com.felixbrucker.jules.ui.icon.DifferenceIcon
 
@@ -365,12 +366,16 @@ private fun SessionDetailTopBar(
                         PullRequestChip(
                             pr = pr,
                             pullRequestState = sessionWithPr.pullRequestState,
-                            workflows = sessionWithPr.workflows,
-                            onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
-                            onWorkflowSelected = onSelectWorkflow
+                            onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
                         )
                     }
                 }
+
+                WorkflowCiButton(
+                    dispatchedWorkflowRun = sessionWithPr.dispatchedWorkflowRun,
+                    workflows = sessionWithPr.workflows,
+                    onWorkflowSelected = onSelectWorkflow
+                )
 
                 if (totalAdditions > 0 || totalDeletions > 0) {
                     Box(

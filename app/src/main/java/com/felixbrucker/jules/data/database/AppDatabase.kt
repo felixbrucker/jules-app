@@ -20,9 +20,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SourceSyncMetadataEntity::class,
         ChatElementEntity::class,
         ChatStateEntity::class,
-        ActivityBasedStateEntity::class
+        ActivityBasedStateEntity::class,
+        DispatchedWorkflowRunEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -35,7 +36,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 9, to = 10),
         AutoMigration(from = 10, to = 11, spec = AppDatabase.Migration10To11Spec::class),
         AutoMigration(from = 11, to = 12),
-        AutoMigration(from = 12, to = 13)
+        AutoMigration(from = 12, to = 13),
+        AutoMigration(from = 13, to = 14)
     ]
 )
 @TypeConverters(Converters::class)
@@ -50,6 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chatElementDao(): ChatElementDao
     abstract fun chatStateDao(): ChatStateDao
     abstract fun activityBasedStateDao(): ActivityBasedStateDao
+    abstract fun dispatchedWorkflowRunDao(): DispatchedWorkflowRunDao
 
     @DeleteTable(tableName = "activities")
     class Migration10To11Spec : AutoMigrationSpec

@@ -14,6 +14,8 @@ import com.felixbrucker.jules.data.database.ChatStateEntity
 import com.felixbrucker.jules.data.database.ComputedDiff
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
+import com.felixbrucker.jules.data.database.DispatchedWorkflowRunDao
+import com.felixbrucker.jules.data.database.DispatchedWorkflowRunEntity
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
 import com.felixbrucker.jules.data.database.SessionDao
@@ -38,6 +40,7 @@ import com.felixbrucker.jules.network.api.model.GitHubRepoContext
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.network.api.model.SourceContext
+import com.felixbrucker.jules.network.api.model.WorkflowRunState
 import com.felixbrucker.jules.network.api.util.UnidiffParser
 import com.felixbrucker.jules.network.api.util.WorkflowDispatchParser
 import com.felixbrucker.jules.notification.JulesNotificationManager
@@ -73,6 +76,7 @@ class JulesRepository @Inject constructor(
     private val sourceDao: SourceDao,
     private val sessionDraftDao: SessionDraftDao,
     private val dispatchableWorkflowDao: DispatchableWorkflowDao,
+    private val dispatchedWorkflowRunDao: DispatchedWorkflowRunDao,
     private val sourceSyncMetadataDao: SourceSyncMetadataDao,
     private val chatElementDao: ChatElementDao,
     private val chatStateDao: ChatStateDao,
@@ -172,6 +176,7 @@ class JulesRepository @Inject constructor(
         syncArchivedSessions(isBackground = isBackground, force = force)
         syncPullRequests()
         syncWorkflows(force = force)
+        syncDispatchedWorkflowRuns()
     }
 
     suspend fun syncActivities(sessionId: String, pageSize: Int = 30) = withContext(Dispatchers.IO) {
@@ -420,6 +425,7 @@ class JulesRepository @Inject constructor(
             }
 
             syncPullRequests()
+            syncDispatchedWorkflowRuns()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing session $sessionId")
@@ -675,6 +681,51 @@ class JulesRepository @Inject constructor(
         }
     }
 
+    suspend fun syncDispatchedWorkflowRuns() = withContext(Dispatchers.IO) {
+        try {
+            val githubToken = appSettingsRepository.githubAuthTokenFlow.first()
+            if (githubToken.isNullOrBlank()) {
+                return@withContext
+            }
+            val cutoffEpochMillis = Instant.now().minus(Duration.ofMinutes(1)).toEpochMilli()
+            val runsToSync = dispatchedWorkflowRunDao.getActiveWorkflowRunsNeedingSync(cutoffEpochMillis)
+            if (runsToSync.isEmpty()) return@withContext
+
+            val semaphore = Semaphore(4)
+            coroutineScope {
+                runsToSync.map { run ->
+                    async {
+                        semaphore.withPermit {
+                            try {
+                                val sessionWithPr = sessionDao.getSessionById(run.sessionId) ?: return@withPermit
+                                val repo = sessionWithPr.session.repo ?: return@withPermit
+                                val runResponse = gitHubApi.getWorkflowRun(
+                                    owner = repo.owner,
+                                    repo = repo.name,
+                                    runId = run.workflowRunId
+                                )
+                                val newState = WorkflowRunState.from(runResponse.status, runResponse.conclusion)
+                                dispatchedWorkflowRunDao.upsertWorkflowRun(
+                                    run.copy(
+                                        state = newState,
+                                        updatedAt = Instant.now()
+                                    )
+                                )
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                Timber.tag(TAG).e(e, "Failed to sync workflow run state for run ${run.workflowRunId}")
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.tag(TAG).e(e, "Error syncing dispatched workflow runs")
+            throw e
+        }
+    }
+
     suspend fun syncArchivedSessions(isBackground: Boolean = false, force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
             if (!force) {
@@ -833,19 +884,32 @@ class JulesRepository @Inject constructor(
     }
 
     suspend fun dispatchWorkflow(
+        sessionId: String,
         owner: String,
         repo: String,
         workflowId: String,
+        workflowName: String,
         ref: String,
         inputs: Map<String, String>? = null
-    ) = withContext(Dispatchers.IO) {
-        gitHubApi.dispatchWorkflow(
+    ): Long = withContext(Dispatchers.IO) {
+        val runId = gitHubApi.dispatchWorkflow(
             owner = owner,
             repo = repo,
             workflowId = workflowId,
             ref = ref,
             inputs = inputs
         )
+        dispatchedWorkflowRunDao.upsertWorkflowRun(
+            DispatchedWorkflowRunEntity(
+                sessionId = sessionId,
+                workflowRunId = runId,
+                workflowName = workflowName,
+                state = WorkflowRunState.QUEUED,
+                updatedAt = Instant.EPOCH
+            )
+        )
+        syncDispatchedWorkflowRuns()
+        runId
     }
 
     private fun computeChangedFiles(unidiff1: String?, unidiff2: String): List<String> {

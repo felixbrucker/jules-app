@@ -331,13 +331,16 @@ class SessionListViewModel @Inject constructor(
             _dispatchDialogState.value = _dispatchDialogState.value?.copy(isDispatching = true, errorMessage = null)
             try {
                 julesRepository.dispatchWorkflow(
+                    sessionId = session.id,
                     owner = repo.owner,
                     repo = repo.name,
                     workflowId = workflow.workflowId.toString(),
+                    workflowName = workflow.name,
                     ref = branch,
                     inputs = inputs
                 )
                 dismissDispatchDialog()
+                _userError.value = "Workflow '${workflow.name}' dispatched successfully"
             } catch (e: Exception) {
                 _dispatchDialogState.value = _dispatchDialogState.value?.copy(
                     isDispatching = false,

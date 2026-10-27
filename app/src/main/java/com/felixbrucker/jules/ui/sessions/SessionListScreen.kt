@@ -112,6 +112,7 @@ import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.ui.components.DiffBadges
 import com.felixbrucker.jules.ui.components.PullRequestChip
 import com.felixbrucker.jules.ui.components.SessionStateBadge
+import com.felixbrucker.jules.ui.components.WorkflowCiButton
 import kotlin.math.roundToInt
 
 @Composable
@@ -773,9 +774,7 @@ private fun SessionCard(
             )
             Spacer(modifier = Modifier.height(12.dp))
             SessionCardFooter(
-                session = session,
-                pullRequestState = sessionWithPullRequest.pullRequestState,
-                workflows = sessionWithPullRequest.workflows,
+                sessionWithPullRequest = sessionWithPullRequest,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
                 onSelectWorkflow = { wf -> onSelectWorkflow(session, wf) }
@@ -957,13 +956,14 @@ private fun SessionActionDropdownMenu(
 
 @Composable
 private fun SessionCardFooter(
-    session: SessionEntity,
-    pullRequestState: PullRequestState?,
-    workflows: List<DispatchableWorkflowEntity>,
+    sessionWithPullRequest: SessionWithPullRequest,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
 ) {
+    val session = sessionWithPullRequest.session
+    val pullRequestState = sessionWithPullRequest.pullRequestState
+    val workflows = sessionWithPullRequest.workflows
     val context = LocalContext.current
     val timeToFormat = session.updateTime ?: session.createTime
     val relativeTime = DateUtils.getRelativeTimeSpanString(
@@ -1027,12 +1027,16 @@ private fun SessionCardFooter(
                     PullRequestChip(
                         pr = pr,
                         pullRequestState = pullRequestState,
-                        workflows = workflows,
-                        onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
-                        onWorkflowSelected = onSelectWorkflow
+                        onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
                     )
                 }
             }
+
+            WorkflowCiButton(
+                dispatchedWorkflowRun = sessionWithPullRequest.dispatchedWorkflowRun,
+                workflows = workflows,
+                onWorkflowSelected = onSelectWorkflow
+            )
         }
     }
 }
