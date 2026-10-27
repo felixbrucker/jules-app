@@ -972,6 +972,7 @@ private fun ProgressUpdatedBubble(
                             ChatMarkdown(
                                 markdown = title ?: "",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                isTextSelectable = false,
                                 onClick = { isExpanded = !isExpanded }
                             )
                         }
@@ -1066,6 +1067,7 @@ private fun PlanStepItemRow(stepIndex: Int, step: PlanStep) {
                 ChatMarkdown(
                     markdown = step.title,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    isTextSelectable = false,
                     onClick = if (hasDesc) { { isExpanded = !isExpanded } } else null
                 )
             }

@@ -22,14 +22,7 @@ fun ChatMarkdown(
         style = style.copy(color = color),
         syntaxHighlightColor = Color.Transparent,
         syntaxHighlightTextColor = Color.White,
-        isTextSelectable = isTextSelectable,
-        disableLinkMovementMethod = onClick != null,
-        onClick = onClick,
-        afterSetMarkdown = { textView ->
-            if (onClick != null) {
-                textView.movementMethod = null
-                textView.setOnClickListener { onClick.invoke() }
-            }
-        }
+        isTextSelectable = if (onClick != null) false else isTextSelectable,
+        onClick = onClick
     )
 }
