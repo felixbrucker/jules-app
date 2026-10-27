@@ -272,6 +272,7 @@ class JulesRepository @Inject constructor(
                             )
                         }
                         is Activity.PlanApproved -> {
+                            chatState = chatState.copy(hasApprovedPlan = true)
                             newChatElements.add(
                                 ChatElementEntity(
                                     id = activity.id,
@@ -315,8 +316,12 @@ class JulesRepository @Inject constructor(
                         }
                     }
 
-                    if (activity is Activity.SessionCompleted || activity is Activity.SessionFailed || activity is Activity.PlanGenerated) {
+                    if (activity is Activity.SessionCompleted || activity is Activity.SessionFailed) {
                         chatState = chatState.copy(agentState = AgentState.Idle)
+                    } else if (activity is Activity.PlanGenerated) {
+                        if (!chatState.hasApprovedPlan) {
+                            chatState = chatState.copy(agentState = AgentState.Idle)
+                        }
                     } else if (activity !is Activity.UserMessaged) {
                         chatState = chatState.copy(agentState = AgentState.Working)
                     }
@@ -422,6 +427,9 @@ class JulesRepository @Inject constructor(
 
     suspend fun approvePlan(sessionId: String) = withContext(Dispatchers.IO) {
         julesApi.approvePlan(sessionId = sessionId)
+        val chatState = chatStateDao.getChatState(sessionId)
+            ?: ChatStateEntity(sessionId = sessionId, agentState = AgentState.Idle)
+        chatStateDao.upsertChatState(chatState.copy(hasApprovedPlan = true))
         syncActivities(sessionId = sessionId)
         syncSession(sessionId = sessionId)
     }
