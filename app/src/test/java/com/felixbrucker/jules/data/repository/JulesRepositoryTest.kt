@@ -152,14 +152,14 @@ class JulesRepositoryTest {
             nextPageToken = null
         )
         coEvery { sessionDao.getAllActiveSessionIds() } returns emptyList()
-        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false) } returns emptyList()
+        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any()) } returns emptyList()
 
         repository.sync()
 
         coVerifyOrder {
             julesApi.getSources(pageSize = 100, pageToken = null)
             julesApi.getSessions(pageSize = 30, pageToken = null)
-            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false)
+            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any())
         }
     }
 
@@ -187,15 +187,15 @@ class JulesRepositoryTest {
             changeSet = null
         )
 
-        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false) } returns listOf(activeSession)
+        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any()) } returns listOf(activeSession)
         coEvery { gitHubApi.getPullRequestState(prUrl) } returns PullRequestState.MERGED
 
         repository.syncPullRequests()
 
         coVerify {
-            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false)
+            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any())
             gitHubApi.getPullRequestState(prUrl)
-            pullRequestDao.upsertPullRequests(listOf(PullRequestEntity(sessionId = "sess-1", url = prUrl, state = PullRequestState.MERGED)))
+            pullRequestDao.upsertPullRequests(match { it.first().sessionId == "sess-1" && it.first().url == prUrl && it.first().state == PullRequestState.MERGED })
         }
     }
 

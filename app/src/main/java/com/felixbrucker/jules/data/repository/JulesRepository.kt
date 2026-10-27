@@ -188,7 +188,7 @@ class JulesRepository @Inject constructor(
                 ?: ActivityBasedStateEntity(sessionId = sessionId)
 
             val initialFilter = activityBasedState.latestActivityCreatedAt?.let { instant ->
-                ActivityFilter.CreatedAfter(instant.plusMillis(100))
+                ActivityFilter.CreatedAfter(instant.plusMillis(1))
             }
             var pageToken: String? = null
             do {
@@ -500,6 +500,16 @@ class JulesRepository @Inject constructor(
             sessionDao.updateSessions(toUpdate)
         }
 
+        for (newSession in entities) {
+            if (newSession.state == SessionState.COMPLETED || newSession.state == SessionState.FAILED) {
+                val chatState = chatStateDao.getChatState(newSession.id)
+                    ?: ChatStateEntity(sessionId = newSession.id)
+                if (chatState.agentState != AgentState.Idle) {
+                    chatStateDao.upsertChatState(chatState.copy(agentState = AgentState.Idle))
+                }
+            }
+        }
+
         if (isBackground) {
             val feedbackNotificationsEnabled = appSettingsRepository.feedbackNotificationsEnabledFlow.first()
             val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow.first()
@@ -600,7 +610,11 @@ class JulesRepository @Inject constructor(
         try {
             val githubToken = appSettingsRepository.githubAuthTokenFlow.first()
             val includePrivate = !githubToken.isNullOrBlank()
-            val activeSessions = sessionDao.getActiveSessionsWithPullRequests(includePrivate = includePrivate)
+            val cutoffEpochMillis = Instant.now().minus(Duration.ofMinutes(1)).toEpochMilli()
+            val activeSessions = sessionDao.getActiveSessionsWithPullRequests(
+                includePrivate = includePrivate,
+                cutoffEpochMillis = cutoffEpochMillis
+            )
 
             val sessionPrTuples = activeSessions.mapNotNull { session ->
                 val prUrl = session.pullRequest?.url ?: return@mapNotNull null
@@ -615,7 +629,12 @@ class JulesRepository @Inject constructor(
                     semaphore.withPermit {
                         try {
                             val state = gitHubApi.getPullRequestState(prUrl)
-                            PullRequestEntity(sessionId = sessionId, url = prUrl, state = state)
+                            PullRequestEntity(
+                                sessionId = sessionId,
+                                url = prUrl,
+                                state = state,
+                                updatedAt = Instant.now()
+                            )
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e
                             Timber.tag(TAG).e(e, "Failed to sync pull request state for $prUrl")
