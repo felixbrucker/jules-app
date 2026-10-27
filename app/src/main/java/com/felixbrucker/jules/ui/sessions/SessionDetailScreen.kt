@@ -74,6 +74,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,6 +88,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -453,6 +455,7 @@ private fun SessionDetailSplitContent(
     onApprovePlan: () -> Unit
 ) {
     var containerWidthPx by remember { mutableStateOf(0) }
+    var chatInputText by rememberSaveable(session.id) { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -466,10 +469,15 @@ private fun SessionDetailSplitContent(
                     chatElements = chatElements,
                     chatState = chatState,
                     activityBasedState = activityBasedState,
+                    chatInputText = chatInputText,
+                    onChatInputTextChange = { chatInputText = it },
                     isInitialSyncing = isInitialSyncing,
                     isSendingMessage = isSendingMessage,
                     isApprovingPlan = isApprovingPlan,
-                    onSendMessage = onSendMessage,
+                    onSendMessage = {
+                        onSendMessage(it)
+                        chatInputText = ""
+                    },
                     onApprovePlan = onApprovePlan
                 )
             } else {
@@ -489,10 +497,15 @@ private fun SessionDetailSplitContent(
                             chatElements = chatElements,
                             chatState = chatState,
                             activityBasedState = activityBasedState,
+                            chatInputText = chatInputText,
+                            onChatInputTextChange = { chatInputText = it },
                             isInitialSyncing = isInitialSyncing,
                             isSendingMessage = isSendingMessage,
                             isApprovingPlan = isApprovingPlan,
-                            onSendMessage = onSendMessage,
+                            onSendMessage = {
+                                onSendMessage(it)
+                                chatInputText = ""
+                            },
                             onApprovePlan = onApprovePlan
                         )
                     }
@@ -564,6 +577,8 @@ private fun ChatWindowView(
     chatElements: LazyPagingItems<ChatElementUiItem>,
     chatState: ChatStateEntity?,
     activityBasedState: ActivityBasedStateEntity?,
+    chatInputText: String,
+    onChatInputTextChange: (String) -> Unit,
     isInitialSyncing: Boolean,
     isSendingMessage: Boolean,
     isApprovingPlan: Boolean,
@@ -633,6 +648,8 @@ private fun ChatWindowView(
             }
 
             ChatInputBottomBar(
+                textInput = chatInputText,
+                onTextInputChange = onChatInputTextChange,
                 isSending = isSendingMessage,
                 onSendMessage = onSendMessage
             )
@@ -706,30 +723,32 @@ private fun ChatElementBubbleContainer(
     session: SessionEntity,
     activityBasedState: ActivityBasedStateEntity?
 ) {
-    when (element) {
-        is ChatElement.UserMessageElement -> UserMessageBubble(message = element.message)
-        is ChatElement.AgentMessageBlockElement -> {
-            ProgressUpdatedBubble(
-                title = element.titleMarkdown,
-                description = element.detailMarkdown
+    SelectionContainer {
+        when (element) {
+            is ChatElement.UserMessageElement -> UserMessageBubble(message = element.message)
+            is ChatElement.AgentMessageBlockElement -> {
+                ProgressUpdatedBubble(
+                    title = element.titleMarkdown,
+                    description = element.detailMarkdown
+                )
+            }
+            is ChatElement.AgentThoughtElement -> {
+                AgentThoughtBubble(
+                    thoughts = element.thoughts,
+                    durationText = "${element.thoughtDuration.inWholeSeconds}s"
+                )
+            }
+            is ChatElement.ChangedFilesElement -> {
+                ChangedFilesBubble(changedFiles = element.changedFiles)
+            }
+            is ChatElement.PlanElement -> PlanGeneratedCard(planSteps = element.steps)
+            is ChatElement.PlanApprovedElement -> PlanApprovedPill()
+            is ChatElement.SessionFailedElement -> SessionFailedBox(reason = element.reason)
+            is ChatElement.SessionCompletedElement -> SessionCompletedSummaryBox(
+                session = session,
+                element = element
             )
         }
-        is ChatElement.AgentThoughtElement -> {
-            AgentThoughtBubble(
-                thoughts = element.thoughts,
-                durationText = "${element.thoughtDuration.inWholeSeconds}s"
-            )
-        }
-        is ChatElement.ChangedFilesElement -> {
-            ChangedFilesBubble(changedFiles = element.changedFiles)
-        }
-        is ChatElement.PlanElement -> PlanGeneratedCard(planSteps = element.steps)
-        is ChatElement.PlanApprovedElement -> PlanApprovedPill()
-        is ChatElement.SessionFailedElement -> SessionFailedBox(reason = element.reason)
-        is ChatElement.SessionCompletedElement -> SessionCompletedSummaryBox(
-            session = session,
-            element = element
-        )
     }
 }
 
@@ -1091,7 +1110,7 @@ private fun SessionCompletedSummaryBox(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_github_pr_open),
+                            painter = painterResource(id = R.drawable.ic_github_branch),
                             contentDescription = "Branch",
                             modifier = Modifier.size(16.dp),
                             tint = Color(0xFF3FB950)
@@ -1163,11 +1182,11 @@ private fun ApprovePlanBottomBar(
 
 @Composable
 private fun ChatInputBottomBar(
+    textInput: String,
+    onTextInputChange: (String) -> Unit,
     isSending: Boolean,
     onSendMessage: (String) -> Unit
 ) {
-    var textInput by remember { mutableStateOf("") }
-
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 6.dp
@@ -1180,7 +1199,7 @@ private fun ChatInputBottomBar(
         ) {
             BasicTextField(
                 value = textInput,
-                onValueChange = { textInput = it },
+                onValueChange = onTextInputChange,
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(20.dp))
@@ -1202,7 +1221,6 @@ private fun ChatInputBottomBar(
                 onClick = {
                     if (textInput.isNotBlank() && !isSending) {
                         onSendMessage(textInput)
-                        textInput = ""
                     }
                 },
                 enabled = textInput.isNotBlank() && !isSending
@@ -1425,7 +1443,7 @@ private fun DiffLineRow(
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                                textAlign = TextAlign.End
                 ),
                 color = diffLineNumFg
             )
@@ -1435,7 +1453,7 @@ private fun DiffLineRow(
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                                textAlign = TextAlign.End
                 ),
                 color = diffLineNumFg
             )

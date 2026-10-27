@@ -1,7 +1,10 @@
 package com.felixbrucker.jules.data.database
 
+import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.PlanStep
+import com.felixbrucker.jules.ui.sessions.ParsedDiffLine
 import com.squareup.moshi.JsonClass
+import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -12,9 +15,9 @@ enum class AgentState {
 }
 
 data class ComputedDiff(
-    val fileDiffLinesMap: Map<String, List<com.felixbrucker.jules.ui.sessions.ParsedDiffLine>>,
-    val parsedFilesMap: Map<String, com.felixbrucker.jules.network.api.model.ParsedFile>,
-    val updatedAt: java.time.Instant
+    val fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
+    val parsedFilesMap: Map<String, ParsedFile>,
+    val updatedAt: Instant
 )
 
 sealed class ChatElement {

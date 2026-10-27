@@ -234,8 +234,17 @@ class JulesRepository @Inject constructor(
                             )
                         }
                         is Activity.ProgressUpdated -> {
-                            val title = activity.title
-                            val desc = activity.description
+                            var title = activity.title
+                            var desc = activity.description
+
+                            if (!title.isNullOrBlank() && !desc.isNullOrBlank()) {
+                                val cleanTitle = title.trimEnd('.', '…').trim()
+                                if (cleanTitle.isNotEmpty() && desc.startsWith(cleanTitle)) {
+                                    title = desc
+                                    desc = null
+                                }
+                            }
+
                             val element = when {
                                 !title.isNullOrBlank() -> ChatElement.AgentMessageBlockElement(title, desc)
                                 !desc.isNullOrBlank() -> ChatElement.AgentMessageBlockElement("Progress Update", desc)
