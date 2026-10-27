@@ -670,7 +670,15 @@ private fun ChatWindowView(
                 }
             }
 
-            if (session.state == SessionState.AWAITING_PLAN_APPROVAL) {
+            val latestElement = chatElements.itemSnapshotList.items
+                .filterIsInstance<ChatElementUiItem.ElementItem>()
+                .firstOrNull()
+                ?.elementEntity
+                ?.element
+
+            val showApprovePlan = latestElement is ChatElement.PlanElement && chatState?.hasApprovedPlan != true
+
+            if (showApprovePlan) {
                 ApprovePlanBottomBar(
                     isApprovingPlan = isApprovingPlan,
                     onApprovePlan = onApprovePlan
