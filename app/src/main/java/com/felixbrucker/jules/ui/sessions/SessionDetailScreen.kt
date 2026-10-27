@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -1508,27 +1509,23 @@ private fun DiffLineRow(
         ) {
             Text(
                 text = line.oldLineNumber?.toString().orEmpty(),
-                modifier = Modifier.width(40.dp).padding(end = 4.dp),
+                modifier = Modifier.widthIn(min = 40.dp).padding(end = 4.dp),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
                     textAlign = TextAlign.End
                 ),
-                color = diffLineNumFg,
-                maxLines = 1,
-                softWrap = false
+                color = diffLineNumFg
             )
             Text(
                 text = line.newLineNumber?.toString().orEmpty(),
-                modifier = Modifier.width(40.dp).padding(end = 8.dp),
+                modifier = Modifier.widthIn(min = 40.dp).padding(end = 8.dp),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
                     textAlign = TextAlign.End
                 ),
-                color = diffLineNumFg,
-                maxLines = 1,
-                softWrap = false
+                color = diffLineNumFg
             )
             Text(
                 text = line.content,
