@@ -603,7 +603,7 @@ private fun ChatWindowView(
 
     val isAtBottom by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex <= 1
+            listState.firstVisibleItemIndex <= 3
         }
     }
 

@@ -501,7 +501,13 @@ class JulesRepository @Inject constructor(
         }
 
         for (newSession in entities) {
-            if (newSession.state == SessionState.COMPLETED || newSession.state == SessionState.FAILED) {
+            val previousSession = previousSessionsMap[newSession.id]
+            val stateChangedToCompletedOrFailed = (previousSession != null &&
+                previousSession.state != newSession.state &&
+                (newSession.state == SessionState.COMPLETED || newSession.state == SessionState.FAILED)) ||
+                (previousSession == null && (newSession.state == SessionState.COMPLETED || newSession.state == SessionState.FAILED))
+
+            if (stateChangedToCompletedOrFailed) {
                 val chatState = chatStateDao.getChatState(newSession.id)
                     ?: ChatStateEntity(sessionId = newSession.id)
                 if (chatState.agentState != AgentState.Idle) {
