@@ -971,7 +971,8 @@ private fun ProgressUpdatedBubble(
                         Box(modifier = Modifier.weight(1f)) {
                             ChatMarkdown(
                                 markdown = title ?: "",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                onClick = { isExpanded = !isExpanded }
                             )
                         }
                         Icon(
@@ -1064,7 +1065,8 @@ private fun PlanStepItemRow(stepIndex: Int, step: PlanStep) {
             Box(modifier = Modifier.weight(1f)) {
                 ChatMarkdown(
                     markdown = step.title,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    onClick = if (hasDesc) { { isExpanded = !isExpanded } } else null
                 )
             }
             if (hasDesc) {
