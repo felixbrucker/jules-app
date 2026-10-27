@@ -1,6 +1,7 @@
 package com.felixbrucker.jules.ui.sessions
 
 import android.content.Intent
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -11,6 +12,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import kotlinx.coroutines.yield
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -136,6 +141,8 @@ fun SessionDetailScreen(
     val sessionWithPr by viewModel.sessionWithPullRequestFlow.collectAsState(initial = null)
     val chatState by viewModel.chatStateFlow.collectAsState()
     val activityBasedState by viewModel.activityBasedStateFlow.collectAsState()
+    val filteredParsedFiles by viewModel.filteredParsedFilesFlow.collectAsState()
+    val fileSearchQuery by viewModel.fileSearchQuery.collectAsState()
     val fileTree by viewModel.fileTreeFlow.collectAsState()
     val fileDiffLinesMap by viewModel.fileDiffLinesMapFlow.collectAsState()
     val chatElements = viewModel.chatElementsPagingDataFlow.collectAsLazyPagingItems()
@@ -216,6 +223,8 @@ fun SessionDetailScreen(
                     chatElements = chatElements,
                     chatState = chatState,
                     activityBasedState = activityBasedState,
+                    filteredParsedFiles = filteredParsedFiles,
+                    fileSearchQuery = fileSearchQuery,
                     fileTree = fileTree,
                     fileDiffLinesMap = fileDiffLinesMap,
                     splitRatio = splitRatio,
@@ -224,6 +233,7 @@ fun SessionDetailScreen(
                     isSendingMessage = isSendingMessage,
                     isApprovingPlan = isApprovingPlan,
                     onSplitRatioChange = { viewModel.updateSplitRatio(it) },
+                    onSearchQueryChange = { viewModel.updateFileSearchQuery(it) },
                     onSendMessage = { viewModel.sendMessage(it) },
                     onApprovePlan = { viewModel.approvePlan() }
                 )
@@ -384,10 +394,16 @@ private fun SessionDetailTopBar(
                         onClick = onToggleViewMode,
                         modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            imageVector = if (splitRatio > 0.0f) DifferenceIcon else ChatIcon,
-                            contentDescription = if (splitRatio > 0.0f) "Show diffs" else "Show chat"
-                        )
+                        AnimatedContent(
+                            targetState = splitRatio > 0.0f,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "PhoneViewModeIconTransition"
+                        ) { isChatView ->
+                            Icon(
+                                imageVector = if (isChatView) DifferenceIcon else ChatIcon,
+                                contentDescription = if (isChatView) "Show diffs" else "Show chat"
+                            )
+                        }
                     }
                 }
 
@@ -453,6 +469,8 @@ private fun SessionDetailSplitContent(
     chatElements: LazyPagingItems<ChatElementUiItem>,
     chatState: ChatStateEntity?,
     activityBasedState: ActivityBasedStateEntity?,
+    filteredParsedFiles: List<ParsedFile>,
+    fileSearchQuery: String,
     fileTree: List<FileTreeNode>,
     fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     splitRatio: Float,
@@ -461,6 +479,7 @@ private fun SessionDetailSplitContent(
     isSendingMessage: Boolean,
     isApprovingPlan: Boolean,
     onSplitRatioChange: (Float) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
     onSendMessage: (String) -> Unit,
     onApprovePlan: () -> Unit
 ) {
@@ -473,30 +492,40 @@ private fun SessionDetailSplitContent(
             .onGloballyPositioned { containerWidthPx = it.size.width }
     ) {
         if (isPhone) {
-            if (splitRatio > 0.0f) {
-                ChatWindowView(
-                    session = session,
-                    chatElements = chatElements,
-                    chatState = chatState,
-                    activityBasedState = activityBasedState,
-                    chatInputText = chatInputText,
-                    onChatInputTextChange = { chatInputText = it },
-                    isInitialSyncing = isInitialSyncing,
-                    isSendingMessage = isSendingMessage,
-                    isApprovingPlan = isApprovingPlan,
-                    onSendMessage = {
-                        onSendMessage(it)
-                        chatInputText = ""
-                    },
-                    onApprovePlan = onApprovePlan
-                )
-            } else {
-                FileDiffView(
-                    activityBasedState = activityBasedState,
-                    fileTree = fileTree,
-                    fileDiffLinesMap = fileDiffLinesMap,
-                    isFullScreen = false
-                )
+            AnimatedContent(
+                targetState = splitRatio > 0.0f,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "PhoneViewModeContentTransition",
+                modifier = Modifier.fillMaxSize()
+            ) { isChatView ->
+                if (isChatView) {
+                    ChatWindowView(
+                        session = session,
+                        chatElements = chatElements,
+                        chatState = chatState,
+                        activityBasedState = activityBasedState,
+                        chatInputText = chatInputText,
+                        onChatInputTextChange = { chatInputText = it },
+                        isInitialSyncing = isInitialSyncing,
+                        isSendingMessage = isSendingMessage,
+                        isApprovingPlan = isApprovingPlan,
+                        onSendMessage = {
+                            onSendMessage(it)
+                            chatInputText = ""
+                        },
+                        onApprovePlan = onApprovePlan
+                    )
+                } else {
+                    FileDiffView(
+                        activityBasedState = activityBasedState,
+                        filteredParsedFiles = filteredParsedFiles,
+                        fileSearchQuery = fileSearchQuery,
+                        fileTree = fileTree,
+                        fileDiffLinesMap = fileDiffLinesMap,
+                        isFullScreen = false,
+                        onSearchQueryChange = onSearchQueryChange
+                    )
+                }
             }
         } else {
             Row(modifier = Modifier.fillMaxSize()) {
@@ -531,9 +560,12 @@ private fun SessionDetailSplitContent(
                     if (splitRatio < 1.0f) {
                         FileDiffView(
                             activityBasedState = activityBasedState,
+                            filteredParsedFiles = filteredParsedFiles,
+                            fileSearchQuery = fileSearchQuery,
                             fileTree = fileTree,
                             fileDiffLinesMap = fileDiffLinesMap,
-                            isFullScreen = (splitRatio == 0.0f)
+                            isFullScreen = (splitRatio == 0.0f),
+                            onSearchQueryChange = onSearchQueryChange
                         )
                     }
                 }
@@ -1327,20 +1359,84 @@ private val diffLineNumFg = Color(0xFF6E7681)
 private val diffCodeDarkBg = Color(0xFF0D1117)
 
 @Composable
+private fun FileDiffSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search files",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                singleLine = true,
+                decorationBox = { innerTextField ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) {
+                            Text(
+                                text = "Filter files...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            )
+            if (query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Clear search",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun FileDiffView(
     activityBasedState: ActivityBasedStateEntity?,
+    filteredParsedFiles: List<ParsedFile>,
+    fileSearchQuery: String,
     fileTree: List<FileTreeNode>,
     fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
-    isFullScreen: Boolean
+    isFullScreen: Boolean,
+    onSearchQueryChange: (String) -> Unit
 ) {
     val expandedCards = remember { mutableStateMapOf<String, Boolean>() }
     val expandedFolders = remember { mutableStateMapOf<String, Boolean>() }
     val listState = rememberLazyListState()
     var selectedFilePath by remember { mutableStateOf<String?>(null) }
 
-    val parsedFiles = activityBasedState?.latestDiff?.parsedFilesMap?.values?.toList() ?: emptyList()
+    val allParsedFiles = activityBasedState?.latestDiff?.parsedFilesMap?.values?.toList() ?: emptyList()
 
-    if (parsedFiles.isEmpty()) {
+    if (allParsedFiles.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -1353,49 +1449,69 @@ private fun FileDiffView(
     LaunchedEffect(selectedFilePath) {
         val path = selectedFilePath ?: return@LaunchedEffect
         var targetIndex = 0
-        for (file in parsedFiles) {
+        for (file in filteredParsedFiles) {
             if (file.path == path) break
             targetIndex += 1
             if (expandedCards[file.path] == true) {
                 targetIndex += (fileDiffLinesMap[file.path]?.size ?: 0)
             }
         }
-        kotlinx.coroutines.yield()
+        yield()
         listState.animateScrollToItem(targetIndex)
     }
 
     Row(modifier = Modifier.fillMaxSize()) {
-        SelectionContainer(modifier = Modifier.weight(1f)) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                parsedFiles.forEach { file ->
-                    val isExpanded = expandedCards[file.path] ?: false
-                    val lines = fileDiffLinesMap[file.path] ?: emptyList()
+        Column(modifier = Modifier.weight(1f)) {
+            FileDiffSearchBar(
+                query = fileSearchQuery,
+                onQueryChange = onSearchQueryChange,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            )
+            if (filteredParsedFiles.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No matching files found",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                SelectionContainer(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        filteredParsedFiles.forEach { file ->
+                            val isExpanded = expandedCards[file.path] ?: false
+                            val lines = fileDiffLinesMap[file.path] ?: emptyList()
 
-                    item(key = "header_${file.path}") {
-                        Box(modifier = Modifier.padding(top = 8.dp)) {
-                            FileDiffHeaderCard(
-                                file = file,
-                                isExpanded = isExpanded,
-                                onToggleExpand = { expandedCards[file.path] = !isExpanded }
-                            )
-                        }
-                    }
+                            item(key = "header_${file.path}") {
+                                Box(modifier = Modifier.padding(top = 8.dp)) {
+                                    FileDiffHeaderCard(
+                                        file = file,
+                                        isExpanded = isExpanded,
+                                        onToggleExpand = { expandedCards[file.path] = !isExpanded }
+                                    )
+                                }
+                            }
 
-                    if (isExpanded && lines.isNotEmpty()) {
-                        items(
-                            count = lines.size,
-                            key = { index -> "line_${file.path}_$index" }
-                        ) { index ->
-                            DiffLineRow(
-                                line = lines[index],
-                                isLast = index == lines.size - 1
-                            )
+                            if (isExpanded && lines.isNotEmpty()) {
+                                items(
+                                    count = lines.size,
+                                    key = { index -> "line_${file.path}_$index" }
+                                ) { index ->
+                                    DiffLineRow(
+                                        line = lines[index],
+                                        isLast = index == lines.size - 1
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1403,7 +1519,7 @@ private fun FileDiffView(
         }
 
         if (isFullScreen) {
-            val hasExpandedDiffs = parsedFiles.any { expandedCards[it.path] == true }
+            val hasExpandedDiffs = filteredParsedFiles.any { expandedCards[it.path] == true }
             Box(
                 modifier = Modifier
                     .width(260.dp)
@@ -1420,7 +1536,7 @@ private fun FileDiffView(
                     },
                     onToggleAllCards = {
                         val targetState = !hasExpandedDiffs
-                        parsedFiles.forEach { file ->
+                        filteredParsedFiles.forEach { file ->
                             expandedCards[file.path] = targetState
                         }
                     },

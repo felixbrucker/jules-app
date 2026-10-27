@@ -59,7 +59,7 @@ fun ChatMarkdown(
         isTextSelectable = isTextSelectable,
         onClick = onClick,
         afterSetMarkdown = { textView ->
-            textView.isFocusableInTouchMode = false
+            textView.isFocusableInTouchMode = isTextSelectable
         }
     )
 }
