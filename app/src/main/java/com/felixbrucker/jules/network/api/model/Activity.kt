@@ -27,7 +27,6 @@ enum class FileChangeType {
 @JsonClass(generateAdapter = true)
 data class PlanStep(
     @Json(name = "id") val id: String,
-    @Json(name = "index") val index: Int,
     @Json(name = "title") val title: String,
     @Json(name = "description") val description: String? = null
 )
@@ -35,13 +34,12 @@ data class PlanStep(
 @JsonClass(generateAdapter = true)
 data class Plan(
     @Json(name = "id") val id: String,
-    @Json(name = "steps") val steps: List<PlanStep>,
-    @Json(name = "createTime") val createTime: Instant
+    @Json(name = "steps") val steps: List<PlanStep>
 )
 
 @JsonClass(generateAdapter = true)
 data class GitPatch(
-    @Json(name = "unidiffPatch") val unidiffPatch: String,
+    @Json(name = "unidiffPatch") val unidiffPatch: String? = null,
     @Json(name = "baseCommitId") val baseCommitId: String? = null,
     @Json(name = "suggestedCommitMessage") val suggestedCommitMessage: String? = null
 )
@@ -51,7 +49,9 @@ data class ChangeSet(
     @Json(name = "source") val source: String,
     @Json(name = "gitPatch") val gitPatch: GitPatch
 ) {
-    val parsedFiles: List<ParsedFile> by lazy { UnidiffParser.parse(patch = gitPatch.unidiffPatch) }
+    val parsedFiles: List<ParsedFile> by lazy {
+        gitPatch.unidiffPatch?.let { UnidiffParser.parse(patch = it) } ?: emptyList()
+    }
 
     val summary: ChangeSetSummary by lazy {
         val files = parsedFiles
@@ -253,8 +253,21 @@ data class RestActivity(
     }
 }
 
+fun Activity.toRestActivity(): RestActivity = when (this) {
+    is Activity.UserMessaged -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, userMessaged = UserMessagedDto(userMessage))
+    is Activity.AgentMessaged -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, agentMessaged = AgentMessagedDto(agentMessage))
+    is Activity.PlanGenerated -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, planGenerated = PlanGeneratedDto(plan))
+    is Activity.PlanApproved -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, planApproved = PlanApprovedDto(planId))
+    is Activity.ProgressUpdated -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, artifacts = artifacts, progressUpdated = ProgressUpdatedDto(title, description))
+    is Activity.SessionCompleted -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, artifacts = artifacts, sessionCompleted = SessionCompletedDto())
+    is Activity.SessionFailed -> RestActivity(name = name, id = id, originator = originator, createTime = createTime, artifacts = artifacts, sessionFailed = SessionFailedDto(reason))
+}
+
 @JsonClass(generateAdapter = true)
 data class ActivitiesListResponse(
-    @Json(name = "activities") val activities: List<Activity>,
+    @Json(name = "activities") val activities: List<Activity>? = null,
     @Json(name = "nextPageToken") val nextPageToken: String? = null
-)
+) {
+    val activitiesList: List<Activity>
+        get() = activities.orEmpty()
+}

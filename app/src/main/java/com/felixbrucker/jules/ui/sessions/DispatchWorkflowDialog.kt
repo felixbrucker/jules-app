@@ -4,12 +4,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -157,6 +160,7 @@ private fun DialogContentBody(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BranchSelectionDropdown(
     options: List<String>,
@@ -165,16 +169,19 @@ private fun BranchSelectionDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             text = "Branch",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f).padding(end = 8.dp)
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .weight(1f, fill = false)
+                .padding(end = 8.dp)
         )
         Box {
             Surface(
@@ -237,6 +244,7 @@ private fun WorkflowInputField(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NumberInputField(
     input: WorkflowInput,
@@ -244,12 +252,17 @@ private fun NumberInputField(
     onValueChange: (String) -> Unit
 ) {
     val labelText = if (input.required) "${input.name} *" else input.name
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .weight(1f, fill = false)
+                .padding(end = 8.dp)
+        ) {
             Text(text = labelText, style = MaterialTheme.typography.labelMedium)
             if (!input.description.isNullOrBlank()) {
                 Text(
@@ -262,7 +275,7 @@ private fun NumberInputField(
         OutlinedTextField(
             value = currentValue,
             onValueChange = onValueChange,
-            modifier = Modifier.width(130.dp),
+            modifier = Modifier.widthIn(min = 120.dp, max = 160.dp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number
@@ -271,6 +284,7 @@ private fun NumberInputField(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChoiceInputField(
     input: WorkflowInput,
@@ -280,12 +294,17 @@ private fun ChoiceInputField(
     var expanded by remember { mutableStateOf(false) }
     val labelText = if (input.required) "${input.name} *" else input.name
 
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .weight(1f, fill = false)
+                .padding(end = 8.dp)
+        ) {
             Text(text = labelText, style = MaterialTheme.typography.labelMedium)
             if (!input.description.isNullOrBlank()) {
                 Text(
@@ -331,6 +350,7 @@ private fun ChoiceInputField(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BooleanInputField(
     input: WorkflowInput,
@@ -338,12 +358,17 @@ private fun BooleanInputField(
     onValueChange: (String) -> Unit
 ) {
     val isChecked = currentValue.equals("true", ignoreCase = true)
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .weight(1f, fill = false)
+                .padding(end = 8.dp)
+        ) {
             Text(text = input.name, style = MaterialTheme.typography.labelMedium)
             if (!input.description.isNullOrBlank()) {
                 Text(text = input.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -356,6 +381,7 @@ private fun BooleanInputField(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TextInputField(
     input: WorkflowInput,
@@ -363,12 +389,17 @@ private fun TextInputField(
     onValueChange: (String) -> Unit
 ) {
     val labelText = if (input.required) "${input.name} *" else input.name
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .weight(1f, fill = false)
+                .padding(end = 8.dp)
+        ) {
             Text(text = labelText, style = MaterialTheme.typography.labelMedium)
             if (!input.description.isNullOrBlank()) {
                 Text(
@@ -381,7 +412,7 @@ private fun TextInputField(
         OutlinedTextField(
             value = currentValue,
             onValueChange = onValueChange,
-            modifier = Modifier.width(160.dp),
+            modifier = Modifier.widthIn(min = 140.dp, max = 200.dp),
             singleLine = true
         )
     }

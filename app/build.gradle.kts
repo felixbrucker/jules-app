@@ -117,6 +117,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.work.runtime.ktx)
     implementation(libs.timber)
+    implementation(libs.compose.markdown)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)

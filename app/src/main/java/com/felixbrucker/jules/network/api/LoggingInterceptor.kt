@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.IOException
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
@@ -51,7 +52,11 @@ class LoggingInterceptor @Inject constructor(
             if (logBuffer.isNotEmpty()) {
                 logBuffer.append("\n")
             }
-            logBuffer.append(line)
+            if (line.length > MAX_LINE_LENGTH) {
+                logBuffer.append(line.take(MAX_LINE_LENGTH)).append("... [truncated]")
+            } else {
+                logBuffer.append(line)
+            }
         }.apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
@@ -59,7 +64,8 @@ class LoggingInterceptor @Inject constructor(
         val response = try {
             loggingInterceptor.intercept(chain)
         } catch (e: Exception) {
-            if (e !is CancellationException) {
+            val isCanceled = e is CancellationException || (e is IOException && e.message?.equals("Canceled", ignoreCase = true) == true)
+            if (!isCanceled) {
                 val sanitizedLog = sanitizeLog(logBuffer.toString(), currentApiKey, currentGithubToken)
                 if (sanitizedLog.isNotEmpty()) {
                     Timber.tag(TAG).e(e, sanitizedLog)
@@ -96,5 +102,6 @@ class LoggingInterceptor @Inject constructor(
 
     companion object {
         private const val TAG = "OkHttp"
+        private const val MAX_LINE_LENGTH = 8000
     }
 }

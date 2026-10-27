@@ -14,6 +14,9 @@ import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.SessionState
+import com.felixbrucker.jules.util.periodicTickerFlow
+import kotlinx.coroutines.Job
+import kotlin.time.Duration.Companion.minutes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -157,8 +160,27 @@ class SessionListViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    private var periodicSyncJob: Job? = null
+
     init {
         syncSessions()
+    }
+
+    fun startPeriodicSync() {
+        if (periodicSyncJob != null) return
+        periodicSyncJob = viewModelScope.launch {
+            periodicTickerFlow(5.minutes).collect {
+                try {
+                    julesRepository.sync()
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    fun stopPeriodicSync() {
+        periodicSyncJob?.cancel()
+        periodicSyncJob = null
     }
 
     fun updateSearchQuery(query: String) {

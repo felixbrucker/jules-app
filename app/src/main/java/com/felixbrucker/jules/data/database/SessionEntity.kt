@@ -105,7 +105,7 @@ fun Session.toEntity(): SessionEntity {
         changeSet = changeSet?.let {
             EmbeddedChangeSet(
                 source = it.source,
-                unidiffPatch = it.gitPatch.unidiffPatch,
+                unidiffPatch = it.gitPatch.unidiffPatch.orEmpty(),
                 totalAdditions = it.summary.totalAdditions,
                 totalDeletions = it.summary.totalDeletions
             )

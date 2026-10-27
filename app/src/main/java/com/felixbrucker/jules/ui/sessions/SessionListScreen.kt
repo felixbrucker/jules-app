@@ -5,6 +5,9 @@ import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -23,13 +26,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -93,6 +96,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -119,22 +123,30 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.felixbrucker.jules.R
+import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.EmbeddedChangeSet
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
-import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
+import com.felixbrucker.jules.ui.components.AnimatedMovingDotsIcon
+import com.felixbrucker.jules.ui.components.DiffBadges
+import com.felixbrucker.jules.ui.components.PullRequestChip
+import com.felixbrucker.jules.ui.components.SessionStateBadge
 import kotlin.math.roundToInt
-import androidx.core.net.toUri
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun SessionListScreen(
     viewModel: SessionListViewModel,
-    onSettingsClick: () -> Unit
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    onSettingsClick: () -> Unit,
+    onSessionClick: (String) -> Unit
 ) {
     val sessions by viewModel.sessions.collectAsState()
     val drafts by viewModel.drafts.collectAsState()
@@ -147,13 +159,17 @@ fun SessionListScreen(
     val dailyLimit by viewModel.dailySessionLimit.collectAsState()
 
     val showCreateDialog by viewModel.showCreateDialog.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.startPeriodicSync()
+    }
     val activeDraft by viewModel.activeDraft.collectAsState()
     val isCreatingSession by viewModel.isCreatingSession.collectAsState()
     val createSessionError by viewModel.createSessionError.collectAsState()
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
     val userError by viewModel.userError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var isSearchActive by remember { mutableStateOf(false) }
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(userError) {
         userError?.let { message ->
@@ -231,12 +247,15 @@ fun SessionListScreen(
         SessionListContent(
             modifier = Modifier.padding(innerPadding),
             viewModel = viewModel,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
             selectedChips = selectedChips,
             includeArchived = includeArchived,
             includeDrafts = includeDrafts,
             drafts = drafts,
             sessions = sessions,
-            onFabVisibilityChanged = { isFabVisible = it }
+            onFabVisibilityChanged = { isFabVisible = it },
+            onSessionClick = onSessionClick
         )
     }
 }
@@ -471,16 +490,20 @@ private fun TopBarSearchFieldContent(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SessionListContent(
     modifier: Modifier = Modifier,
     viewModel: SessionListViewModel,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
     includeDrafts: Boolean,
     drafts: List<SessionDraftWithSource>,
     sessions: List<SessionWithPullRequest>,
-    onFabVisibilityChanged: (Boolean) -> Unit
+    onFabVisibilityChanged: (Boolean) -> Unit,
+    onSessionClick: (String) -> Unit
 ) {
     val listState = rememberLazyListState()
     var filterBarHeightPx by remember { mutableFloatStateOf(0f) }
@@ -539,6 +562,8 @@ private fun SessionListContent(
             )
             SessionLazyColumn(
                 listState = listState,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
                 drafts = drafts,
                 sessions = sessions,
                 onCardClickDraft = { viewModel.openCreateDialog(it.draft) },
@@ -546,7 +571,8 @@ private fun SessionListContent(
                 onDelete = { viewModel.deleteSession(it) },
                 onArchive = { viewModel.archiveSession(it) },
                 onUnarchive = { viewModel.unarchiveSession(it) },
-                onSelectWorkflow = { session, workflow -> viewModel.openDispatchDialog(session, workflow) }
+                onSelectWorkflow = { session, workflow -> viewModel.openDispatchDialog(session, workflow) },
+                onSessionClick = onSessionClick
             )
         }
     }
@@ -665,9 +691,12 @@ private fun FilterChipLeadingIcon(chip: SessionFilterChip) {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SessionLazyColumn(
     listState: LazyListState,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     drafts: List<SessionDraftWithSource>,
     sessions: List<SessionWithPullRequest>,
     onCardClickDraft: (SessionDraftWithSource) -> Unit,
@@ -675,7 +704,8 @@ private fun SessionLazyColumn(
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit,
-    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit
+    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit,
+    onSessionClick: (String) -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -702,23 +732,30 @@ private fun SessionLazyColumn(
             SessionCard(
                 modifier = Modifier.animateItem(),
                 sessionWithPullRequest = item,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
                 onDelete = onDelete,
                 onArchive = onArchive,
                 onUnarchive = onUnarchive,
-                onSelectWorkflow = onSelectWorkflow
+                onSelectWorkflow = onSelectWorkflow,
+                onSessionClick = onSessionClick
             )
         }
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SessionCard(
     modifier: Modifier = Modifier,
     sessionWithPullRequest: SessionWithPullRequest,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit,
-    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit
+    onSelectWorkflow: (SessionEntity, DispatchableWorkflowEntity) -> Unit,
+    onSessionClick: (String) -> Unit
 ) {
     val session = sessionWithPullRequest.session
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -733,17 +770,32 @@ private fun SessionCard(
         )
     }
 
-    Card(modifier = modifier.fillMaxWidth()) {
+    val cardModifier = with(sharedTransitionScope) {
+        modifier
+            .fillMaxWidth()
+            .sharedBounds(
+                sharedContentState = rememberSharedContentState(key = "container_${session.id}"),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+            .clickable { onSessionClick(session.id) }
+    }
+
+    Card(modifier = cardModifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            SessionCardHeader(session = session)
+            SessionCardHeader(
+                session = session,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
+            )
             Spacer(modifier = Modifier.height(8.dp))
             SessionCardPromptRow(
-                prompt = session.prompt,
-                isArchived = session.isArchived,
+                session = session,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
                 onRequestDelete = { showDeleteDialog = true },
                 onArchive = { onArchive(session.id) },
                 onUnarchive = { onUnarchive(session.id) }
@@ -753,16 +805,20 @@ private fun SessionCard(
                 session = session,
                 pullRequestState = sessionWithPullRequest.pullRequestState,
                 workflows = sessionWithPullRequest.workflows,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
                 onSelectWorkflow = { wf -> onSelectWorkflow(session, wf) }
             )
         }
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SessionCardPromptRow(
-    prompt: String,
-    isArchived: Boolean,
+    session: SessionEntity,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onRequestDelete: () -> Unit,
     onArchive: () -> Unit,
     onUnarchive: () -> Unit
@@ -774,19 +830,28 @@ private fun SessionCardPromptRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = prompt,
+            text = session.prompt,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        Box(modifier = Modifier.offset(x = 12.dp)) {
+        Box(
+            modifier = with(sharedTransitionScope) {
+                Modifier
+                    .offset(x = 12.dp)
+                    .sharedElement(
+                        sharedContentState = rememberSharedContentState(key = "menu_${session.id}"),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    )
+            }
+        ) {
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Actions")
             }
             SessionActionDropdownMenu(
                 expanded = menuExpanded,
-                isArchived = isArchived,
+                isArchived = session.isArchived,
                 onDismiss = { menuExpanded = false },
                 onRequestDelete = onRequestDelete,
                 onArchive = onArchive,
@@ -796,9 +861,12 @@ private fun SessionCardPromptRow(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SessionCardHeader(
-    session: SessionEntity
+    session: SessionEntity,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -810,51 +878,39 @@ private fun SessionCardHeader(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SessionStateBadge(state = session.state)
+            SessionStateBadge(
+                state = session.state,
+                sessionId = session.id,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
+            )
             if (session.isArchived) {
                 ArchivedBadge()
             }
             Text(
                 text = session.title ?: "Untitled Session",
+                modifier = with(sharedTransitionScope) {
+                    Modifier.sharedElement(
+                        sharedContentState = rememberSharedContentState(key = "title_${session.id}"),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    )
+                },
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
         session.changeSet?.let { cs ->
-            DiffBadges(changeSet = cs)
-        }
-    }
-}
-
-@Composable
-private fun SessionStateBadge(state: SessionState) {
-    val style = getSessionStateStyle(state)
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = style.containerColor
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (style.isAnimatedDots) {
-                AnimatedMovingDotsIcon(color = style.contentColor)
-            } else style.icon?.let { iconVec ->
-                Icon(
-                    imageVector = iconVec,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = style.contentColor
-                )
+            Box(
+                modifier = with(sharedTransitionScope) {
+                    Modifier.sharedElement(
+                        sharedContentState = rememberSharedContentState(key = "changes_${session.id}"),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    )
+                }
+            ) {
+                DiffBadges(additions = cs.totalAdditions, deletions = cs.totalDeletions)
             }
-            Text(
-                text = state.label,
-                color = style.contentColor,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Medium
-            )
         }
     }
 }
@@ -886,131 +942,6 @@ private fun ArchivedBadge() {
     }
 }
 
-data class StateBadgeStyle(
-    val containerColor: Color,
-    val contentColor: Color,
-    val icon: ImageVector? = null,
-    val isAnimatedDots: Boolean = false
-)
-
-private fun getSessionStateStyle(state: SessionState): StateBadgeStyle {
-    return when (state) {
-        SessionState.IN_PROGRESS -> StateBadgeStyle(
-            containerColor = Color(0xFF1E3A8A),
-            contentColor = Color(0xFF93C5FD),
-            isAnimatedDots = true
-        )
-        SessionState.AWAITING_PLAN_APPROVAL, SessionState.AWAITING_USER_FEEDBACK -> StateBadgeStyle(
-            containerColor = Color(0xFF78350F),
-            contentColor = Color(0xFFFDE68A),
-            icon = Icons.Default.RateReview
-        )
-        SessionState.COMPLETED -> StateBadgeStyle(
-            containerColor = Color(0xFF14532D),
-            contentColor = Color(0xFF86EFAC),
-            icon = Icons.Default.CheckCircle
-        )
-        SessionState.FAILED -> StateBadgeStyle(
-            containerColor = Color(0xFF7F1D1D),
-            contentColor = Color(0xFFFCA5A5),
-            icon = Icons.Default.Error
-        )
-        SessionState.QUEUED, SessionState.PLANNING -> StateBadgeStyle(
-            containerColor = Color(0xFF1E293B),
-            contentColor = Color(0xFF94A3B8),
-            icon = Icons.Default.HourglassEmpty
-        )
-        SessionState.PAUSED -> StateBadgeStyle(
-            containerColor = Color(0xFF374151),
-            contentColor = Color(0xFFD1D5DB),
-            icon = Icons.Default.PauseCircle
-        )
-        else -> StateBadgeStyle(
-            containerColor = Color(0xFF374151),
-            contentColor = Color(0xFFD1D5DB),
-            icon = Icons.AutoMirrored.Filled.Help
-        )
-    }
-}
-
-@Composable
-fun AnimatedMovingDotsIcon(
-    modifier: Modifier = Modifier,
-    color: Color = Color.Unspecified
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "DotsTransition")
-    val dot1Alpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 1200
-                0.3f at 0
-                1.0f at 200
-                0.3f at 600
-                0.3f at 1200
-            },
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "Dot1Alpha"
-    )
-    val dot2Alpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 1200
-                0.3f at 0
-                0.3f at 300
-                1.0f at 500
-                0.3f at 900
-                0.3f at 1200
-            },
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "Dot2Alpha"
-    )
-    val dot3Alpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 1200
-                0.3f at 0
-                0.3f at 600
-                1.0f at 800
-                0.3f at 1200
-            },
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "Dot3Alpha"
-    )
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(4.dp)
-                .graphicsLayer { alpha = dot1Alpha }
-                .background(color, CircleShape)
-        )
-        Box(
-            modifier = Modifier
-                .size(4.dp)
-                .graphicsLayer { alpha = dot2Alpha }
-                .background(color, CircleShape)
-        )
-        Box(
-            modifier = Modifier
-                .size(4.dp)
-                .graphicsLayer { alpha = dot3Alpha }
-                .background(color, CircleShape)
-        )
-    }
-}
 
 @Composable
 private fun SessionActionDropdownMenu(
@@ -1055,43 +986,6 @@ private fun SessionActionDropdownMenu(
     }
 }
 
-@Composable
-private fun DiffBadges(changeSet: EmbeddedChangeSet) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (changeSet.totalAdditions > 0) {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = Color(0xFF234C28)
-            ) {
-                Text(
-                    text = "+${changeSet.totalAdditions}",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = Color(0xFF6CF098),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-        }
-        if (changeSet.totalDeletions > 0) {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = Color(0xFF4C2323)
-            ) {
-                Text(
-                    text = "-${changeSet.totalDeletions}",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = Color(0xFFFF8585),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun RoundedBadge(text: String, color: Color) {
@@ -1108,12 +1002,14 @@ private fun RoundedBadge(text: String, color: Color) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SessionCardFooter(
     session: SessionEntity,
     pullRequestState: PullRequestState?,
     workflows: List<DispatchableWorkflowEntity>,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
 ) {
     val context = LocalContext.current
@@ -1137,19 +1033,28 @@ private fun SessionCardFooter(
         ) {
             session.repo?.let { repo ->
                 val repoUrl = "https://github.com/${repo.owner}/${repo.name}"
-                AssistChip(
-                    modifier = Modifier.height(28.dp),
-                    onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri())) },
-                    label = { Text(repo.label, style = MaterialTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_github),
-                            contentDescription = "GitHub Repo",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
+                Box(
+                    modifier = with(sharedTransitionScope) {
+                        Modifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "source_${session.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope
                         )
                     }
-                )
+                ) {
+                    AssistChip(
+                        modifier = Modifier.height(28.dp),
+                        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri())) },
+                        label = { Text(repo.label, style = MaterialTheme.typography.labelSmall) },
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_github),
+                                contentDescription = "GitHub Repo",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    )
+                }
             }
             Text(text = "Updated $relativeTime", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -1159,171 +1064,27 @@ private fun SessionCardFooter(
         ) {
             Text(text = "Duration: $durationStr", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             session.pullRequest?.let { pr ->
-                PullRequestChip(
-                    pr = pr,
-                    pullRequestState = pullRequestState,
-                    workflows = workflows,
-                    onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
-                    onWorkflowSelected = onSelectWorkflow
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PullRequestChip(
-    pr: EmbeddedPullRequest,
-    pullRequestState: PullRequestState?,
-    workflows: List<DispatchableWorkflowEntity>,
-    onPrClick: (String) -> Unit,
-    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
-) {
-    if (workflows.isEmpty()) {
-        SimplePullRequestChip(
-            pr = pr,
-            pullRequestState = pullRequestState,
-            onPrClick = onPrClick
-        )
-    } else {
-        CompoundPullRequestWorkflowButton(
-            pr = pr,
-            pullRequestState = pullRequestState,
-            workflows = workflows,
-            onPrClick = onPrClick,
-            onWorkflowSelected = onWorkflowSelected
-        )
-    }
-}
-
-@Composable
-private fun SimplePullRequestChip(
-    pr: EmbeddedPullRequest,
-    pullRequestState: PullRequestState?,
-    onPrClick: (String) -> Unit
-) {
-    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
-    val prNumberText = pr.number?.let { " (#$it)" } ?: ""
-
-    AssistChip(
-        modifier = Modifier.height(28.dp),
-        onClick = { onPrClick(pr.url) },
-        label = { Text("View PR$prNumberText", style = MaterialTheme.typography.labelSmall) },
-        leadingIcon = {
-            Icon(
-                painter = painterResource(id = iconRes),
-                contentDescription = "GitHub PR",
-                modifier = Modifier.size(14.dp),
-                tint = iconColor
-            )
-        }
-    )
-}
-
-@Composable
-private fun CompoundPullRequestWorkflowButton(
-    pr: EmbeddedPullRequest,
-    pullRequestState: PullRequestState?,
-    workflows: List<DispatchableWorkflowEntity>,
-    onPrClick: (String) -> Unit,
-    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
-) {
-    val (iconRes, iconColor) = getPullRequestIconInfo(pullRequestState)
-    val prNumberText = pr.number?.let { " (#$it)" } ?: ""
-    var menuExpanded by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = Modifier.height(28.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        )
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable { onPrClick(pr.url) }
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = "GitHub PR",
-                    modifier = Modifier.size(14.dp),
-                    tint = iconColor
-                )
-                Text(
-                    text = "View PR$prNumberText",
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable { menuExpanded = true }
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Workflow Dispatches",
-                    modifier = Modifier.size(18.dp)
-                )
-                WorkflowDropdownMenu(
-                    expanded = menuExpanded,
-                    workflows = workflows,
-                    onDismiss = { menuExpanded = false },
-                    onWorkflowSelected = onWorkflowSelected
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WorkflowDropdownMenu(
-    expanded: Boolean,
-    workflows: List<DispatchableWorkflowEntity>,
-    onDismiss: () -> Unit,
-    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
-) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss
-    ) {
-        workflows.forEach { workflow ->
-            DropdownMenuItem(
-                text = { Text(workflow.name) },
-                onClick = {
-                    onDismiss()
-                    onWorkflowSelected(workflow)
+                Box(
+                    modifier = with(sharedTransitionScope) {
+                        Modifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "pr_badge_${session.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    }
+                ) {
+                    PullRequestChip(
+                        pr = pr,
+                        pullRequestState = pullRequestState,
+                        workflows = workflows,
+                        onPrClick = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
+                        onWorkflowSelected = onSelectWorkflow
+                    )
                 }
-            )
+            }
         }
     }
 }
 
-private fun getPullRequestIconInfo(pullRequestState: PullRequestState?): Pair<Int, Color> {
-    return when (pullRequestState) {
-        PullRequestState.MERGED -> R.drawable.ic_github_pr_merged to Color(0xFFA371F7)
-        PullRequestState.CLOSED -> R.drawable.ic_github_pr_closed to Color(0xFFF85149)
-        PullRequestState.OPEN, null -> R.drawable.ic_github_pr_open to Color(0xFF3FB950)
-    }
-}
 
 @Composable
 private fun DeleteConfirmationDialog(

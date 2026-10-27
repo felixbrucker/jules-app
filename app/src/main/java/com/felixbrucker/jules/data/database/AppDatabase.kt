@@ -2,14 +2,27 @@ package com.felixbrucker.jules.data.database
 
 import androidx.room.AutoMigration
 import androidx.room.Database
+import androidx.room.DeleteTable
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.AutoMigrationSpec
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [SessionEntity::class, PullRequestEntity::class, SourceEntity::class, LogEntity::class, SessionDraftEntity::class, DispatchableWorkflowEntity::class, SourceSyncMetadataEntity::class],
-    version = 9,
+    entities = [
+        SessionEntity::class,
+        PullRequestEntity::class,
+        SourceEntity::class,
+        LogEntity::class,
+        SessionDraftEntity::class,
+        DispatchableWorkflowEntity::class,
+        SourceSyncMetadataEntity::class,
+        ChatElementEntity::class,
+        ChatStateEntity::class,
+        ActivityBasedStateEntity::class
+    ],
+    version = 13,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -18,7 +31,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8),
-        AutoMigration(from = 8, to = 9)
+        AutoMigration(from = 8, to = 9),
+        AutoMigration(from = 9, to = 10),
+        AutoMigration(from = 10, to = 11, spec = AppDatabase.Migration10To11Spec::class),
+        AutoMigration(from = 11, to = 12),
+        AutoMigration(from = 12, to = 13)
     ]
 )
 @TypeConverters(Converters::class)
@@ -30,6 +47,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sessionDraftDao(): SessionDraftDao
     abstract fun dispatchableWorkflowDao(): DispatchableWorkflowDao
     abstract fun sourceSyncMetadataDao(): SourceSyncMetadataDao
+    abstract fun chatElementDao(): ChatElementDao
+    abstract fun chatStateDao(): ChatStateDao
+    abstract fun activityBasedStateDao(): ActivityBasedStateDao
+
+    @DeleteTable(tableName = "activities")
+    class Migration10To11Spec : AutoMigrationSpec
 
     companion object {
         val MIGRATION_4_5 = object : Migration(4, 5) {

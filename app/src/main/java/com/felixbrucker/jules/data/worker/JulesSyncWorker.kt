@@ -12,6 +12,7 @@ import androidx.work.WorkerParameters
 import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.felixbrucker.jules.util.AppState
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
@@ -30,10 +31,15 @@ class JulesSyncWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val julesRepository: JulesRepository,
     private val appSettingsRepository: AppSettingsRepository,
-    private val sessionDao: SessionDao
+    private val sessionDao: SessionDao,
+    private val appState: AppState
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
+        if (appState.isForeground) {
+            Timber.tag(TAG).d("App is in foreground, skipping background sync in worker")
+            return Result.success()
+        }
         Timber.tag(TAG).d("Starting sync in worker")
         return try {
             val settings = appSettingsRepository.appSettingsFlow.first()

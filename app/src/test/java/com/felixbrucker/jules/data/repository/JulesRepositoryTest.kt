@@ -1,5 +1,9 @@
 package com.felixbrucker.jules.data.repository
 
+import com.felixbrucker.jules.data.database.ActivityBasedStateDao
+import com.felixbrucker.jules.data.database.ChatElementDao
+import com.felixbrucker.jules.data.database.ChatStateDao
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
@@ -9,10 +13,8 @@ import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
-import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
-import com.felixbrucker.jules.notification.JulesNotificationManager
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.model.AutomationMode
@@ -24,6 +26,7 @@ import com.felixbrucker.jules.network.api.model.SessionsListResponse
 import com.felixbrucker.jules.network.api.model.Source
 import com.felixbrucker.jules.network.api.model.SourceContext
 import com.felixbrucker.jules.network.api.model.SourcesListResponse
+import com.felixbrucker.jules.notification.JulesNotificationManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -42,6 +45,9 @@ class JulesRepositoryTest {
     private lateinit var sessionDraftDao: SessionDraftDao
     private lateinit var dispatchableWorkflowDao: DispatchableWorkflowDao
     private lateinit var sourceSyncMetadataDao: SourceSyncMetadataDao
+    private lateinit var chatElementDao: ChatElementDao
+    private lateinit var chatStateDao: ChatStateDao
+    private lateinit var activityBasedStateDao: ActivityBasedStateDao
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
     private lateinit var notificationManager: JulesNotificationManager
@@ -57,6 +63,9 @@ class JulesRepositoryTest {
         sessionDraftDao = mockk(relaxed = true)
         dispatchableWorkflowDao = mockk(relaxed = true)
         sourceSyncMetadataDao = mockk(relaxed = true)
+        chatElementDao = mockk(relaxed = true)
+        chatStateDao = mockk(relaxed = true)
+        activityBasedStateDao = mockk(relaxed = true)
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
         notificationManager = mockk(relaxed = true)
@@ -77,6 +86,9 @@ class JulesRepositoryTest {
             sessionDraftDao = sessionDraftDao,
             dispatchableWorkflowDao = dispatchableWorkflowDao,
             sourceSyncMetadataDao = sourceSyncMetadataDao,
+            chatElementDao = chatElementDao,
+            chatStateDao = chatStateDao,
+            activityBasedStateDao = activityBasedStateDao,
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,
             notificationManager = notificationManager,
@@ -141,14 +153,14 @@ class JulesRepositoryTest {
             nextPageToken = null
         )
         coEvery { sessionDao.getAllActiveSessionIds() } returns emptyList()
-        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false) } returns emptyList()
+        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any()) } returns emptyList()
 
         repository.sync()
 
         coVerifyOrder {
             julesApi.getSources(pageSize = 100, pageToken = null)
             julesApi.getSessions(pageSize = 30, pageToken = null)
-            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false)
+            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any())
         }
     }
 
@@ -176,15 +188,15 @@ class JulesRepositoryTest {
             changeSet = null
         )
 
-        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false) } returns listOf(activeSession)
+        coEvery { sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any()) } returns listOf(activeSession)
         coEvery { gitHubApi.getPullRequestState(prUrl) } returns PullRequestState.MERGED
 
         repository.syncPullRequests()
 
         coVerify {
-            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false)
+            sessionDao.getActiveSessionsWithPullRequests(includePrivate = false, cutoffEpochMillis = any())
             gitHubApi.getPullRequestState(prUrl)
-            pullRequestDao.upsertPullRequests(listOf(PullRequestEntity(sessionId = "sess-1", url = prUrl, state = PullRequestState.MERGED)))
+            pullRequestDao.upsertPullRequests(match { it.first().sessionId == "sess-1" && it.first().url == prUrl && it.first().state == PullRequestState.MERGED })
         }
     }
 

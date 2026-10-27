@@ -20,6 +20,7 @@ import com.felixbrucker.jules.data.worker.WorkerScheduler
 import com.felixbrucker.jules.ui.navigation.JulesNavGraph
 import com.felixbrucker.jules.ui.navigation.Screen
 import com.felixbrucker.jules.ui.theme.JulesTheme
+import com.felixbrucker.jules.util.AppState
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
@@ -37,6 +38,29 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var sessionDao: SessionDao
+
+    @Inject
+    lateinit var appState: AppState
+
+    override fun onStart() {
+        super.onStart()
+        appState.isForeground = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        appState.isForeground = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        appState.isForeground = false
+    }
+
+    override fun onStop() {
+        super.onStop()
+        appState.isForeground = false
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -2,14 +2,17 @@ package com.felixbrucker.jules.di
 
 import android.content.Context
 import androidx.room.Room
+import com.felixbrucker.jules.data.database.ActivityBasedStateDao
 import com.felixbrucker.jules.data.database.AppDatabase
+import com.felixbrucker.jules.data.database.ChatElementDao
+import com.felixbrucker.jules.data.database.ChatStateDao
+import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
+import com.felixbrucker.jules.data.database.LogDao
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.database.SessionDraftDao
-import com.felixbrucker.jules.data.database.LogDao
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
-import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -72,5 +75,23 @@ object DatabaseModule {
     @Singleton
     fun provideSourceSyncMetadataDao(database: AppDatabase): SourceSyncMetadataDao {
         return database.sourceSyncMetadataDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideChatElementDao(database: AppDatabase): ChatElementDao {
+        return database.chatElementDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideChatStateDao(database: AppDatabase): ChatStateDao {
+        return database.chatStateDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideActivityBasedStateDao(database: AppDatabase): ActivityBasedStateDao {
+        return database.activityBasedStateDao()
     }
 }

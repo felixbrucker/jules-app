@@ -34,6 +34,14 @@ interface SessionDao {
     @Query("SELECT EXISTS(SELECT 1 FROM sessions WHERE isArchived = 0 AND state IN ('QUEUED', 'PLANNING', 'IN_PROGRESS'))")
     fun hasActiveInProgressSessionsFlow(): Flow<Boolean>
 
+    @Transaction
+    @Query("SELECT * FROM sessions WHERE id = :sessionId")
+    fun getSessionByIdFlow(sessionId: String): Flow<SessionWithPullRequest?>
+
+    @Transaction
+    @Query("SELECT * FROM sessions WHERE id = :sessionId")
+    suspend fun getSessionById(sessionId: String): SessionWithPullRequest?
+
     @Query("SELECT * FROM sessions WHERE id IN (:ids)")
     suspend fun getSessionsByIds(ids: List<String>): List<SessionEntity>
 
@@ -50,12 +58,14 @@ interface SessionDao {
         """
         SELECT s.* FROM sessions s
         LEFT JOIN sources src ON s.sourceId = src.id
+        LEFT JOIN pull_requests pr ON s.id = pr.sessionId
         WHERE s.isArchived = 0
           AND s.pull_request_url IS NOT NULL
           AND (:includePrivate = 1 OR src.github_repo_isPrivate = 0 OR src.github_repo_isPrivate IS NULL)
+          AND (pr.updatedAt IS NULL OR pr.updatedAt < :cutoffEpochMillis)
         """
     )
-    suspend fun getActiveSessionsWithPullRequests(includePrivate: Boolean): List<SessionEntity>
+    suspend fun getActiveSessionsWithPullRequests(includePrivate: Boolean, cutoffEpochMillis: Long): List<SessionEntity>
 
     @Insert
     suspend fun insertSessions(sessions: List<SessionEntity>)

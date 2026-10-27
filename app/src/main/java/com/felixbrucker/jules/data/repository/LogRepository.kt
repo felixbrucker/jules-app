@@ -20,7 +20,7 @@ class LogRepository @Inject constructor(
     fun getLogsPaged(
         priorities: Set<Int>,
         searchQuery: String,
-        pageSize: Int = 30
+        pageSize: Int = 15
     ): Flow<PagingData<LogEntity>> {
         val priorityList = priorities.toList()
         return Pager(

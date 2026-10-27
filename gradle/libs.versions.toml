@@ -24,9 +24,11 @@ paging = "3.5.3"
 ksp = "2.3.12"
 kotlin = "2.4.21"
 kaml = "0.72.0"
+composeMarkdown = "0.7.3"
 
 [libraries]
 kaml = { group = "com.charleskorn.kaml", name = "kaml", version.ref = "kaml" }
+compose-markdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "composeMarkdown" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }

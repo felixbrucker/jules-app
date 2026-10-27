@@ -5,10 +5,12 @@ import com.felixbrucker.jules.network.api.model.ParsedFile
 
 object UnidiffParser {
 
+    private val diffGitRegex = Regex("^diff --git ", RegexOption.MULTILINE)
+
     fun parse(patch: String?): List<ParsedFile> {
         if (patch.isNullOrBlank()) return emptyList()
 
-        val rawBlocks = patch.split(Regex("^diff --git ", RegexOption.MULTILINE))
+        val rawBlocks = patch.split(diffGitRegex)
         val parsedFiles = mutableListOf<ParsedFile>()
 
         for (block in rawBlocks) {
