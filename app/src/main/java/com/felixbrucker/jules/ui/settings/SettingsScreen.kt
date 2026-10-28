@@ -12,9 +12,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import android.app.AlarmManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.OutlinedButton
 import android.Manifest
 import android.content.pm.PackageManager
@@ -67,6 +77,7 @@ fun SettingsScreen(
     val smartSyncEnabled by viewModel.smartSyncEnabled.collectAsState()
     val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
     val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
+    val useExactAlarms by viewModel.useExactAlarms.collectAsState()
     val selectedPlan by viewModel.selectedPlan.collectAsState()
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -108,6 +119,7 @@ fun SettingsScreen(
             smartSyncEnabled = smartSyncEnabled,
             feedbackNotificationsEnabled = feedbackNotificationsEnabled,
             completionNotificationsEnabled = completionNotificationsEnabled,
+            useExactAlarms = useExactAlarms,
             selectedPlan = selectedPlan,
             onViewLogsClick = onViewLogsClick
         )
@@ -151,6 +163,7 @@ private fun SettingsContent(
     smartSyncEnabled: Boolean,
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
+    useExactAlarms: Boolean,
     selectedPlan: JulesPlan,
     onViewLogsClick: () -> Unit
 ) {
@@ -169,6 +182,11 @@ private fun SettingsContent(
             onPlanSelected = { viewModel.selectPlan(it) }
         )
         Spacer(modifier = Modifier.height(16.dp))
+        ExactAlarmsCard(
+            useExactAlarms = useExactAlarms,
+            onToggleExactAlarms = { viewModel.setUseExactAlarms(it) }
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         SyncSettingsCard(
             periodicSyncEnabled = periodicSyncEnabled,
             syncIntervalMinutes = syncIntervalMinutes,
@@ -185,6 +203,120 @@ private fun SettingsContent(
         )
         Spacer(modifier = Modifier.height(16.dp))
         DiagnosticsCard(onViewLogsClick = onViewLogsClick)
+    }
+}
+
+private fun canScheduleExactAlarms(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.canScheduleExactAlarms()
+    } else {
+        true
+    }
+}
+
+@Composable
+private fun ExactAlarmsCard(
+    useExactAlarms: Boolean,
+    onToggleExactAlarms: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    var hasPermission by remember { mutableStateOf(canScheduleExactAlarms(context)) }
+
+    DisposableEffect(Unit) {
+        val listener = android.view.ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+            if (hasFocus) {
+                hasPermission = canScheduleExactAlarms(context)
+            }
+        }
+        val activity = context as? android.app.Activity
+        activity?.window?.decorView?.viewTreeObserver?.addOnWindowFocusChangeListener(listener)
+        onDispose {
+            activity?.window?.decorView?.viewTreeObserver?.removeOnWindowFocusChangeListener(listener)
+        }
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Alarm,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.padding(start = 8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Exact Alarms",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Trigger scheduled tasks precisely at specified times",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = useExactAlarms,
+                    onCheckedChange = { enabled ->
+                        onToggleExactAlarms(enabled)
+                        if (enabled && !canScheduleExactAlarms(context)) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(intent)
+                            }
+                        }
+                    }
+                )
+            }
+
+            if (useExactAlarms && !hasPermission) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Text(
+                            text = "Exact alarm permission is required for exact scheduling.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Without this permission, task executions may be delayed by Android system power optimizations.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                }
+                            }
+                        ) {
+                            Text("Grant Permission")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

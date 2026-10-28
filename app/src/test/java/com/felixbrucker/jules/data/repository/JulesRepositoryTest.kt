@@ -8,8 +8,10 @@ import com.felixbrucker.jules.data.database.DispatchedWorkflowRunDao
 import com.felixbrucker.jules.data.database.DispatchedWorkflowRunEntity
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.PullRequestDao
+import com.felixbrucker.jules.data.database.ScheduledTaskDao
 import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.database.SessionDraftDao
+import com.felixbrucker.jules.data.worker.ScheduledTaskScheduler
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
@@ -49,6 +51,8 @@ class JulesRepositoryTest {
     private lateinit var pullRequestDao: PullRequestDao
     private lateinit var sourceDao: SourceDao
     private lateinit var sessionDraftDao: SessionDraftDao
+    private lateinit var scheduledTaskDao: ScheduledTaskDao
+    private lateinit var scheduledTaskScheduler: ScheduledTaskScheduler
     private lateinit var dispatchableWorkflowDao: DispatchableWorkflowDao
     private lateinit var dispatchedWorkflowRunDao: DispatchedWorkflowRunDao
     private lateinit var sourceSyncMetadataDao: SourceSyncMetadataDao
@@ -68,6 +72,8 @@ class JulesRepositoryTest {
         pullRequestDao = mockk(relaxed = true)
         sourceDao = mockk(relaxed = true)
         sessionDraftDao = mockk(relaxed = true)
+        scheduledTaskDao = mockk(relaxed = true)
+        scheduledTaskScheduler = mockk(relaxed = true)
         dispatchableWorkflowDao = mockk(relaxed = true)
         dispatchedWorkflowRunDao = mockk(relaxed = true)
         sourceSyncMetadataDao = mockk(relaxed = true)
@@ -92,6 +98,8 @@ class JulesRepositoryTest {
             pullRequestDao = pullRequestDao,
             sourceDao = sourceDao,
             sessionDraftDao = sessionDraftDao,
+            scheduledTaskDao = scheduledTaskDao,
+            scheduledTaskScheduler = scheduledTaskScheduler,
             dispatchableWorkflowDao = dispatchableWorkflowDao,
             dispatchedWorkflowRunDao = dispatchedWorkflowRunDao,
             sourceSyncMetadataDao = sourceSyncMetadataDao,

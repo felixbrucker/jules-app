@@ -143,7 +143,7 @@ class SessionListViewModelTest {
             )
         }
         assertNull(viewModel.dispatchDialogState.value)
-        assertEquals("Workflow 'CI' dispatched successfully", viewModel.userError.value)
+        assertEquals("Workflow 'CI' dispatched successfully", viewModel.userFeedback.value)
     }
 
     @Test
@@ -173,10 +173,10 @@ class SessionListViewModelTest {
         viewModel.syncSessions()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals("Network error", viewModel.userError.value)
+        assertEquals("Network error", viewModel.userFeedback.value)
 
-        viewModel.clearUserError()
-        assertNull(viewModel.userError.value)
+        viewModel.clearUserFeedback()
+        assertNull(viewModel.userFeedback.value)
     }
 
     @Test

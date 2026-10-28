@@ -1,7 +1,13 @@
 package com.felixbrucker.jules.ui.sessions
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -199,7 +205,7 @@ private fun CreateSessionDialogBody(
 }
 
 @Composable
-private fun RepoAndBranchSelectionRow(
+fun RepoAndBranchSelectionRow(
     sources: List<SourceEntity>,
     selectedSource: SourceEntity?,
     selectedBranch: String,
@@ -280,6 +286,7 @@ private fun RepoDropdown(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RepoDropdownMenu(
     expanded: Boolean,
@@ -297,9 +304,27 @@ private fun RepoDropdownMenu(
         }
     }
 
+    val isImeVisible = WindowInsets.isImeVisible
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    BackHandler(enabled = expanded) {
+        if (isImeVisible) {
+            keyboardController?.hide()
+        } else {
+            onDismiss()
+        }
+    }
+
     DropdownMenu(
         expanded = expanded,
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (isImeVisible) {
+                keyboardController?.hide()
+            } else {
+                onDismiss()
+            }
+        },
+        properties = PopupProperties(focusable = true, dismissOnBackPress = false),
         shape = RoundedCornerShape(12.dp)
     ) {
         OutlinedTextField(
@@ -393,7 +418,7 @@ private fun BranchDropdown(
 }
 
 @Composable
-private fun TitleInputField(
+fun TitleInputField(
     title: String,
     onTitleChange: (String) -> Unit
 ) {
@@ -414,7 +439,7 @@ private fun TitleInputField(
 }
 
 @Composable
-private fun PromptInputField(
+fun PromptInputField(
     prompt: String,
     onPromptChange: (String) -> Unit
 ) {
@@ -430,7 +455,7 @@ private fun PromptInputField(
 }
 
 @Composable
-private fun RequirePlanApprovalToggleRow(
+fun RequirePlanApprovalToggleRow(
     requirePlanApproval: Boolean,
     onToggle: (Boolean) -> Unit
 ) {

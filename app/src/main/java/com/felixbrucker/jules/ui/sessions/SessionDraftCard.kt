@@ -92,6 +92,11 @@ fun SessionDraftCard(
 
 @Composable
 private fun DraftCardHeader(draftWithSource: SessionDraftWithSource) {
+    val draft = draftWithSource.draft
+    val displayTitle = draft.title.takeIf { !it.isNullOrBlank() }
+        ?: draft.prompt.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+        ?: "Untitled Draft"
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -104,7 +109,7 @@ private fun DraftCardHeader(draftWithSource: SessionDraftWithSource) {
         ) {
             DraftBadge()
             Text(
-                text = draftWithSource.draft.title.takeIf { !it.isNullOrBlank() } ?: "Untitled Draft",
+                text = displayTitle,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
