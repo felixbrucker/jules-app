@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -119,11 +122,13 @@ private fun ScheduledTaskCardHeader(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Switch(
-            checked = task.enabled,
-            onCheckedChange = onToggleEnabled,
-            modifier = Modifier.scale(0.75f)
-        )
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+            Switch(
+                checked = task.enabled,
+                onCheckedChange = onToggleEnabled,
+                modifier = Modifier.scale(0.68f)
+            )
+        }
     }
 }
 
