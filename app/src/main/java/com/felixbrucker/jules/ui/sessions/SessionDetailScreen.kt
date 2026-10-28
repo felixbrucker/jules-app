@@ -4,7 +4,6 @@ import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -22,11 +21,9 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -79,6 +76,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,12 +90,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -113,7 +111,6 @@ import com.felixbrucker.jules.R
 import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
 import com.felixbrucker.jules.data.database.AgentState
 import com.felixbrucker.jules.data.database.ChatElement
-import com.felixbrucker.jules.data.database.ChatElementEntity
 import com.felixbrucker.jules.data.database.ChatStateEntity
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.SessionEntity
@@ -121,7 +118,6 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.FileChangeType
 import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.PlanStep
-import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.ui.components.AnimatedMovingDotsIcon
 import com.felixbrucker.jules.ui.components.ChatMarkdown
 import com.felixbrucker.jules.ui.components.DiffBadges
@@ -130,7 +126,6 @@ import com.felixbrucker.jules.ui.components.SessionStateBadge
 import com.felixbrucker.jules.ui.icon.ChatIcon
 import com.felixbrucker.jules.ui.icon.DifferenceIcon
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun SessionDetailScreen(
     viewModel: SessionDetailViewModel,
@@ -153,7 +148,9 @@ fun SessionDetailScreen(
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
     val errorEvent by viewModel.errorEvents.collectAsState(initial = null)
 
-    val isPhone = LocalConfiguration.current.screenWidthDp < 600
+    val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
+    val isPhone = with(density) { windowInfo.containerSize.width.toDp() } < 600.dp
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -243,7 +240,6 @@ fun SessionDetailScreen(
 }
 
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SessionDetailTopBar(
     sessionWithPr: SessionWithPullRequest,
@@ -483,7 +479,7 @@ private fun SessionDetailSplitContent(
     onSendMessage: (String) -> Unit,
     onApprovePlan: () -> Unit
 ) {
-    var containerWidthPx by remember { mutableStateOf(0) }
+    var containerWidthPx by remember { mutableIntStateOf(0) }
     var chatInputText by rememberSaveable(session.id) { mutableStateOf("") }
 
     Box(
@@ -503,7 +499,6 @@ private fun SessionDetailSplitContent(
                         session = session,
                         chatElements = chatElements,
                         chatState = chatState,
-                        activityBasedState = activityBasedState,
                         chatInputText = chatInputText,
                         onChatInputTextChange = { chatInputText = it },
                         isInitialSyncing = isInitialSyncing,
@@ -535,7 +530,6 @@ private fun SessionDetailSplitContent(
                             session = session,
                             chatElements = chatElements,
                             chatState = chatState,
-                            activityBasedState = activityBasedState,
                             chatInputText = chatInputText,
                             onChatInputTextChange = { chatInputText = it },
                             isInitialSyncing = isInitialSyncing,
@@ -618,7 +612,6 @@ private fun ChatWindowView(
     session: SessionEntity,
     chatElements: LazyPagingItems<ChatElementUiItem>,
     chatState: ChatStateEntity?,
-    activityBasedState: ActivityBasedStateEntity?,
     chatInputText: String,
     onChatInputTextChange: (String) -> Unit,
     isInitialSyncing: Boolean,
@@ -694,8 +687,7 @@ private fun ChatWindowView(
                         if (item != null) {
                             ChatElementRow(
                                 item = item,
-                                session = session,
-                                activityBasedState = activityBasedState
+                                session = session
                             )
                         }
                     }
@@ -793,8 +785,7 @@ private fun ChatWindowView(
 @Composable
 private fun ChatElementRow(
     item: ChatElementUiItem,
-    session: SessionEntity,
-    activityBasedState: ActivityBasedStateEntity?
+    session: SessionEntity
 ) {
     when (item) {
         is ChatElementUiItem.RelativeTimeDivider -> {
@@ -803,8 +794,7 @@ private fun ChatElementRow(
         is ChatElementUiItem.ElementItem -> {
             ChatElementBubbleContainer(
                 element = item.elementEntity.element,
-                session = session,
-                activityBasedState = activityBasedState
+                session = session
             )
         }
     }
@@ -829,8 +819,7 @@ private fun CenteredTimeDivider(timeText: String) {
 @Composable
 private fun ChatElementBubbleContainer(
     element: ChatElement,
-    session: SessionEntity,
-    activityBasedState: ActivityBasedStateEntity?
+    session: SessionEntity
 ) {
     SelectionContainer {
         when (element) {
@@ -1008,7 +997,7 @@ private fun ProgressUpdatedBubble(
                     ) {
                         Box(modifier = Modifier.weight(1f)) {
                             ChatMarkdown(
-                                markdown = title ?: "",
+                                markdown = title,
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 onClick = { isExpanded = !isExpanded }
                             )

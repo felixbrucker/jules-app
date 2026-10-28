@@ -6,13 +6,11 @@ import java.time.Instant
 
 class InstantAdapter {
 
-    @Suppress("unused")
     @ToJson
     fun toJson(instant: Instant?): String? {
         return instant?.toString()
     }
 
-    @Suppress("unused")
     @FromJson
     fun fromJson(json: String?): Instant? {
         if (json.isNullOrBlank()) return null

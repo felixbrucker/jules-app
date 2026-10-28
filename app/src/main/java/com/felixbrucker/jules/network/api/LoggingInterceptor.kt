@@ -1,5 +1,6 @@
 package com.felixbrucker.jules.network.api
 
+import android.annotation.SuppressLint
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,7 @@ class LoggingInterceptor @Inject constructor(
         }
     }
 
+    @SuppressLint("TimberExceptionLogging")
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val url = request.url.toString()

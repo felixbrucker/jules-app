@@ -514,37 +514,6 @@ private fun TaskNotificationsSection(
 }
 
 @Composable
-private fun SubNotificationToggleRow(
-    title: String,
-    description: String,
-    checked: Boolean,
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = checked && enabled,
-            enabled = enabled,
-            onCheckedChange = onCheckedChange
-        )
-    }
-}
-
-
-@Composable
 private fun SyncSettingsHeader() {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(

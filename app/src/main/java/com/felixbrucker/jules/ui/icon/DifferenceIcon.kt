@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
+@Suppress("ObjectPropertyName")
 private var _differenceIcon: ImageVector? = null
 val DifferenceIcon: ImageVector
     get() {

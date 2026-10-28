@@ -36,7 +36,6 @@ import com.felixbrucker.jules.network.api.model.AutomationMode
 import com.felixbrucker.jules.network.api.model.CreateSessionRequest
 import com.felixbrucker.jules.network.api.model.GitHubRepoContext
 import com.felixbrucker.jules.network.api.model.JulesApiException
-import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.network.api.model.SourceContext
 import com.felixbrucker.jules.network.api.util.UnidiffParser
@@ -62,11 +61,9 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
 @Singleton
@@ -288,7 +285,7 @@ class JulesRepository @Inject constructor(
                                     id = activity.id,
                                     sessionId = sessionId,
                                     createdAt = actTime,
-                                    element = ChatElement.SessionFailedElement(activity.reason ?: "Session failed")
+                                    element = ChatElement.SessionFailedElement(activity.reason)
                                 )
                             )
                         }
@@ -487,7 +484,7 @@ class JulesRepository @Inject constructor(
                     ChatElementEntity(
                         id = "init_prompt_${session.id}",
                         sessionId = session.id,
-                        createdAt = session.createTime ?: Instant.now(),
+                        createdAt = session.createTime,
                         element = ChatElement.UserMessageElement(session.prompt)
                     )
                 } else null

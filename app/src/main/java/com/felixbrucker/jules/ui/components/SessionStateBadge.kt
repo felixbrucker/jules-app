@@ -76,7 +76,6 @@ fun getSessionStateStyle(state: SessionState): StateBadgeStyle {
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun SessionStateBadge(
     state: SessionState,
