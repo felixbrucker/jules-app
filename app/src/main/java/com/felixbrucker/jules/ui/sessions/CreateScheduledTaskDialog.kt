@@ -392,12 +392,13 @@ private fun TimeSelectionField(
             readOnly = true,
             label = { Text("Time") },
             trailingIcon = {
-                IconButton(onClick = { showTimePicker = true }) {
-                    Icon(imageVector = Icons.Default.AccessTime, contentDescription = "Select Time")
-                }
+                Icon(imageVector = Icons.Default.AccessTime, contentDescription = "Select Time")
             },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .matchParentSize()
                 .clickable { showTimePicker = true }
         )
     }
@@ -447,12 +448,13 @@ private fun DateSelectionField(
             readOnly = true,
             label = { Text("Date (YYYY-MM-DD)") },
             trailingIcon = {
-                IconButton(onClick = { showDatePicker = true }) {
-                    Icon(imageVector = Icons.Default.CalendarToday, contentDescription = "Select Date")
-                }
+                Icon(imageVector = Icons.Default.CalendarToday, contentDescription = "Select Date")
             },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .matchParentSize()
                 .clickable { showDatePicker = true }
         )
     }

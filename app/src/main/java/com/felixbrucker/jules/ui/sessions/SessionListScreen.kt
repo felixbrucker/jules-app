@@ -220,24 +220,10 @@ fun SessionListScreen(
         label = "FabRotation"
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (isFabExpanded) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        isFabExpanded = false
-                    }
-            )
-        }
-
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            topBar = {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        topBar = {
             SessionTopBar(
                 isSearchActive = isSearchActive,
                 searchQuery = searchQuery,
@@ -337,23 +323,37 @@ fun SessionListScreen(
             }
         }
     ) { innerPadding ->
-        SessionListContent(
-            modifier = Modifier.padding(innerPadding),
-            viewModel = viewModel,
-            sharedTransitionScope = sharedTransitionScope,
-            animatedVisibilityScope = animatedVisibilityScope,
-            selectedChips = selectedChips,
-            includeArchived = includeArchived,
-            includeDrafts = includeDrafts,
+        Box(modifier = Modifier.fillMaxSize()) {
+            SessionListContent(
+                modifier = Modifier.padding(innerPadding),
+                viewModel = viewModel,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+                selectedChips = selectedChips,
+                includeArchived = includeArchived,
+                includeDrafts = includeDrafts,
                 includeScheduled = includeScheduled,
-            drafts = drafts,
+                drafts = drafts,
                 scheduledTasks = scheduledTasks,
                 sources = sources,
-            sessions = sessions,
-            onFabVisibilityChanged = { isFabVisible = it },
-            onSessionClick = onSessionClick
-        )
-    }
+                sessions = sessions,
+                onFabVisibilityChanged = { isFabVisible = it },
+                onSessionClick = onSessionClick
+            )
+
+            if (isFabExpanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            isFabExpanded = false
+                        }
+                )
+            }
+        }
     }
 }
 
