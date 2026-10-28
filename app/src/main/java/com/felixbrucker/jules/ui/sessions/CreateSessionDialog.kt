@@ -1,7 +1,12 @@
 package com.felixbrucker.jules.ui.sessions
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -280,6 +285,7 @@ private fun RepoDropdown(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RepoDropdownMenu(
     expanded: Boolean,
@@ -294,6 +300,17 @@ private fun RepoDropdownMenu(
         else sources.filter { src ->
             val label = src.githubRepo?.let { "${it.owner}/${it.repo}" } ?: src.name
             label.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    val isImeVisible = WindowInsets.isImeVisible
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    BackHandler(enabled = expanded) {
+        if (isImeVisible) {
+            keyboardController?.hide()
+        } else {
+            onDismiss()
         }
     }
 

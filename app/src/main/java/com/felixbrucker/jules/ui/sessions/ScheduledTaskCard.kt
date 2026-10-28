@@ -76,18 +76,12 @@ fun ScheduledTaskCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            ScheduledTaskCardHeader(
-                task = task,
+            ScheduledTaskCardHeader(task = task)
+            Spacer(modifier = Modifier.height(8.dp))
+            ScheduledTaskCardPromptRow(
+                prompt = task.prompt,
                 onRequestExecute = onExecuteNow,
                 onRequestDelete = { showDeleteDialog = true }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = task.prompt.ifBlank { "No prompt entered" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (task.prompt.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(12.dp))
             ScheduledTaskCardFooter(task = task, sources = sources)
@@ -96,12 +90,10 @@ fun ScheduledTaskCard(
 }
 
 @Composable
-private fun ScheduledTaskCardHeader(
-    task: ScheduledTaskEntity,
-    onRequestExecute: () -> Unit,
-    onRequestDelete: () -> Unit
-) {
-    var menuExpanded by remember { mutableStateOf(false) }
+private fun ScheduledTaskCardHeader(task: ScheduledTaskEntity) {
+    val displayTitle = task.title.takeIf { !it.isNullOrBlank() }
+        ?: task.prompt.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+        ?: "Untitled Scheduled Task"
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -115,12 +107,35 @@ private fun ScheduledTaskCardHeader(
         ) {
             ScheduledBadge()
             Text(
-                text = task.title.takeIf { !it.isNullOrBlank() } ?: "Untitled Scheduled Task",
+                text = displayTitle,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+@Composable
+private fun ScheduledTaskCardPromptRow(
+    prompt: String,
+    onRequestExecute: () -> Unit,
+    onRequestDelete: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = prompt.ifBlank { "No prompt entered" },
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (prompt.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
         Box(modifier = Modifier.offset(x = 12.dp)) {
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Task Actions")
