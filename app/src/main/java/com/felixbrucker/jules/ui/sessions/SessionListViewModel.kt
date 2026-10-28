@@ -298,7 +298,6 @@ class SessionListViewModel @Inject constructor(
             try {
                 val updated = task.copy(enabled = enabled, updatedAt = Instant.now())
                 julesRepository.saveScheduledTask(updated)
-                _userFeedback.value = if (enabled) "Scheduled task enabled" else "Scheduled task disabled"
             } catch (e: Exception) {
                 _userFeedback.value = e.message ?: "Failed to update scheduled task"
             }

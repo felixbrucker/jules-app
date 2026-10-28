@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -120,7 +121,8 @@ private fun ScheduledTaskCardHeader(
         }
         Switch(
             checked = task.enabled,
-            onCheckedChange = onToggleEnabled
+            onCheckedChange = onToggleEnabled,
+            modifier = Modifier.scale(0.75f)
         )
     }
 }
