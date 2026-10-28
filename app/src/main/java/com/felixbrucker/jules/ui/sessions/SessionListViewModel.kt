@@ -261,7 +261,7 @@ class SessionListViewModel @Inject constructor(
                         ?: "main"
                     listOf(ScheduledTaskRepo(id, branch))
                 } ?: emptyList()
-                ScheduledTaskEntity(repos = defaultRepo)
+                ScheduledTaskEntity(repos = defaultRepo, requirePlanApproval = false)
             }
             _activeScheduledTask.value = initialTask
             _scheduledTaskError.value = null

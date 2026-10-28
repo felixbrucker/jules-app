@@ -1,5 +1,6 @@
 package com.felixbrucker.jules.ui.sessions
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,19 +8,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -30,9 +34,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.felixbrucker.jules.data.database.ScheduleType
 import com.felixbrucker.jules.data.database.ScheduledTaskEntity
@@ -53,8 +58,16 @@ import com.felixbrucker.jules.ui.components.LoadingStateButton
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
+
+fun ScheduleType.displayName(): String = when (this) {
+    ScheduleType.ONCE -> "Once"
+    ScheduleType.DAILY -> "Daily"
+    ScheduleType.WEEKLY -> "Weekly"
+    ScheduleType.MONTHLY -> "Monthly"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -225,43 +238,21 @@ private fun CreateScheduledTaskDialogBody(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = String.format(Locale.ROOT, "%02d", timeHour),
-                onValueChange = { input ->
-                    input.toIntOrNull()?.let { timeHour = it.coerceIn(0, 23) }
-                },
-                label = { Text("Hour (0-23)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-            Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            OutlinedTextField(
-                value = String.format(Locale.ROOT, "%02d", timeMinute),
-                onValueChange = { input ->
-                    input.toIntOrNull()?.let { timeMinute = it.coerceIn(0, 59) }
-                },
-                label = { Text("Minute (0-59)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-        }
+        TimeSelectionField(
+            hour = timeHour,
+            minute = timeMinute,
+            onTimeSelected = { h, m ->
+                timeHour = h
+                timeMinute = m
+            }
+        )
 
         when (scheduleType) {
             ScheduleType.ONCE -> {
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = dateStr,
-                    onValueChange = { dateStr = it },
-                    label = { Text("Date (YYYY-MM-DD)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                DateSelectionField(
+                    selectedDateStr = dateStr,
+                    onDateSelected = { dateStr = it }
                 )
             }
             ScheduleType.WEEKLY -> {
@@ -273,15 +264,9 @@ private fun CreateScheduledTaskDialogBody(
             }
             ScheduleType.MONTHLY -> {
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = dayOfMonth.toString(),
-                    onValueChange = { input ->
-                        input.toIntOrNull()?.let { dayOfMonth = it.coerceIn(1, 31) }
-                    },
-                    label = { Text("Day of Month (1-31)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                DayOfMonthDropdown(
+                    selectedDay = dayOfMonth,
+                    onDaySelected = { dayOfMonth = it }
                 )
             }
             ScheduleType.DAILY -> {}
@@ -364,7 +349,7 @@ private fun ScheduleTypeDropdown(
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            value = selectedType.name,
+            value = selectedType.displayName(),
             onValueChange = {},
             readOnly = true,
             label = { Text("Schedule Type") },
@@ -379,13 +364,134 @@ private fun ScheduleTypeDropdown(
         ) {
             ScheduleType.entries.forEach { type ->
                 DropdownMenuItem(
-                    text = { Text(type.name) },
+                    text = { Text(type.displayName()) },
                     onClick = {
                         onTypeSelected(type)
                         expanded = false
                     }
                 )
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeSelectionField(
+    hour: Int,
+    minute: Int,
+    onTimeSelected: (Int, Int) -> Unit
+) {
+    var showTimePicker by remember { mutableStateOf(false) }
+    val formattedTime = String.format(Locale.ROOT, "%02d:%02d", hour, minute)
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = formattedTime,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Time") },
+            trailingIcon = {
+                IconButton(onClick = { showTimePicker = true }) {
+                    Icon(imageVector = Icons.Default.AccessTime, contentDescription = "Select Time")
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showTimePicker = true }
+        )
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = hour,
+            initialMinute = minute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onTimeSelected(timePickerState.hour, timePickerState.minute)
+                        showTimePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateSelectionField(
+    selectedDateStr: String,
+    onDateSelected: (String) -> Unit
+) {
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = selectedDateStr,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Date (YYYY-MM-DD)") },
+            trailingIcon = {
+                IconButton(onClick = { showDatePicker = true }) {
+                    Icon(imageVector = Icons.Default.CalendarToday, contentDescription = "Select Date")
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showDatePicker = true }
+        )
+    }
+
+    if (showDatePicker) {
+        val initialUtcMillis = try {
+            LocalDate.parse(selectedDateStr)
+                .atStartOfDay(ZoneOffset.UTC)
+                .toInstant()
+                .toEpochMilli()
+        } catch (_: Exception) {
+            System.currentTimeMillis()
+        }
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialUtcMillis)
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val localDate = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneOffset.UTC)
+                                .toLocalDate()
+                            onDateSelected(localDate.toString())
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
@@ -424,6 +530,45 @@ private fun DayOfWeekDropdown(
                     text = { Text(day.getDisplayName(TextStyle.FULL, Locale.getDefault())) },
                     onClick = {
                         onDaySelected(day.value)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DayOfMonthDropdown(
+    selectedDay: Int,
+    onDaySelected: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = "Day $selectedDay",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Day of Month") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            (1..31).forEach { day ->
+                DropdownMenuItem(
+                    text = { Text("Day $day") },
+                    onClick = {
+                        onDaySelected(day)
                         expanded = false
                     }
                 )

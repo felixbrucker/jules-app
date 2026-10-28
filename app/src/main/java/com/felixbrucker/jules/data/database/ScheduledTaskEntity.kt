@@ -26,7 +26,7 @@ data class ScheduledTaskEntity(
     val title: String? = null,
     val prompt: String = "",
     val repos: List<ScheduledTaskRepo> = emptyList(),
-    val requirePlanApproval: Boolean = true,
+    val requirePlanApproval: Boolean = false,
     val scheduleType: ScheduleType = ScheduleType.DAILY,
     val timeHour: Int = 9,
     val timeMinute: Int = 0,
