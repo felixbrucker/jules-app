@@ -66,6 +66,7 @@ data class ChangeSet(
     }
 }
 
+@JsonClass(generateAdapter = true)
 data class ParsedFile(
     val path: String,
     val changeType: FileChangeType,

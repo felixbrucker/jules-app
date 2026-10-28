@@ -17,6 +17,7 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.util.periodicTickerFlow
+import com.squareup.moshi.JsonClass
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,6 +65,7 @@ enum class DiffLineType {
     DELETION
 }
 
+@JsonClass(generateAdapter = true)
 data class ParsedDiffLine(
     val oldLineNumber: Int?,
     val newLineNumber: Int?,
