@@ -20,5 +20,6 @@ import java.time.Instant
 data class SourceSyncMetadataEntity(
     @PrimaryKey
     val sourceId: String,
-    val lastWorkflowSyncedAt: Instant? = null
+    val lastWorkflowSyncedAt: Instant? = null,
+    val lastSourceSyncedAt: Instant? = null
 )

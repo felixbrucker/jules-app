@@ -37,6 +37,9 @@ data class Source(
 
 @JsonClass(generateAdapter = true)
 data class SourcesListResponse(
-    @Json(name = "sources") val sources: List<Source>,
+    @Json(name = "sources") val sources: List<Source>? = emptyList(),
     @Json(name = "nextPageToken") val nextPageToken: String? = null
-)
+) {
+    val sourcesList: List<Source>
+        get() = sources.orEmpty()
+}

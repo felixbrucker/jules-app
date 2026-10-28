@@ -143,7 +143,7 @@ class JulesRepository @Inject constructor(
     suspend fun createSessionFromDraft(draft: SessionDraftEntity) = withContext(Dispatchers.IO) {
         val sourceContext = draft.sourceId?.let { srcId ->
             SourceContext(
-                source = if (srcId.startsWith("sources/")) srcId else "sources/$srcId",
+                source = srcId,
                 githubRepoContext = draft.branch?.let { GitHubRepoContext(startingBranch = it) }
             )
         }
@@ -466,9 +466,9 @@ class JulesRepository @Inject constructor(
                     pageSize = pageSize,
                     pageToken = pageToken
                 )
-                val entities = response.sources.map { it.toEntity() }
+                val entities = response.sourcesList.map { it.toEntity() }
                 sourceDao.upsertSources(entities)
-                response.sources.forEach { fetchedSourceIds.add(it.id) }
+                response.sourcesList.forEach { fetchedSourceIds.add(it.id) }
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
 
@@ -479,6 +479,25 @@ class JulesRepository @Inject constructor(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Timber.tag(TAG).e(e, "Error syncing sources")
+            throw e
+        }
+    }
+
+    suspend fun syncSource(sourceId: String, force: Boolean = false) = withContext(Dispatchers.IO) {
+        try {
+            if (!force) {
+                val cutoff = Instant.now().minus(Duration.ofMinutes(5))
+                if (sourceSyncMetadataDao.isSourceSyncedRecently(sourceId, cutoff)) {
+                    return@withContext
+                }
+            }
+
+            val fetched = julesApi.getSource(sourceId)
+            sourceDao.upsertSources(listOf(fetched.toEntity()))
+            sourceSyncMetadataDao.updateLastSourceSyncedAtTargeted(sourceId, Instant.now())
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.tag(TAG).e(e, "Error syncing source $sourceId")
             throw e
         }
     }
@@ -594,9 +613,9 @@ class JulesRepository @Inject constructor(
                     pageSize = pageSize,
                     pageToken = pageToken
                 )
-                val entities = response.sessions.map { it.toEntity() }
+                val entities = response.sessionsList.map { it.toEntity() }
                 saveSessions(entities, isBackground = isBackground)
-                response.sessions.forEach { fetchedSessionIds.add(it.id) }
+                response.sessionsList.forEach { fetchedSessionIds.add(it.id) }
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
 
@@ -744,9 +763,9 @@ class JulesRepository @Inject constructor(
                     pageSize = pageSize,
                     pageToken = pageToken
                 )
-                val entities = response.sessions.map { it.toEntity() }
+                val entities = response.sessionsList.map { it.toEntity() }
                 saveSessions(entities, isBackground = isBackground)
-                response.sessions.forEach { fetchedArchivedIds.add(it.id) }
+                response.sessionsList.forEach { fetchedArchivedIds.add(it.id) }
                 pageToken = response.nextPageToken
             } while (!pageToken.isNullOrBlank())
 

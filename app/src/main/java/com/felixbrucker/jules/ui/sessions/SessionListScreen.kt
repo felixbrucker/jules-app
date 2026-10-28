@@ -166,7 +166,8 @@ fun SessionListScreen(
             errorMessage = createSessionError,
             onDismiss = { viewModel.dismissCreateDialog() },
             onSaveDraft = { viewModel.saveDraft(it) },
-            onCreateSession = { viewModel.createSessionFromDraft(it) }
+            onCreateSession = { viewModel.createSessionFromDraft(it) },
+            onSourceSelected = { source -> viewModel.syncSourceIfNeeded(source.id) }
         )
     }
 
