@@ -920,7 +920,7 @@ private fun AgentThoughtBubble(thoughts: String, durationText: String) {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(6.dp))
-                        ChatMarkdown(markdown = thoughts)
+                        ChatMarkdown(markdown = thoughts, onClick = { isExpanded = !isExpanded })
                     }
                 }
             }
@@ -1027,8 +1027,9 @@ private fun ProgressUpdatedBubble(
                         Column {
                             Spacer(modifier = Modifier.height(6.dp))
                             ChatMarkdown(
-                                markdown = description ?: "",
-                                style = MaterialTheme.typography.bodyMedium
+                                markdown = description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                onClick = { isExpanded = !isExpanded }
                             )
                         }
                     }
@@ -1125,8 +1126,9 @@ private fun PlanStepItemRow(stepIndex: Int, step: PlanStep) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Box(modifier = Modifier.padding(start = 32.dp)) {
                         ChatMarkdown(
-                            markdown = step.description.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall
+                            markdown = step.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            onClick = { isExpanded = !isExpanded },
                         )
                     }
                 }
