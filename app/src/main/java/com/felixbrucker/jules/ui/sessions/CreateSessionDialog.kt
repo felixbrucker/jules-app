@@ -324,7 +324,7 @@ private fun RepoDropdownMenu(
                 onDismiss()
             }
         },
-        properties = PopupProperties(dismissOnBackPress = false),
+        properties = PopupProperties(focusable = true, dismissOnBackPress = false),
         shape = RoundedCornerShape(12.dp)
     ) {
         OutlinedTextField(
