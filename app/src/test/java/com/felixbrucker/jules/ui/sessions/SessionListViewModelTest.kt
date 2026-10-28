@@ -45,6 +45,9 @@ class SessionListViewModelTest {
         coEvery { julesRepository.getSourcesFlow() } returns flowOf(emptyList())
         coEvery { appSettingsRepository.dailySessionLimitFlow } returns flowOf(15)
         coEvery { appSettingsRepository.selectedFilterChipsFlow } returns flowOf(emptySet())
+        coEvery { appSettingsRepository.includeDraftsFlow } returns flowOf(true)
+        coEvery { appSettingsRepository.includeScheduledFlow } returns flowOf(false)
+        coEvery { appSettingsRepository.includeArchivedFlow } returns flowOf(false)
         coEvery { appSettingsRepository.lastSelectedSourceIdFlow } returns flowOf(null)
 
         viewModel = SessionListViewModel(julesRepository, appSettingsRepository)
@@ -222,5 +225,38 @@ class SessionListViewModelTest {
             )
         }
         sessionsCollector.cancel()
+    }
+
+    @Test
+    fun testToggleIncludeDraftsScheduledAndArchived() = runTest {
+        viewModel.toggleIncludeDrafts(false)
+        viewModel.toggleIncludeScheduled(true)
+        viewModel.toggleIncludeArchived(true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { appSettingsRepository.setIncludeDrafts(false) }
+        coVerify { appSettingsRepository.setIncludeScheduled(true) }
+        coVerify { appSettingsRepository.setIncludeArchived(true) }
+    }
+
+    @Test
+    fun testRestoresIncludeDraftsScheduledAndArchived() = runTest {
+        coEvery { appSettingsRepository.includeDraftsFlow } returns flowOf(false)
+        coEvery { appSettingsRepository.includeScheduledFlow } returns flowOf(true)
+        coEvery { appSettingsRepository.includeArchivedFlow } returns flowOf(true)
+
+        val vm = SessionListViewModel(julesRepository, appSettingsRepository)
+        val draftsCollector = launch { vm.includeDrafts.collect {} }
+        val scheduledCollector = launch { vm.includeScheduled.collect {} }
+        val archivedCollector = launch { vm.includeArchived.collect {} }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(false, vm.includeDrafts.value)
+        assertEquals(true, vm.includeScheduled.value)
+        assertEquals(true, vm.includeArchived.value)
+
+        draftsCollector.cancel()
+        scheduledCollector.cancel()
+        archivedCollector.cancel()
     }
 }

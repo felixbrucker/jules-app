@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -443,15 +444,21 @@ fun PromptInputField(
     prompt: String,
     onPromptChange: (String) -> Unit
 ) {
-    OutlinedTextField(
-        value = prompt,
-        onValueChange = onPromptChange,
-        label = { Text("Prompt") },
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 120.dp, max = 240.dp),
-        minLines = 4
-    )
+            .heightIn(min = 120.dp, max = 240.dp)
+    ) {
+        OutlinedTextField(
+            value = prompt,
+            onValueChange = onPromptChange,
+            label = { Text("Prompt") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            minLines = 4
+        )
+    }
 }
 
 @Composable

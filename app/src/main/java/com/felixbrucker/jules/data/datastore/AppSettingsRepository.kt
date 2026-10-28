@@ -42,6 +42,9 @@ class AppSettingsRepository @Inject constructor(
         val COMPLETION_NOTIFICATIONS_ENABLED = booleanPreferencesKey("completion_notifications_enabled")
         val LAST_SELECTED_SOURCE_ID = stringPreferencesKey("last_selected_source_id")
         val SELECTED_FILTER_CHIPS = stringSetPreferencesKey("selected_filter_chips")
+        val INCLUDE_DRAFTS = booleanPreferencesKey("include_drafts")
+        val INCLUDE_SCHEDULED = booleanPreferencesKey("include_scheduled")
+        val INCLUDE_ARCHIVED = booleanPreferencesKey("include_archived")
         val USE_EXACT_ALARMS = booleanPreferencesKey("use_exact_alarms")
         val WORKFLOW_DISPATCHING_ENABLED = booleanPreferencesKey("workflow_dispatching_enabled")
     }
@@ -93,6 +96,15 @@ class AppSettingsRepository @Inject constructor(
 
     val selectedFilterChipsFlow: Flow<Set<String>> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.SELECTED_FILTER_CHIPS] ?: emptySet() }
+
+    val includeDraftsFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.INCLUDE_DRAFTS] ?: true }
+
+    val includeScheduledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.INCLUDE_SCHEDULED] ?: false }
+
+    val includeArchivedFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.INCLUDE_ARCHIVED] ?: false }
 
     val workflowDispatchingEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.WORKFLOW_DISPATCHING_ENABLED] ?: false }
@@ -162,6 +174,24 @@ class AppSettingsRepository @Inject constructor(
     suspend fun saveSelectedFilterChips(chips: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SELECTED_FILTER_CHIPS] = chips
+        }
+    }
+
+    suspend fun setIncludeDrafts(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.INCLUDE_DRAFTS] = enabled
+        }
+    }
+
+    suspend fun setIncludeScheduled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.INCLUDE_SCHEDULED] = enabled
+        }
+    }
+
+    suspend fun setIncludeArchived(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.INCLUDE_ARCHIVED] = enabled
         }
     }
 

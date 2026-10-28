@@ -64,12 +64,24 @@ class SessionListViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptySet()
         )
-    private val _includeArchived = MutableStateFlow(false)
-    val includeArchived: StateFlow<Boolean> = _includeArchived.asStateFlow()
-    private val _includeDrafts = MutableStateFlow(true)
-    val includeDrafts: StateFlow<Boolean> = _includeDrafts.asStateFlow()
-    private val _includeScheduled = MutableStateFlow(false)
-    val includeScheduled: StateFlow<Boolean> = _includeScheduled.asStateFlow()
+    val includeArchived: StateFlow<Boolean> = appSettingsRepository.includeArchivedFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+    val includeDrafts: StateFlow<Boolean> = appSettingsRepository.includeDraftsFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+    val includeScheduled: StateFlow<Boolean> = appSettingsRepository.includeScheduledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
 
     private val _showCreateDialog = MutableStateFlow(false)
     val showCreateDialog: StateFlow<Boolean> = _showCreateDialog.asStateFlow()
@@ -237,15 +249,21 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun toggleIncludeArchived(include: Boolean) {
-        _includeArchived.value = include
+        viewModelScope.launch {
+            appSettingsRepository.setIncludeArchived(include)
+        }
     }
 
     fun toggleIncludeDrafts(include: Boolean) {
-        _includeDrafts.value = include
+        viewModelScope.launch {
+            appSettingsRepository.setIncludeDrafts(include)
+        }
     }
 
     fun toggleIncludeScheduled(include: Boolean) {
-        _includeScheduled.value = include
+        viewModelScope.launch {
+            appSettingsRepository.setIncludeScheduled(include)
+        }
     }
 
     fun openScheduledTaskDialog(task: ScheduledTaskEntity? = null) {
