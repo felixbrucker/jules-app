@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -316,7 +317,14 @@ private fun RepoDropdownMenu(
 
     DropdownMenu(
         expanded = expanded,
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (isImeVisible) {
+                keyboardController?.hide()
+            } else {
+                onDismiss()
+            }
+        },
+        properties = PopupProperties(dismissOnBackPress = false),
         shape = RoundedCornerShape(12.dp)
     ) {
         OutlinedTextField(
