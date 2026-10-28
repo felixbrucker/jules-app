@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
@@ -19,9 +21,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LocalMinimumInteractiveComponentSize
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -45,7 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.felixbrucker.jules.data.database.ScheduleType
 import com.felixbrucker.jules.data.database.ScheduledTaskEntity
-import com.felixbrucker.jules.data.database.SourceEntity
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
@@ -54,7 +52,6 @@ import java.util.Locale
 fun ScheduledTaskCard(
     modifier: Modifier = Modifier,
     task: ScheduledTaskEntity,
-    sources: List<SourceEntity>,
     onCardClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
     onExecuteNow: () -> Unit,
@@ -90,7 +87,7 @@ fun ScheduledTaskCard(
                 onRequestDelete = { showDeleteDialog = true }
             )
             Spacer(modifier = Modifier.height(12.dp))
-            ScheduledTaskCardFooter(task = task, sources = sources)
+            ScheduledTaskCardFooter(task = task)
         }
     }
 }
@@ -122,7 +119,12 @@ private fun ScheduledTaskCardHeader(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        Box(
+            modifier = Modifier
+                .height(21.dp)
+                .width(36.dp)
+                .wrapContentSize(Alignment.Center, unbounded = true)
+        ) {
             Switch(
                 checked = task.enabled,
                 onCheckedChange = onToggleEnabled,
@@ -210,8 +212,7 @@ private fun ScheduledBadge() {
 
 @Composable
 private fun ScheduledTaskCardFooter(
-    task: ScheduledTaskEntity,
-    sources: List<SourceEntity>
+    task: ScheduledTaskEntity
 ) {
     val scheduleSummary = formatScheduleSummary(task)
     val reposCount = task.repos.size

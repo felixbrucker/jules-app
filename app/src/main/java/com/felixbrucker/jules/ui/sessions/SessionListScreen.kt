@@ -115,7 +115,6 @@ import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
-import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.ui.components.DiffBadges
 import com.felixbrucker.jules.ui.components.PullRequestChip
 import com.felixbrucker.jules.ui.components.SessionStateBadge
@@ -864,7 +863,6 @@ private fun SessionLazyColumn(
             ScheduledTaskCard(
                 modifier = Modifier.animateItem(),
                 task = taskItem,
-                sources = sources,
                 onCardClick = { onCardClickScheduledTask(taskItem) },
                 onToggleEnabled = { enabled -> onToggleScheduledTaskEnabled(taskItem, enabled) },
                 onExecuteNow = { onExecuteScheduledTaskNow(taskItem.id) },
