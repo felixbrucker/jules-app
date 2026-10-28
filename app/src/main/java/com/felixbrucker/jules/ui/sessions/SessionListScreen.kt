@@ -140,6 +140,7 @@ fun SessionListScreen(
     val scheduledTasks by viewModel.scheduledTasks.collectAsState()
     val dailyCount by viewModel.dailySessionCount.collectAsState()
     val dailyLimit by viewModel.dailySessionLimit.collectAsState()
+    val workflowDispatchingEnabled by viewModel.workflowDispatchingEnabled.collectAsState()
 
     val showCreateDialog by viewModel.showCreateDialog.collectAsState()
     val showScheduledTaskDialog by viewModel.showScheduledTaskDialog.collectAsState()
@@ -332,8 +333,9 @@ fun SessionListScreen(
                 includeArchived = includeArchived,
                 includeDrafts = includeDrafts,
                 includeScheduled = includeScheduled,
-                drafts = drafts,
-                scheduledTasks = scheduledTasks,
+                workflowDispatchingEnabled = workflowDispatchingEnabled,
+            drafts = drafts,
+            scheduledTasks = scheduledTasks,
                 sources = sources,
                 sessions = sessions,
                 onFabVisibilityChanged = { isFabVisible = it },
@@ -596,6 +598,7 @@ private fun SessionListContent(
     includeArchived: Boolean,
     includeDrafts: Boolean,
     includeScheduled: Boolean,
+    workflowDispatchingEnabled: Boolean,
     drafts: List<SessionDraftWithSource>,
     scheduledTasks: List<ScheduledTaskEntity>,
     sources: List<SourceEntity>,
@@ -668,6 +671,7 @@ private fun SessionListContent(
                 scheduledTasks = scheduledTasks,
                 sources = sources,
                 sessions = sessions,
+                workflowDispatchingEnabled = workflowDispatchingEnabled,
                 onCardClickDraft = { viewModel.openCreateDialog(it.draft) },
                 onDeleteDraft = { viewModel.deleteDraft(it) },
                 onCardClickScheduledTask = { viewModel.openScheduledTaskDialog(it) },
@@ -826,6 +830,7 @@ private fun SessionLazyColumn(
     scheduledTasks: List<ScheduledTaskEntity>,
     sources: List<SourceEntity>,
     sessions: List<SessionWithPullRequest>,
+    workflowDispatchingEnabled: Boolean,
     onCardClickDraft: (SessionDraftWithSource) -> Unit,
     onDeleteDraft: (String) -> Unit,
     onCardClickScheduledTask: (ScheduledTaskEntity) -> Unit,
@@ -876,6 +881,7 @@ private fun SessionLazyColumn(
             SessionCard(
                 modifier = Modifier.animateItem(),
                 sessionWithPullRequest = item,
+                workflowDispatchingEnabled = workflowDispatchingEnabled,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
                 onDelete = onDelete,
@@ -892,6 +898,7 @@ private fun SessionLazyColumn(
 private fun SessionCard(
     modifier: Modifier = Modifier,
     sessionWithPullRequest: SessionWithPullRequest,
+    workflowDispatchingEnabled: Boolean,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onDelete: (String) -> Unit,
@@ -946,6 +953,7 @@ private fun SessionCard(
             Spacer(modifier = Modifier.height(8.dp))
             SessionCardFooter(
                 sessionWithPullRequest = sessionWithPullRequest,
+                workflowDispatchingEnabled = workflowDispatchingEnabled,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
                 onSelectWorkflow = { wf -> onSelectWorkflow(session, wf) }
@@ -1128,6 +1136,7 @@ private fun SessionActionDropdownMenu(
 @Composable
 private fun SessionCardFooter(
     sessionWithPullRequest: SessionWithPullRequest,
+    workflowDispatchingEnabled: Boolean,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onSelectWorkflow: (DispatchableWorkflowEntity) -> Unit
@@ -1203,14 +1212,16 @@ private fun SessionCardFooter(
                 }
             }
 
-            WorkflowCiButton(
-                sessionId = session.id,
-                dispatchedWorkflowRun = sessionWithPullRequest.dispatchedWorkflowRun,
-                workflows = workflows,
-                onWorkflowSelected = onSelectWorkflow,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope
-            )
+            if (workflowDispatchingEnabled) {
+                WorkflowCiButton(
+                    sessionId = session.id,
+                    dispatchedWorkflowRun = sessionWithPullRequest.dispatchedWorkflowRun,
+                    workflows = workflows,
+                    onWorkflowSelected = onSelectWorkflow,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
+            }
         }
     }
 }

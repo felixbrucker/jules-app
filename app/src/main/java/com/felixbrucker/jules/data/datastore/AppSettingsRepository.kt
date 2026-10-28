@@ -23,7 +23,8 @@ data class AppSettings(
     val dailySessionLimit: Int,
     val feedbackNotificationsEnabled: Boolean,
     val completionNotificationsEnabled: Boolean,
-    val useExactAlarms: Boolean = false
+    val useExactAlarms: Boolean = false,
+    val workflowDispatchingEnabled: Boolean = false
 )
 
 @Singleton
@@ -42,6 +43,7 @@ class AppSettingsRepository @Inject constructor(
         val LAST_SELECTED_SOURCE_ID = stringPreferencesKey("last_selected_source_id")
         val SELECTED_FILTER_CHIPS = stringSetPreferencesKey("selected_filter_chips")
         val USE_EXACT_ALARMS = booleanPreferencesKey("use_exact_alarms")
+        val WORKFLOW_DISPATCHING_ENABLED = booleanPreferencesKey("workflow_dispatching_enabled")
     }
 
     val appSettingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -54,7 +56,8 @@ class AppSettingsRepository @Inject constructor(
                 dailySessionLimit = preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15,
                 feedbackNotificationsEnabled = preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] ?: true,
                 completionNotificationsEnabled = preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true,
-                useExactAlarms = preferences[PreferencesKeys.USE_EXACT_ALARMS] ?: false
+                useExactAlarms = preferences[PreferencesKeys.USE_EXACT_ALARMS] ?: false,
+                workflowDispatchingEnabled = preferences[PreferencesKeys.WORKFLOW_DISPATCHING_ENABLED] ?: false
             )
         }
 
@@ -90,6 +93,9 @@ class AppSettingsRepository @Inject constructor(
 
     val selectedFilterChipsFlow: Flow<Set<String>> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.SELECTED_FILTER_CHIPS] ?: emptySet() }
+
+    val workflowDispatchingEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.WORKFLOW_DISPATCHING_ENABLED] ?: false }
 
     suspend fun saveApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
@@ -162,6 +168,12 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setUseExactAlarms(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.USE_EXACT_ALARMS] = enabled
+        }
+    }
+
+    suspend fun setWorkflowDispatchingEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.WORKFLOW_DISPATCHING_ENABLED] = enabled
         }
     }
 }

@@ -78,6 +78,7 @@ fun SettingsScreen(
     val feedbackNotificationsEnabled by viewModel.feedbackNotificationsEnabled.collectAsState()
     val completionNotificationsEnabled by viewModel.completionNotificationsEnabled.collectAsState()
     val useExactAlarms by viewModel.useExactAlarms.collectAsState()
+    val workflowDispatchingEnabled by viewModel.workflowDispatchingEnabled.collectAsState()
     val selectedPlan by viewModel.selectedPlan.collectAsState()
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -120,6 +121,7 @@ fun SettingsScreen(
             feedbackNotificationsEnabled = feedbackNotificationsEnabled,
             completionNotificationsEnabled = completionNotificationsEnabled,
             useExactAlarms = useExactAlarms,
+            workflowDispatchingEnabled = workflowDispatchingEnabled,
             selectedPlan = selectedPlan,
             onViewLogsClick = onViewLogsClick
         )
@@ -164,6 +166,7 @@ private fun SettingsContent(
     feedbackNotificationsEnabled: Boolean,
     completionNotificationsEnabled: Boolean,
     useExactAlarms: Boolean,
+    workflowDispatchingEnabled: Boolean,
     selectedPlan: JulesPlan,
     onViewLogsClick: () -> Unit
 ) {
@@ -175,7 +178,7 @@ private fun SettingsContent(
     ) {
         ApiKeyCard(viewModel = viewModel)
         Spacer(modifier = Modifier.height(16.dp))
-        GitHubAuthTokenCard(viewModel = viewModel)
+        GitHubAuthTokenCard(viewModel = viewModel, workflowDispatchingEnabled = workflowDispatchingEnabled)
         Spacer(modifier = Modifier.height(16.dp))
         PlanSelectionCard(
             currentPlan = selectedPlan,
@@ -470,8 +473,11 @@ private fun ApiKeyCard(
 
 @Composable
 private fun GitHubAuthTokenCard(
-    viewModel: SettingsViewModel
+    viewModel: SettingsViewModel,
+    workflowDispatchingEnabled: Boolean
 ) {
+    val isGithubTokenSet = !viewModel.persistedGithubAuthToken.isNullOrBlank()
+
     ElevatedCard(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -515,6 +521,25 @@ private fun GitHubAuthTokenCard(
                     isLoading = viewModel.isValidatingGithubAuthToken,
                     enabled = viewModel.persistedGithubAuthToken != viewModel.githubAuthToken,
                     onClick = { viewModel.validateAndApplyGithubAuthToken() }
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Workflow Dispatching", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = "Enable dispatching GitHub Actions workflows from session views",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = workflowDispatchingEnabled && isGithubTokenSet,
+                    enabled = isGithubTokenSet,
+                    onCheckedChange = { viewModel.setWorkflowDispatchingEnabled(it) }
                 )
             }
         }

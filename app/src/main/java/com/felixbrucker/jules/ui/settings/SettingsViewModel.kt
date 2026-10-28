@@ -85,6 +85,9 @@ class SettingsViewModel @Inject constructor(
     val useExactAlarms = appSettingsRepository.useExactAlarmsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val workflowDispatchingEnabled = appSettingsRepository.workflowDispatchingEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val selectedPlan = appSettingsRepository.dailySessionLimitFlow
         .map { JulesPlan.fromLimit(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), JulesPlan.FREE)
@@ -231,6 +234,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             appSettingsRepository.setUseExactAlarms(enabled)
             scheduledTaskScheduler.rescheduleAllTasks()
+        }
+    }
+
+    fun setWorkflowDispatchingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setWorkflowDispatchingEnabled(enabled)
         }
     }
 
