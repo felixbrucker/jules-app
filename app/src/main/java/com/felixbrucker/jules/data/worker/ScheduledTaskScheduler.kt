@@ -19,6 +19,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -66,7 +67,10 @@ class ScheduledTaskScheduler @Inject constructor(
                 pendingIntent
             )
         }
-        Timber.tag(TAG).i("Scheduled task ${task.id} ('${task.title ?: "Untitled"}', ${task.scheduleType}) for $nextRunMillis (exact=$useExact, canExact=$canExact)")
+        val nextRunFormatted = Instant.ofEpochMilli(nextRunMillis)
+            .atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z"))
+        Timber.tag(TAG).i("Scheduled task ${task.id} ('${task.title ?: "Untitled"}', ${task.scheduleType}) for $nextRunFormatted (exact=$useExact, canExact=$canExact)")
     }
 
     fun cancelTask(taskId: String) {
