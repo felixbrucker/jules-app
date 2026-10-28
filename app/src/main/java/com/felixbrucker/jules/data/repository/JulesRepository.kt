@@ -176,7 +176,13 @@ class JulesRepository @Inject constructor(
                 saveSessions(listOf(fetched.toEntity()), isBackground = true)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                val errorMsg = e.message ?: "Unknown error"
                 Timber.tag(TAG).e(e, "Error executing scheduled task $taskId for repo ${repoTarget.sourceId}")
+                notificationManager.sendScheduledTaskErrorNotification(
+                    taskTitle = task.title,
+                    repoTarget = repoTarget.sourceId,
+                    errorMessage = errorMsg
+                )
             }
         }
 
