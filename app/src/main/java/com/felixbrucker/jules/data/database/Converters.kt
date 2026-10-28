@@ -44,6 +44,27 @@ class Converters {
     private val workflowInputListType = Types.newParameterizedType(List::class.java, WorkflowInput::class.java)
     private val workflowInputListAdapter: JsonAdapter<List<WorkflowInput>> = moshi.adapter(workflowInputListType)
 
+    private val scheduledTaskRepoListType = Types.newParameterizedType(List::class.java, ScheduledTaskRepo::class.java)
+    private val scheduledTaskRepoListAdapter: JsonAdapter<List<ScheduledTaskRepo>> = moshi.adapter(scheduledTaskRepoListType)
+
+    @TypeConverter
+    fun fromScheduleType(type: ScheduleType): String = type.name
+
+    @TypeConverter
+    fun toScheduleType(value: String): ScheduleType = ScheduleType.valueOf(value)
+
+    @TypeConverter
+    fun fromScheduledTaskRepoList(repos: List<ScheduledTaskRepo>?): String? {
+        if (repos == null) return null
+        return scheduledTaskRepoListAdapter.toJson(repos)
+    }
+
+    @TypeConverter
+    fun toScheduledTaskRepoList(value: String?): List<ScheduledTaskRepo>? {
+        if (value.isNullOrBlank()) return null
+        return scheduledTaskRepoListAdapter.fromJson(value)
+    }
+
     @TypeConverter
     fun fromSessionState(state: SessionState): String = state.name
 

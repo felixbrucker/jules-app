@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.felixbrucker.jules.data.worker.ScheduledTaskScheduler
 import com.felixbrucker.jules.network.api.model.GitHubApiException
 import com.felixbrucker.jules.network.api.model.JulesApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,7 +33,8 @@ enum class JulesPlan(val displayName: String, val dailyLimit: Int) {
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val julesRepository: JulesRepository,
-    private val appSettingsRepository: AppSettingsRepository
+    private val appSettingsRepository: AppSettingsRepository,
+    private val scheduledTaskScheduler: ScheduledTaskScheduler
 ) : ViewModel() {
 
     var apiKey by mutableStateOf("")
@@ -79,6 +81,9 @@ class SettingsViewModel @Inject constructor(
 
     val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val useExactAlarms = appSettingsRepository.useExactAlarmsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val workflowDispatchingEnabled = appSettingsRepository.workflowDispatchingEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -222,6 +227,13 @@ class SettingsViewModel @Inject constructor(
     fun setCompletionNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             appSettingsRepository.setCompletionNotificationsEnabled(enabled)
+        }
+    }
+
+    fun setUseExactAlarms(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setUseExactAlarms(enabled)
+            scheduledTaskScheduler.rescheduleAllTasks()
         }
     }
 
