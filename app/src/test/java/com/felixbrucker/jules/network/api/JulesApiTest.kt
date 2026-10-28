@@ -80,8 +80,8 @@ class JulesApiTest {
         assertTrue("Query param pageSize mismatch", recordedRequest.path?.contains("pageSize=10") == true)
         assertTrue("Query param filter name mismatch", recordedRequest.path?.contains("filter=name") == true)
 
-        assertEquals("Sources size mismatch", 1, result.sources.size)
-        val source = result.sources.first()
+        assertEquals("Sources size mismatch", 1, result.sourcesList.size)
+        val source = result.sourcesList.first()
         assertEquals("github/owner/repo", source.id)
         assertEquals(SourceType.GITHUB_REPO, source.type)
         assertEquals("owner/repo", source.displayName)
@@ -137,8 +137,8 @@ class JulesApiTest {
         val recordedRequest = mockWebServer.takeRequest()
         assertTrue("Path mismatch", recordedRequest.path?.contains("/v1alpha/sessions") == true)
         assertTrue("Archived filter missing", recordedRequest.path?.contains("filter=archived%3Dtrue") == true || recordedRequest.path?.contains("filter=archived=true") == true)
-        assertEquals(1, response.sessions.size)
-        assertEquals("archived-123", response.sessions.first().id)
+        assertEquals(1, response.sessionsList.size)
+        assertEquals("archived-123", response.sessionsList.first().id)
     }
 
     @Test
@@ -290,6 +290,13 @@ class JulesApiTest {
         mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
         val response = julesApi.getActivities(sessionId = "session-empty")
         assertTrue("Expected empty activities list for empty JSON object response", response.activitiesList.isEmpty())
+    }
+
+    @Test
+    fun testEmptySessionsResponseParsing() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        val response = julesApi.getSessions()
+        assertTrue("Expected empty sessions list for empty JSON object response", response.sessionsList.isEmpty())
     }
 
     @Test

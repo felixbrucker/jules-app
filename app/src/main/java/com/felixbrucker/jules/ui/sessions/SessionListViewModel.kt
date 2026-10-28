@@ -221,6 +221,16 @@ class SessionListViewModel @Inject constructor(
             _activeDraft.value = initialDraft
             _createSessionError.value = null
             _showCreateDialog.value = true
+            initialDraft.sourceId?.let { syncSourceIfNeeded(it) }
+        }
+    }
+
+    fun syncSourceIfNeeded(sourceId: String) {
+        viewModelScope.launch {
+            try {
+                julesRepository.syncSource(sourceId)
+            } catch (_: Exception) {
+            }
         }
     }
 

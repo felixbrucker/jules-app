@@ -16,6 +16,7 @@ import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
+import com.felixbrucker.jules.data.database.SourceSyncMetadataEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.network.api.GitHubApi
@@ -241,6 +242,39 @@ class JulesRepositoryTest {
             julesApi.getSources(pageSize = 100, pageToken = null)
             sourceDao.upsertSources(any())
             syncMetadataRepository.saveLastSourcesSyncedAt(any())
+        }
+    }
+
+    @Test
+    fun testSyncSourceGatedWhenSyncedWithin5Minutes() = runBlocking {
+        val sourceId = "sources/github/owner/repo"
+        coEvery { sourceSyncMetadataDao.isSourceSyncedRecently(sourceId, any()) } returns true
+
+        repository.syncSource(sourceId = sourceId, force = false)
+
+        coVerify(exactly = 0) {
+            julesApi.getSource(any())
+        }
+    }
+
+    @Test
+    fun testSyncSourceRunsWhenNotSyncedRecentlyOrForced() = runBlocking {
+        val sourceId = "sources/github/owner/repo"
+        val apiSource = Source(
+            name = sourceId,
+            id = "github/owner/repo",
+            githubRepo = GitHubRepo(owner = "owner", repo = "repo")
+        )
+
+        coEvery { sourceSyncMetadataDao.isSourceSyncedRecently(sourceId, any()) } returns false
+        coEvery { julesApi.getSource(sourceId) } returns apiSource
+
+        repository.syncSource(sourceId = sourceId, force = false)
+
+        coVerify {
+            julesApi.getSource(sourceId)
+            sourceDao.upsertSources(any())
+            sourceSyncMetadataDao.updateLastSourceSyncedAtTargeted(sourceId, any())
         }
     }
 

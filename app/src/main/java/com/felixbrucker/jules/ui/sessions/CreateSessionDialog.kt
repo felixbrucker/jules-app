@@ -32,6 +32,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,7 +58,8 @@ fun CreateSessionDialog(
     errorMessage: String?,
     onDismiss: () -> Unit,
     onSaveDraft: (SessionDraftEntity) -> Unit,
-    onCreateSession: (SessionDraftEntity) -> Unit
+    onCreateSession: (SessionDraftEntity) -> Unit,
+    onSourceSelected: (SourceEntity) -> Unit
 ) {
     BasicAlertDialog(
         onDismissRequest = onDismiss
@@ -76,7 +78,8 @@ fun CreateSessionDialog(
                 errorMessage = errorMessage,
                 onDismiss = onDismiss,
                 onSaveDraft = onSaveDraft,
-                onCreateSession = onCreateSession
+                onCreateSession = onCreateSession,
+                onSourceSelected = onSourceSelected
             )
         }
     }
@@ -91,7 +94,8 @@ private fun CreateSessionDialogBody(
     errorMessage: String?,
     onDismiss: () -> Unit,
     onSaveDraft: (SessionDraftEntity) -> Unit,
-    onCreateSession: (SessionDraftEntity) -> Unit
+    onCreateSession: (SessionDraftEntity) -> Unit,
+    onSourceSelected: (SourceEntity) -> Unit
 ) {
     val initialSource = remember(draft.sourceId, sources) {
         sources.firstOrNull { it.id == draft.sourceId }
@@ -99,6 +103,11 @@ private fun CreateSessionDialogBody(
     }
 
     var selectedSource by remember(initialSource) { mutableStateOf(initialSource) }
+
+    LaunchedEffect(selectedSource?.id) {
+        selectedSource?.let { src -> onSourceSelected(src) }
+    }
+
     var selectedBranch by remember(selectedSource, draft.branch) {
         val branch = draft.branch
             ?: selectedSource?.githubRepo?.defaultBranchName

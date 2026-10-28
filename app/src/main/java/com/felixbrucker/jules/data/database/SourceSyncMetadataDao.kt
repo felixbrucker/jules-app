@@ -25,6 +25,27 @@ interface SourceSyncMetadataDao {
         updateLastWorkflowSyncedAt(sourceId = sourceId, timestamp = timestamp)
     }
 
+    @Query("UPDATE source_sync_metadata SET lastSourceSyncedAt = :timestamp WHERE sourceId = :sourceId")
+    suspend fun updateLastSourceSyncedAt(sourceId: String, timestamp: Instant)
+
+    @Transaction
+    suspend fun updateLastSourceSyncedAtTargeted(sourceId: String, timestamp: Instant) {
+        insertIgnore(SourceSyncMetadataEntity(sourceId = sourceId))
+        updateLastSourceSyncedAt(sourceId = sourceId, timestamp = timestamp)
+    }
+
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM source_sync_metadata
+            WHERE sourceId = :sourceId
+              AND lastSourceSyncedAt IS NOT NULL
+              AND lastSourceSyncedAt >= :cutoffTimestamp
+        )
+        """
+    )
+    suspend fun isSourceSyncedRecently(sourceId: String, cutoffTimestamp: Instant): Boolean
+
     @Query("SELECT * FROM source_sync_metadata WHERE sourceId = :sourceId")
     suspend fun getMetadata(sourceId: String): SourceSyncMetadataEntity?
 }

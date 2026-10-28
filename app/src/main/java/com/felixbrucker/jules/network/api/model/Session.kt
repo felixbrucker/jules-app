@@ -139,6 +139,9 @@ class UnarchiveSessionRequest
 
 @JsonClass(generateAdapter = true)
 data class SessionsListResponse(
-    @Json(name = "sessions") val sessions: List<Session>,
+    @Json(name = "sessions") val sessions: List<Session>? = emptyList(),
     @Json(name = "nextPageToken") val nextPageToken: String? = null
-)
+) {
+    val sessionsList: List<Session>
+        get() = sessions.orEmpty()
+}
