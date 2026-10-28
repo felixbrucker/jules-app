@@ -18,6 +18,9 @@ import com.felixbrucker.jules.data.database.DispatchedWorkflowRunDao
 import com.felixbrucker.jules.data.database.DispatchedWorkflowRunEntity
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.PullRequestEntity
+import com.felixbrucker.jules.data.database.ScheduledTaskDao
+import com.felixbrucker.jules.data.database.ScheduledTaskEntity
+import com.felixbrucker.jules.data.database.ScheduleType
 import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.database.SessionDraftEntity
@@ -30,6 +33,7 @@ import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
 import com.felixbrucker.jules.data.database.toEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
+import com.felixbrucker.jules.data.worker.ScheduledTaskScheduler
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.filter.ActivityFilter
@@ -75,6 +79,8 @@ class JulesRepository @Inject constructor(
     private val pullRequestDao: PullRequestDao,
     private val sourceDao: SourceDao,
     private val sessionDraftDao: SessionDraftDao,
+    private val scheduledTaskDao: ScheduledTaskDao,
+    private val scheduledTaskScheduler: ScheduledTaskScheduler,
     private val dispatchableWorkflowDao: DispatchableWorkflowDao,
     private val dispatchedWorkflowRunDao: DispatchedWorkflowRunDao,
     private val sourceSyncMetadataDao: SourceSyncMetadataDao,
@@ -130,6 +136,57 @@ class JulesRepository @Inject constructor(
     fun getDraftsFlow(searchQuery: String): Flow<List<SessionDraftWithSource>> {
         val formattedQuery = if (searchQuery.isBlank()) "%%" else "%${searchQuery.trim()}%"
         return sessionDraftDao.getDrafts(formattedQuery)
+    }
+
+    fun getScheduledTasksFlow(searchQuery: String): Flow<List<ScheduledTaskEntity>> {
+        val formattedQuery = if (searchQuery.isBlank()) "%%" else "%${searchQuery.trim()}%"
+        return scheduledTaskDao.getTasks(formattedQuery)
+    }
+
+    suspend fun saveScheduledTask(task: ScheduledTaskEntity) = withContext(Dispatchers.IO) {
+        scheduledTaskDao.upsertTask(task)
+        scheduledTaskScheduler.scheduleTask(task)
+    }
+
+    suspend fun deleteScheduledTask(taskId: String) = withContext(Dispatchers.IO) {
+        scheduledTaskScheduler.cancelTask(taskId)
+        scheduledTaskDao.deleteTask(taskId)
+    }
+
+    suspend fun executeScheduledTask(taskId: String) = withContext(Dispatchers.IO) {
+        val task = scheduledTaskDao.getTaskById(taskId) ?: return@withContext
+        val repos = task.repos
+        if (repos.isEmpty()) return@withContext
+
+        for (repoTarget in repos) {
+            try {
+                val sourceContext = SourceContext(
+                    sourceName = "sources/${repoTarget.sourceId}",
+                    githubRepoContext = repoTarget.branch.ifBlank { null }?.let { GitHubRepoContext(startingBranch = it) }
+                )
+                val request = CreateSessionRequest(
+                    prompt = task.prompt,
+                    title = task.title?.ifBlank { null },
+                    sourceContext = sourceContext,
+                    requirePlanApproval = task.requirePlanApproval,
+                    automationMode = AutomationMode.AUTO_CREATE_PR
+                )
+                val created = julesApi.createSession(request)
+                val fetched = julesApi.getSession(created.id)
+                saveSessions(listOf(fetched.toEntity()), isBackground = true)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.tag(TAG).e(e, "Error executing scheduled task $taskId for repo ${repoTarget.sourceId}")
+            }
+        }
+
+        val updatedTask = task.copy(
+            lastRunAt = Instant.now(),
+            enabled = if (task.scheduleType == ScheduleType.ONCE) false else task.enabled,
+            updatedAt = Instant.now()
+        )
+        scheduledTaskDao.upsertTask(updatedTask)
+        scheduledTaskScheduler.scheduleTask(updatedTask)
     }
 
     suspend fun saveDraft(draft: SessionDraftEntity) = withContext(Dispatchers.IO) {

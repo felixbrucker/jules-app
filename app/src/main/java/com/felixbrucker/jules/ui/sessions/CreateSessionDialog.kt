@@ -199,7 +199,7 @@ private fun CreateSessionDialogBody(
 }
 
 @Composable
-private fun RepoAndBranchSelectionRow(
+fun RepoAndBranchSelectionRow(
     sources: List<SourceEntity>,
     selectedSource: SourceEntity?,
     selectedBranch: String,
@@ -393,7 +393,7 @@ private fun BranchDropdown(
 }
 
 @Composable
-private fun TitleInputField(
+fun TitleInputField(
     title: String,
     onTitleChange: (String) -> Unit
 ) {
@@ -414,7 +414,7 @@ private fun TitleInputField(
 }
 
 @Composable
-private fun PromptInputField(
+fun PromptInputField(
     prompt: String,
     onPromptChange: (String) -> Unit
 ) {
@@ -430,7 +430,7 @@ private fun PromptInputField(
 }
 
 @Composable
-private fun RequirePlanApprovalToggleRow(
+fun RequirePlanApprovalToggleRow(
     requirePlanApproval: Boolean,
     onToggle: (Boolean) -> Unit
 ) {

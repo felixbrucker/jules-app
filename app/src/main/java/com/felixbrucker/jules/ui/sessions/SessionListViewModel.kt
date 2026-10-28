@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.felixbrucker.jules.data.database.ScheduledTaskEntity
+import com.felixbrucker.jules.data.database.ScheduledTaskRepo
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionDraftWithSource
 import com.felixbrucker.jules.data.database.SessionEntity
@@ -65,6 +67,8 @@ class SessionListViewModel @Inject constructor(
     val includeArchived: StateFlow<Boolean> = _includeArchived.asStateFlow()
     private val _includeDrafts = MutableStateFlow(true)
     val includeDrafts: StateFlow<Boolean> = _includeDrafts.asStateFlow()
+    private val _includeScheduled = MutableStateFlow(false)
+    val includeScheduled: StateFlow<Boolean> = _includeScheduled.asStateFlow()
 
     private val _showCreateDialog = MutableStateFlow(false)
     val showCreateDialog: StateFlow<Boolean> = _showCreateDialog.asStateFlow()
@@ -74,6 +78,15 @@ class SessionListViewModel @Inject constructor(
     val isCreatingSession: StateFlow<Boolean> = _isCreatingSession.asStateFlow()
     private val _createSessionError = MutableStateFlow<String?>(null)
     val createSessionError: StateFlow<String?> = _createSessionError.asStateFlow()
+
+    private val _showScheduledTaskDialog = MutableStateFlow(false)
+    val showScheduledTaskDialog: StateFlow<Boolean> = _showScheduledTaskDialog.asStateFlow()
+    private val _activeScheduledTask = MutableStateFlow<ScheduledTaskEntity?>(null)
+    val activeScheduledTask: StateFlow<ScheduledTaskEntity?> = _activeScheduledTask.asStateFlow()
+    private val _isSavingScheduledTask = MutableStateFlow(false)
+    val isSavingScheduledTask: StateFlow<Boolean> = _isSavingScheduledTask.asStateFlow()
+    private val _scheduledTaskError = MutableStateFlow<String?>(null)
+    val scheduledTaskError: StateFlow<String?> = _scheduledTaskError.asStateFlow()
 
     private val _dispatchDialogState = MutableStateFlow<DispatchDialogState?>(null)
     val dispatchDialogState: StateFlow<DispatchDialogState?> = _dispatchDialogState.asStateFlow()
@@ -153,6 +166,27 @@ class SessionListViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val scheduledTasks: StateFlow<List<ScheduledTaskEntity>> = combine(
+        searchQuery,
+        selectedChips,
+        includeScheduled
+    ) { query, chips, incScheduled ->
+        ScheduledFilterParams(query = query, hasStatusFilters = chips.isNotEmpty(), includeScheduled = incScheduled)
+    }
+        .flatMapLatest { params ->
+            if (!params.includeScheduled || params.hasStatusFilters) {
+                flowOf(emptyList())
+            } else {
+                julesRepository.getScheduledTasksFlow(params.query)
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     val sources: StateFlow<List<SourceEntity>> = julesRepository.getSourcesFlow()
         .stateIn(
             scope = viewModelScope,
@@ -205,6 +239,78 @@ class SessionListViewModel @Inject constructor(
 
     fun toggleIncludeDrafts(include: Boolean) {
         _includeDrafts.value = include
+    }
+
+    fun toggleIncludeScheduled(include: Boolean) {
+        _includeScheduled.value = include
+    }
+
+    fun openScheduledTaskDialog(task: ScheduledTaskEntity? = null) {
+        viewModelScope.launch {
+            val initialTask = if (task != null) {
+                task
+            } else {
+                val lastSourceId = appSettingsRepository.lastSelectedSourceIdFlow.first()
+                val targetSourceId = lastSourceId?.takeIf { id ->
+                    sources.value.any { it.id == id }
+                } ?: sources.value.firstOrNull()?.id
+                val defaultRepo = targetSourceId?.let { id ->
+                    val src = sources.value.firstOrNull { it.id == id }
+                    val branch = src?.githubRepo?.defaultBranchName
+                        ?: src?.githubRepo?.branches?.firstOrNull()?.displayName
+                        ?: "main"
+                    listOf(ScheduledTaskRepo(id, branch))
+                } ?: emptyList()
+                ScheduledTaskEntity(repos = defaultRepo)
+            }
+            _activeScheduledTask.value = initialTask
+            _scheduledTaskError.value = null
+            _showScheduledTaskDialog.value = true
+        }
+    }
+
+    fun dismissScheduledTaskDialog() {
+        _showScheduledTaskDialog.value = false
+        _activeScheduledTask.value = null
+        _scheduledTaskError.value = null
+        _isSavingScheduledTask.value = false
+    }
+
+    fun saveScheduledTask(task: ScheduledTaskEntity) {
+        viewModelScope.launch {
+            _isSavingScheduledTask.value = true
+            _scheduledTaskError.value = null
+            try {
+                task.repos.firstOrNull()?.sourceId?.let { appSettingsRepository.saveLastSelectedSourceId(it) }
+                julesRepository.saveScheduledTask(task)
+                dismissScheduledTaskDialog()
+            } catch (e: Exception) {
+                _scheduledTaskError.value = e.message ?: "Failed to save scheduled task"
+            } finally {
+                _isSavingScheduledTask.value = false
+            }
+        }
+    }
+
+    fun deleteScheduledTask(taskId: String) {
+        viewModelScope.launch {
+            try {
+                julesRepository.deleteScheduledTask(taskId)
+            } catch (e: Exception) {
+                _userError.value = e.message ?: "Failed to delete scheduled task"
+            }
+        }
+    }
+
+    fun executeScheduledTaskNow(taskId: String) {
+        viewModelScope.launch {
+            try {
+                julesRepository.executeScheduledTask(taskId)
+                _userError.value = "Scheduled task triggered successfully"
+            } catch (e: Exception) {
+                _userError.value = e.message ?: "Failed to execute scheduled task"
+            }
+        }
     }
 
     fun openCreateDialog(draft: SessionDraftEntity? = null) {
@@ -365,6 +471,12 @@ data class DraftFilterParams(
     val query: String,
     val hasStatusFilters: Boolean,
     val includeDrafts: Boolean
+)
+
+data class ScheduledFilterParams(
+    val query: String,
+    val hasStatusFilters: Boolean,
+    val includeScheduled: Boolean
 )
 
 data class SessionFilterParams(

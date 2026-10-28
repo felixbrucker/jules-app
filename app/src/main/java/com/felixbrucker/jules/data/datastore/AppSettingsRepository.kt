@@ -22,7 +22,8 @@ data class AppSettings(
     val smartSyncEnabled: Boolean,
     val dailySessionLimit: Int,
     val feedbackNotificationsEnabled: Boolean,
-    val completionNotificationsEnabled: Boolean
+    val completionNotificationsEnabled: Boolean,
+    val useExactAlarms: Boolean = false
 )
 
 @Singleton
@@ -40,6 +41,7 @@ class AppSettingsRepository @Inject constructor(
         val COMPLETION_NOTIFICATIONS_ENABLED = booleanPreferencesKey("completion_notifications_enabled")
         val LAST_SELECTED_SOURCE_ID = stringPreferencesKey("last_selected_source_id")
         val SELECTED_FILTER_CHIPS = stringSetPreferencesKey("selected_filter_chips")
+        val USE_EXACT_ALARMS = booleanPreferencesKey("use_exact_alarms")
     }
 
     val appSettingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -51,9 +53,13 @@ class AppSettingsRepository @Inject constructor(
                 smartSyncEnabled = preferences[PreferencesKeys.SMART_SYNC_ENABLED] ?: true,
                 dailySessionLimit = preferences[PreferencesKeys.DAILY_SESSION_LIMIT] ?: 15,
                 feedbackNotificationsEnabled = preferences[PreferencesKeys.FEEDBACK_NOTIFICATIONS_ENABLED] ?: true,
-                completionNotificationsEnabled = preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true
+                completionNotificationsEnabled = preferences[PreferencesKeys.COMPLETION_NOTIFICATIONS_ENABLED] ?: true,
+                useExactAlarms = preferences[PreferencesKeys.USE_EXACT_ALARMS] ?: false
             )
         }
+
+    val useExactAlarmsFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[PreferencesKeys.USE_EXACT_ALARMS] ?: false }
 
     val apiKeyFlow: Flow<String?> = context.dataStore.data
         .map { preferences -> preferences[PreferencesKeys.API_KEY] }
@@ -150,6 +156,12 @@ class AppSettingsRepository @Inject constructor(
     suspend fun saveSelectedFilterChips(chips: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SELECTED_FILTER_CHIPS] = chips
+        }
+    }
+
+    suspend fun setUseExactAlarms(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.USE_EXACT_ALARMS] = enabled
         }
     }
 }

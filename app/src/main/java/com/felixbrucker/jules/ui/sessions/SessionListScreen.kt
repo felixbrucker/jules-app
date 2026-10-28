@@ -12,9 +12,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material3.SmallFloatingActionButton
+import com.felixbrucker.jules.data.database.ScheduledTaskEntity
+import com.felixbrucker.jules.data.database.SourceEntity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -130,10 +136,16 @@ fun SessionListScreen(
     val selectedChips by viewModel.selectedChips.collectAsState()
     val includeArchived by viewModel.includeArchived.collectAsState()
     val includeDrafts by viewModel.includeDrafts.collectAsState()
+    val includeScheduled by viewModel.includeScheduled.collectAsState()
+    val scheduledTasks by viewModel.scheduledTasks.collectAsState()
     val dailyCount by viewModel.dailySessionCount.collectAsState()
     val dailyLimit by viewModel.dailySessionLimit.collectAsState()
 
     val showCreateDialog by viewModel.showCreateDialog.collectAsState()
+    val showScheduledTaskDialog by viewModel.showScheduledTaskDialog.collectAsState()
+    val activeScheduledTask by viewModel.activeScheduledTask.collectAsState()
+    val isSavingScheduledTask by viewModel.isSavingScheduledTask.collectAsState()
+    val scheduledTaskError by viewModel.scheduledTaskError.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.startPeriodicSync()
@@ -171,6 +183,18 @@ fun SessionListScreen(
         )
     }
 
+    if (showScheduledTaskDialog && activeScheduledTask != null) {
+        CreateScheduledTaskDialog(
+            task = activeScheduledTask!!,
+            sources = sources,
+            isSaving = isSavingScheduledTask,
+            errorMessage = scheduledTaskError,
+            onDismiss = { viewModel.dismissScheduledTaskDialog() },
+            onSaveTask = { viewModel.saveScheduledTask(it) },
+            onSourceSelected = { source -> viewModel.syncSourceIfNeeded(source.id) }
+        )
+    }
+
     dispatchState?.let { state ->
         val source = remember(state.session.sourceId, sources) {
             sources.find { it.id == state.session.sourceId }
@@ -189,6 +213,11 @@ fun SessionListScreen(
     }
 
     var isFabVisible by remember { mutableStateOf(true) }
+    var isFabExpanded by remember { mutableStateOf(false) }
+    val fabRotation by animateFloatAsState(
+        targetValue = if (isFabExpanded) 45f else 0f,
+        label = "FabRotation"
+    )
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -210,12 +239,85 @@ fun SessionListScreen(
                 enter = slideInVertically(initialOffsetY = { it * 2 }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it * 2 }) + fadeOut()
             ) {
-                FloatingActionButton(
-                    onClick = { viewModel.openCreateDialog() },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Create Session")
+                    AnimatedVisibility(
+                        visible = isFabExpanded,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    tonalElevation = 4.dp
+                                ) {
+                                    Text(
+                                        text = "Scheduled Task",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        isFabExpanded = false
+                                        viewModel.openScheduledTaskDialog()
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                ) {
+                                    Icon(imageVector = Icons.Default.Alarm, contentDescription = "Scheduled Task")
+                                }
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    tonalElevation = 4.dp
+                                ) {
+                                    Text(
+                                        text = "New Session",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        isFabExpanded = false
+                                        viewModel.openCreateDialog()
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                ) {
+                                    Icon(imageVector = Icons.Default.Add, contentDescription = "New Session")
+                                }
+                            }
+                        }
+                    }
+                    FloatingActionButton(
+                        onClick = { isFabExpanded = !isFabExpanded },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Create Options",
+                            modifier = Modifier.rotate(fabRotation)
+                        )
+                    }
                 }
             }
         }
@@ -228,7 +330,10 @@ fun SessionListScreen(
             selectedChips = selectedChips,
             includeArchived = includeArchived,
             includeDrafts = includeDrafts,
+                includeScheduled = includeScheduled,
             drafts = drafts,
+                scheduledTasks = scheduledTasks,
+                sources = sources,
             sessions = sessions,
             onFabVisibilityChanged = { isFabVisible = it },
             onSessionClick = onSessionClick
@@ -475,7 +580,10 @@ private fun SessionListContent(
     selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
     includeDrafts: Boolean,
+    includeScheduled: Boolean,
     drafts: List<SessionDraftWithSource>,
+    scheduledTasks: List<ScheduledTaskEntity>,
+    sources: List<SourceEntity>,
     sessions: List<SessionWithPullRequest>,
     onFabVisibilityChanged: (Boolean) -> Unit,
     onSessionClick: (String) -> Unit
@@ -531,18 +639,25 @@ private fun SessionListContent(
                 selectedChips = selectedChips,
                 includeArchived = includeArchived,
                 includeDrafts = includeDrafts,
+                includeScheduled = includeScheduled,
                 onToggleChip = { viewModel.toggleFilterChip(it) },
                 onToggleArchived = { viewModel.toggleIncludeArchived(it) },
-                onToggleDrafts = { viewModel.toggleIncludeDrafts(it) }
+                onToggleDrafts = { viewModel.toggleIncludeDrafts(it) },
+                onToggleScheduled = { viewModel.toggleIncludeScheduled(it) }
             )
             SessionLazyColumn(
                 listState = listState,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
                 drafts = drafts,
+                scheduledTasks = scheduledTasks,
+                sources = sources,
                 sessions = sessions,
                 onCardClickDraft = { viewModel.openCreateDialog(it.draft) },
                 onDeleteDraft = { viewModel.deleteDraft(it) },
+                onCardClickScheduledTask = { viewModel.openScheduledTaskDialog(it) },
+                onExecuteScheduledTaskNow = { viewModel.executeScheduledTaskNow(it) },
+                onDeleteScheduledTask = { viewModel.deleteScheduledTask(it) },
                 onDelete = { viewModel.deleteSession(it) },
                 onArchive = { viewModel.archiveSession(it) },
                 onUnarchive = { viewModel.unarchiveSession(it) },
@@ -562,9 +677,11 @@ private fun CollapsingFilterBar(
     selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
     includeDrafts: Boolean,
+    includeScheduled: Boolean,
     onToggleChip: (SessionFilterChip) -> Unit,
     onToggleArchived: (Boolean) -> Unit,
-    onToggleDrafts: (Boolean) -> Unit
+    onToggleDrafts: (Boolean) -> Unit,
+    onToggleScheduled: (Boolean) -> Unit
 ) {
     FilterChipsRow(
         modifier = Modifier
@@ -584,9 +701,11 @@ private fun CollapsingFilterBar(
         selectedChips = selectedChips,
         includeArchived = includeArchived,
         includeDrafts = includeDrafts,
+        includeScheduled = includeScheduled,
         onToggleChip = onToggleChip,
         onToggleArchived = onToggleArchived,
-        onToggleDrafts = onToggleDrafts
+        onToggleDrafts = onToggleDrafts,
+        onToggleScheduled = onToggleScheduled
     )
 }
 
@@ -596,9 +715,11 @@ private fun FilterChipsRow(
     selectedChips: Set<SessionFilterChip>,
     includeArchived: Boolean,
     includeDrafts: Boolean,
+    includeScheduled: Boolean,
     onToggleChip: (SessionFilterChip) -> Unit,
     onToggleArchived: (Boolean) -> Unit,
-    onToggleDrafts: (Boolean) -> Unit
+    onToggleDrafts: (Boolean) -> Unit,
+    onToggleScheduled: (Boolean) -> Unit
 ) {
     LazyRow(
         modifier = modifier
@@ -622,6 +743,20 @@ private fun FilterChipsRow(
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            )
+        }
+        item {
+            FilterChip(
+                selected = includeScheduled,
+                onClick = { onToggleScheduled(!includeScheduled) },
+                label = { Text("Scheduled") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Alarm,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
@@ -672,9 +807,14 @@ private fun SessionLazyColumn(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     drafts: List<SessionDraftWithSource>,
+    scheduledTasks: List<ScheduledTaskEntity>,
+    sources: List<SourceEntity>,
     sessions: List<SessionWithPullRequest>,
     onCardClickDraft: (SessionDraftWithSource) -> Unit,
     onDeleteDraft: (String) -> Unit,
+    onCardClickScheduledTask: (ScheduledTaskEntity) -> Unit,
+    onExecuteScheduledTaskNow: (String) -> Unit,
+    onDeleteScheduledTask: (String) -> Unit,
     onDelete: (String) -> Unit,
     onArchive: (String) -> Unit,
     onUnarchive: (String) -> Unit,
@@ -697,6 +837,19 @@ private fun SessionLazyColumn(
                 draftWithSource = draftItem,
                 onCardClick = { onCardClickDraft(draftItem) },
                 onDeleteDraft = { onDeleteDraft(draftItem.draft.id) }
+            )
+        }
+        items(
+            items = scheduledTasks,
+            key = { "scheduled_${it.id}" }
+        ) { taskItem ->
+            ScheduledTaskCard(
+                modifier = Modifier.animateItem(),
+                task = taskItem,
+                sources = sources,
+                onCardClick = { onCardClickScheduledTask(taskItem) },
+                onExecuteNow = { onExecuteScheduledTaskNow(taskItem.id) },
+                onDeleteTask = { onDeleteScheduledTask(taskItem.id) }
             )
         }
         items(
