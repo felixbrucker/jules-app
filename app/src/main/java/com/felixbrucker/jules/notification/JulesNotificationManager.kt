@@ -65,6 +65,39 @@ class JulesNotificationManager @Inject constructor(
         notificationManager.notify(notificationId, notification)
     }
 
+    fun sendScheduledTaskExecutedNotification(
+        taskTitle: String?,
+        repoTarget: String,
+        sessionTitle: String?
+    ) {
+        val notificationId = getNotificationId("scheduled_exec_${taskTitle}_${repoTarget}_${System.currentTimeMillis()}")
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = "Scheduled Task Executed"
+        val body = "Created session '${sessionTitle ?: taskTitle ?: "Untitled"}' for $repoTarget"
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_completed)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(notificationId, notification)
+    }
+
     fun sendScheduledTaskErrorNotification(
         taskTitle: String?,
         repoTarget: String,

@@ -174,6 +174,11 @@ class JulesRepository @Inject constructor(
                 val created = julesApi.createSession(request)
                 val fetched = julesApi.getSession(created.id)
                 saveSessions(listOf(fetched.toEntity()), isBackground = true)
+                notificationManager.sendScheduledTaskExecutedNotification(
+                    taskTitle = task.title,
+                    repoTarget = repoTarget.sourceId,
+                    sessionTitle = fetched.title
+                )
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 val errorMsg = e.message ?: "Unknown error"

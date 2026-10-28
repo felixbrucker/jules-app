@@ -19,6 +19,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,12 +34,14 @@ class ScheduledTaskScheduler @Inject constructor(
     suspend fun scheduleTask(task: ScheduledTaskEntity) {
         val pendingIntent = createPendingIntent(task.id)
         if (!task.enabled) {
+            Timber.tag(TAG).i("Task ${task.id} ('${task.title ?: "Untitled"}') is disabled. Cancelling alarm.")
             alarmManager.cancel(pendingIntent)
             return
         }
 
         val nextRunMillis = calculateNextRunMillis(task, Instant.now())
         if (nextRunMillis == null) {
+            Timber.tag(TAG).i("No future run time for task ${task.id} ('${task.title ?: "Untitled"}'). Cancelling alarm.")
             alarmManager.cancel(pendingIntent)
             return
         }
@@ -63,15 +66,18 @@ class ScheduledTaskScheduler @Inject constructor(
                 pendingIntent
             )
         }
+        Timber.tag(TAG).i("Scheduled task ${task.id} ('${task.title ?: "Untitled"}', ${task.scheduleType}) for $nextRunMillis (exact=$useExact, canExact=$canExact)")
     }
 
     fun cancelTask(taskId: String) {
         val pendingIntent = createPendingIntent(taskId)
         alarmManager.cancel(pendingIntent)
+        Timber.tag(TAG).i("Cancelled alarm for task $taskId")
     }
 
     suspend fun rescheduleAllTasks() {
         val tasks = scheduledTaskDao.getAllEnabledTasks()
+        Timber.tag(TAG).i("Rescheduling ${tasks.size} enabled tasks...")
         for (task in tasks) {
             scheduleTask(task)
         }
@@ -92,6 +98,7 @@ class ScheduledTaskScheduler @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "ScheduledTaskScheduler"
         fun calculateNextRunMillis(task: ScheduledTaskEntity, now: Instant): Long? {
             val zoneId = ZoneId.systemDefault()
             val nowZoned = ZonedDateTime.ofInstant(now, zoneId)
