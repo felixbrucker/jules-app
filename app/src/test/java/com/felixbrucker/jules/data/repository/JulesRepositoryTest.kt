@@ -8,7 +8,6 @@ import com.felixbrucker.jules.data.database.DispatchedWorkflowRunDao
 import com.felixbrucker.jules.data.database.DispatchedWorkflowRunEntity
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.PullRequestDao
-import com.felixbrucker.jules.data.database.PullRequestEntity
 import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.database.SessionDraftEntity
@@ -16,7 +15,6 @@ import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.database.SourceDao
 import com.felixbrucker.jules.data.database.SourceSyncMetadataDao
-import com.felixbrucker.jules.data.database.SourceSyncMetadataEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.network.api.GitHubApi
@@ -137,7 +135,7 @@ class JulesRepositoryTest {
             prompt = "Refactor code",
             state = SessionState.PLANNING,
             createTime = Instant.now(),
-            sourceContext = SourceContext(source = "sources/github/owner/repo")
+            sourceContext = SourceContext(sourceName = "sources/github/owner/repo")
         )
 
         coEvery { julesApi.createSession(any()) } returns apiSession

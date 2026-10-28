@@ -180,7 +180,7 @@ class JulesApiTest {
             prompt = "Fix visibility issue",
             title = "Fix bug in app",
             sourceContext = SourceContext(
-                source = "sources/github/owner/repo",
+                sourceName = "sources/github/owner/repo",
                 githubRepoContext = GitHubRepoContext(startingBranch = "main")
             ),
             requirePlanApproval = true,
@@ -196,7 +196,7 @@ class JulesApiTest {
         assertEquals(Instant.parse("2025-01-01T12:00:00Z"), session.createTime)
         assertEquals(Instant.parse("2025-01-01T12:05:00Z"), session.updateTime)
         assertEquals(java.time.Duration.ofMinutes(5), session.duration)
-        assertEquals("sources/github/owner/repo", session.sourceContext.source)
+        assertEquals("sources/github/owner/repo", session.sourceContext.sourceName)
         assertEquals("main", session.sourceContext.githubRepoContext?.startingBranch)
 
         mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(""))

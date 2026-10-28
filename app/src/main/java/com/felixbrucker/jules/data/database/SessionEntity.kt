@@ -79,7 +79,7 @@ fun Session.toEntity(): SessionEntity {
     val pullRequest = pullRequests.firstOrNull()
     val changeSet = changeSets.firstOrNull()
     val isArchived = archived == true
-    val extractedSourceId = sourceContext.source.removePrefix("sources/")
+    val extractedSourceId = sourceContext.sourceName.removePrefix("sources/")
 
     return SessionEntity(
         id = id,

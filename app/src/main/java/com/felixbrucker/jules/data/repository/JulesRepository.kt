@@ -143,7 +143,7 @@ class JulesRepository @Inject constructor(
     suspend fun createSessionFromDraft(draft: SessionDraftEntity) = withContext(Dispatchers.IO) {
         val sourceContext = draft.sourceId?.let { srcId ->
             SourceContext(
-                source = srcId,
+                sourceName = "sources/$srcId",
                 githubRepoContext = draft.branch?.let { GitHubRepoContext(startingBranch = it) }
             )
         }

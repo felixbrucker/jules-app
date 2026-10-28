@@ -47,12 +47,12 @@ data class Repo(
 
 @JsonClass(generateAdapter = true)
 data class SourceContext(
-    @Json(name = "source") val source: String,
+    @Json(name = "source") val sourceName: String, // sourceName is sourceId prefixed with "sources/"
     @Json(name = "githubRepoContext") val githubRepoContext: GitHubRepoContext? = null
 ) {
     val repo: Repo? get() {
-        val sourceString = source.removePrefix("sources/")
-        val parts = sourceString.split("/")
+        val sourceId = sourceName.removePrefix("sources/")
+        val parts = sourceId.split("/")
         if (parts.size != 3) {
             return null
         }
