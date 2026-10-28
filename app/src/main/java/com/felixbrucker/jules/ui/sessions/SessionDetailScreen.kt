@@ -671,6 +671,26 @@ private fun ChatWindowView(
                     contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item(key = "initial_sync_loading_indicator") {
+                        AnimatedVisibility(
+                            visible = isInitialSyncing,
+                            enter = slideInVertically(initialOffsetY = { it }) + expandVertically() + fadeIn(),
+                            exit = slideOutVertically(targetOffsetY = { it }) + shrinkVertically() + fadeOut()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+
                     if (chatState?.agentState == AgentState.Thinking) {
                         item(key = "agent_thinking_indicator") {
                             AgentStatusBubble(label = "Thinking")
@@ -758,31 +778,6 @@ private fun ChatWindowView(
             }
         }
 
-        AnimatedVisibility(
-            visible = isInitialSyncing,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 70.dp)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 6.dp,
-                shadowElevation = 4.dp
-            ) {
-                Box(
-                    modifier = Modifier.padding(10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
-                }
-            }
-        }
     }
 }
 
