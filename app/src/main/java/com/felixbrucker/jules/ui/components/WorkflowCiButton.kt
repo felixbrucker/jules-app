@@ -19,11 +19,12 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -131,19 +132,31 @@ private fun WorkflowStateIndicator(state: WorkflowRunState) {
     when (state) {
         WorkflowRunState.QUEUED -> {
             Icon(
-                imageVector = Icons.Default.RadioButtonUnchecked,
+                imageVector = Icons.Default.Circle,
                 contentDescription = "Queued",
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(10.dp),
                 tint = Color(0xFFD29922)
             )
         }
         WorkflowRunState.IN_PROGRESS -> {
-            Icon(
-                imageVector = Icons.Default.Circle,
-                contentDescription = "In Progress",
-                modifier = Modifier.size(10.dp),
-                tint = Color(0xFFD29922)
-            )
+            Box(
+                modifier = Modifier.size(14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    color = Color(0xFFD29922),
+                    strokeWidth = 1.5.dp,
+                    trackColor = Color(0xFFD29922).copy(alpha = 0.2f),
+                    strokeCap = StrokeCap.Round
+                )
+                Icon(
+                    imageVector = Icons.Default.Circle,
+                    contentDescription = "In Progress",
+                    modifier = Modifier.size(6.dp),
+                    tint = Color(0xFFD29922)
+                )
+            }
         }
         WorkflowRunState.SUCCESS -> {
             Icon(
