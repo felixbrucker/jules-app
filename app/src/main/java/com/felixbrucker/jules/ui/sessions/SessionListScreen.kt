@@ -772,7 +772,7 @@ private fun SessionCard(
                 onArchive = { onArchive(session.id) },
                 onUnarchive = { onUnarchive(session.id) }
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             SessionCardFooter(
                 sessionWithPullRequest = sessionWithPullRequest,
                 sharedTransitionScope = sharedTransitionScope,
