@@ -1033,9 +1033,12 @@ private fun SessionCardFooter(
             }
 
             WorkflowCiButton(
+                sessionId = session.id,
                 dispatchedWorkflowRun = sessionWithPullRequest.dispatchedWorkflowRun,
                 workflows = workflows,
-                onWorkflowSelected = onSelectWorkflow
+                onWorkflowSelected = onSelectWorkflow,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
             )
         }
     }

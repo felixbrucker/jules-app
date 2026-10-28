@@ -1,5 +1,7 @@
 package com.felixbrucker.jules.ui.components
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,9 +41,12 @@ import com.felixbrucker.jules.network.api.model.WorkflowRunState
 
 @Composable
 fun WorkflowCiButton(
+    sessionId: String,
     dispatchedWorkflowRun: DispatchedWorkflowRunEntity?,
     workflows: List<DispatchableWorkflowEntity>,
-    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit
+    onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     if (workflows.isEmpty() && dispatchedWorkflowRun == null) {
         return
@@ -50,62 +55,71 @@ fun WorkflowCiButton(
     var menuExpanded by remember { mutableStateOf(false) }
     val labelText = dispatchedWorkflowRun?.workflowName ?: "CI"
 
-    Surface(
-        modifier = Modifier.height(28.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        )
+    Box(
+        modifier = with(sharedTransitionScope) {
+            Modifier.sharedElement(
+                sharedContentState = rememberSharedContentState(key = "ci_badge_${sessionId}"),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+        }
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.height(28.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(enabled = workflows.isNotEmpty()) { menuExpanded = true }
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                dispatchedWorkflowRun?.let { run ->
-                    WorkflowStateIndicator(state = run.state)
+                Row(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .clickable(enabled = workflows.isNotEmpty()) { menuExpanded = true }
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    dispatchedWorkflowRun?.let { run ->
+                        WorkflowStateIndicator(state = run.state)
+                    }
+
+                    Text(
+                        text = labelText,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
 
-                Text(
-                    text = labelText,
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-
-            if (workflows.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(1.dp)
-                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .clickable { menuExpanded = true }
-                        .padding(horizontal = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Workflow Dispatches",
-                        modifier = Modifier.size(18.dp)
+                if (workflows.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(1.dp)
+                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                     )
-                    WorkflowDropdownMenu(
-                        expanded = menuExpanded,
-                        workflows = workflows,
-                        onDismiss = { menuExpanded = false },
-                        onWorkflowSelected = onWorkflowSelected
-                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .clickable { menuExpanded = true }
+                            .padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Workflow Dispatches",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        WorkflowDropdownMenu(
+                            expanded = menuExpanded,
+                            workflows = workflows,
+                            onDismiss = { menuExpanded = false },
+                            onWorkflowSelected = onWorkflowSelected
+                        )
+                    }
                 }
             }
         }
