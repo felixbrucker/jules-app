@@ -1,9 +1,9 @@
 package com.felixbrucker.jules.ui.sessions
 
 import android.content.Intent
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -11,17 +11,19 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import kotlinx.coroutines.yield
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,6 +76,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,12 +90,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -108,7 +111,6 @@ import com.felixbrucker.jules.R
 import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
 import com.felixbrucker.jules.data.database.AgentState
 import com.felixbrucker.jules.data.database.ChatElement
-import com.felixbrucker.jules.data.database.ChatElementEntity
 import com.felixbrucker.jules.data.database.ChatStateEntity
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.SessionEntity
@@ -116,7 +118,6 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.network.api.model.FileChangeType
 import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.PlanStep
-import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.ui.components.AnimatedMovingDotsIcon
 import com.felixbrucker.jules.ui.components.ChatMarkdown
 import com.felixbrucker.jules.ui.components.DiffBadges
@@ -125,7 +126,6 @@ import com.felixbrucker.jules.ui.components.SessionStateBadge
 import com.felixbrucker.jules.ui.icon.ChatIcon
 import com.felixbrucker.jules.ui.icon.DifferenceIcon
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun SessionDetailScreen(
     viewModel: SessionDetailViewModel,
@@ -136,6 +136,8 @@ fun SessionDetailScreen(
     val sessionWithPr by viewModel.sessionWithPullRequestFlow.collectAsState(initial = null)
     val chatState by viewModel.chatStateFlow.collectAsState()
     val activityBasedState by viewModel.activityBasedStateFlow.collectAsState()
+    val filteredParsedFiles by viewModel.filteredParsedFilesFlow.collectAsState()
+    val fileSearchQuery by viewModel.fileSearchQuery.collectAsState()
     val fileTree by viewModel.fileTreeFlow.collectAsState()
     val fileDiffLinesMap by viewModel.fileDiffLinesMapFlow.collectAsState()
     val chatElements = viewModel.chatElementsPagingDataFlow.collectAsLazyPagingItems()
@@ -146,7 +148,9 @@ fun SessionDetailScreen(
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
     val errorEvent by viewModel.errorEvents.collectAsState(initial = null)
 
-    val isPhone = LocalConfiguration.current.screenWidthDp < 600
+    val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
+    val isPhone = with(density) { windowInfo.containerSize.width.toDp() } < 600.dp
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -216,6 +220,8 @@ fun SessionDetailScreen(
                     chatElements = chatElements,
                     chatState = chatState,
                     activityBasedState = activityBasedState,
+                    filteredParsedFiles = filteredParsedFiles,
+                    fileSearchQuery = fileSearchQuery,
                     fileTree = fileTree,
                     fileDiffLinesMap = fileDiffLinesMap,
                     splitRatio = splitRatio,
@@ -224,6 +230,7 @@ fun SessionDetailScreen(
                     isSendingMessage = isSendingMessage,
                     isApprovingPlan = isApprovingPlan,
                     onSplitRatioChange = { viewModel.updateSplitRatio(it) },
+                    onSearchQueryChange = { viewModel.updateFileSearchQuery(it) },
                     onSendMessage = { viewModel.sendMessage(it) },
                     onApprovePlan = { viewModel.approvePlan() }
                 )
@@ -233,7 +240,6 @@ fun SessionDetailScreen(
 }
 
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SessionDetailTopBar(
     sessionWithPr: SessionWithPullRequest,
@@ -384,10 +390,16 @@ private fun SessionDetailTopBar(
                         onClick = onToggleViewMode,
                         modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            imageVector = if (splitRatio > 0.0f) DifferenceIcon else ChatIcon,
-                            contentDescription = if (splitRatio > 0.0f) "Show diffs" else "Show chat"
-                        )
+                        AnimatedContent(
+                            targetState = splitRatio > 0.0f,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "PhoneViewModeIconTransition"
+                        ) { isChatView ->
+                            Icon(
+                                imageVector = if (isChatView) DifferenceIcon else ChatIcon,
+                                contentDescription = if (isChatView) "Show diffs" else "Show chat"
+                            )
+                        }
                     }
                 }
 
@@ -453,6 +465,8 @@ private fun SessionDetailSplitContent(
     chatElements: LazyPagingItems<ChatElementUiItem>,
     chatState: ChatStateEntity?,
     activityBasedState: ActivityBasedStateEntity?,
+    filteredParsedFiles: List<ParsedFile>,
+    fileSearchQuery: String,
     fileTree: List<FileTreeNode>,
     fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     splitRatio: Float,
@@ -461,10 +475,11 @@ private fun SessionDetailSplitContent(
     isSendingMessage: Boolean,
     isApprovingPlan: Boolean,
     onSplitRatioChange: (Float) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
     onSendMessage: (String) -> Unit,
     onApprovePlan: () -> Unit
 ) {
-    var containerWidthPx by remember { mutableStateOf(0) }
+    var containerWidthPx by remember { mutableIntStateOf(0) }
     var chatInputText by rememberSaveable(session.id) { mutableStateOf("") }
 
     Box(
@@ -473,30 +488,39 @@ private fun SessionDetailSplitContent(
             .onGloballyPositioned { containerWidthPx = it.size.width }
     ) {
         if (isPhone) {
-            if (splitRatio > 0.0f) {
-                ChatWindowView(
-                    session = session,
-                    chatElements = chatElements,
-                    chatState = chatState,
-                    activityBasedState = activityBasedState,
-                    chatInputText = chatInputText,
-                    onChatInputTextChange = { chatInputText = it },
-                    isInitialSyncing = isInitialSyncing,
-                    isSendingMessage = isSendingMessage,
-                    isApprovingPlan = isApprovingPlan,
-                    onSendMessage = {
-                        onSendMessage(it)
-                        chatInputText = ""
-                    },
-                    onApprovePlan = onApprovePlan
-                )
-            } else {
-                FileDiffView(
-                    activityBasedState = activityBasedState,
-                    fileTree = fileTree,
-                    fileDiffLinesMap = fileDiffLinesMap,
-                    isFullScreen = false
-                )
+            AnimatedContent(
+                targetState = splitRatio > 0.0f,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "PhoneViewModeContentTransition",
+                modifier = Modifier.fillMaxSize()
+            ) { isChatView ->
+                if (isChatView) {
+                    ChatWindowView(
+                        session = session,
+                        chatElements = chatElements,
+                        chatState = chatState,
+                        chatInputText = chatInputText,
+                        onChatInputTextChange = { chatInputText = it },
+                        isInitialSyncing = isInitialSyncing,
+                        isSendingMessage = isSendingMessage,
+                        isApprovingPlan = isApprovingPlan,
+                        onSendMessage = {
+                            onSendMessage(it)
+                            chatInputText = ""
+                        },
+                        onApprovePlan = onApprovePlan
+                    )
+                } else {
+                    FileDiffView(
+                        activityBasedState = activityBasedState,
+                        filteredParsedFiles = filteredParsedFiles,
+                        fileSearchQuery = fileSearchQuery,
+                        fileTree = fileTree,
+                        fileDiffLinesMap = fileDiffLinesMap,
+                        isFullScreen = false,
+                        onSearchQueryChange = onSearchQueryChange
+                    )
+                }
             }
         } else {
             Row(modifier = Modifier.fillMaxSize()) {
@@ -506,7 +530,6 @@ private fun SessionDetailSplitContent(
                             session = session,
                             chatElements = chatElements,
                             chatState = chatState,
-                            activityBasedState = activityBasedState,
                             chatInputText = chatInputText,
                             onChatInputTextChange = { chatInputText = it },
                             isInitialSyncing = isInitialSyncing,
@@ -531,9 +554,12 @@ private fun SessionDetailSplitContent(
                     if (splitRatio < 1.0f) {
                         FileDiffView(
                             activityBasedState = activityBasedState,
+                            filteredParsedFiles = filteredParsedFiles,
+                            fileSearchQuery = fileSearchQuery,
                             fileTree = fileTree,
                             fileDiffLinesMap = fileDiffLinesMap,
-                            isFullScreen = (splitRatio == 0.0f)
+                            isFullScreen = (splitRatio == 0.0f),
+                            onSearchQueryChange = onSearchQueryChange
                         )
                     }
                 }
@@ -586,7 +612,6 @@ private fun ChatWindowView(
     session: SessionEntity,
     chatElements: LazyPagingItems<ChatElementUiItem>,
     chatState: ChatStateEntity?,
-    activityBasedState: ActivityBasedStateEntity?,
     chatInputText: String,
     onChatInputTextChange: (String) -> Unit,
     isInitialSyncing: Boolean,
@@ -662,8 +687,7 @@ private fun ChatWindowView(
                         if (item != null) {
                             ChatElementRow(
                                 item = item,
-                                session = session,
-                                activityBasedState = activityBasedState
+                                session = session
                             )
                         }
                     }
@@ -761,8 +785,7 @@ private fun ChatWindowView(
 @Composable
 private fun ChatElementRow(
     item: ChatElementUiItem,
-    session: SessionEntity,
-    activityBasedState: ActivityBasedStateEntity?
+    session: SessionEntity
 ) {
     when (item) {
         is ChatElementUiItem.RelativeTimeDivider -> {
@@ -771,8 +794,7 @@ private fun ChatElementRow(
         is ChatElementUiItem.ElementItem -> {
             ChatElementBubbleContainer(
                 element = item.elementEntity.element,
-                session = session,
-                activityBasedState = activityBasedState
+                session = session
             )
         }
     }
@@ -797,8 +819,7 @@ private fun CenteredTimeDivider(timeText: String) {
 @Composable
 private fun ChatElementBubbleContainer(
     element: ChatElement,
-    session: SessionEntity,
-    activityBasedState: ActivityBasedStateEntity?
+    session: SessionEntity
 ) {
     SelectionContainer {
         when (element) {
@@ -888,7 +909,7 @@ private fun AgentThoughtBubble(thoughts: String, durationText: String) {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(6.dp))
-                        ChatMarkdown(markdown = thoughts)
+                        ChatMarkdown(markdown = thoughts, onClick = { isExpanded = !isExpanded })
                     }
                 }
             }
@@ -976,7 +997,7 @@ private fun ProgressUpdatedBubble(
                     ) {
                         Box(modifier = Modifier.weight(1f)) {
                             ChatMarkdown(
-                                markdown = title ?: "",
+                                markdown = title,
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 onClick = { isExpanded = !isExpanded }
                             )
@@ -995,8 +1016,9 @@ private fun ProgressUpdatedBubble(
                         Column {
                             Spacer(modifier = Modifier.height(6.dp))
                             ChatMarkdown(
-                                markdown = description ?: "",
-                                style = MaterialTheme.typography.bodyMedium
+                                markdown = description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                onClick = { isExpanded = !isExpanded }
                             )
                         }
                     }
@@ -1093,8 +1115,9 @@ private fun PlanStepItemRow(stepIndex: Int, step: PlanStep) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Box(modifier = Modifier.padding(start = 32.dp)) {
                         ChatMarkdown(
-                            markdown = step.description.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall
+                            markdown = step.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            onClick = { isExpanded = !isExpanded },
                         )
                     }
                 }
@@ -1327,20 +1350,84 @@ private val diffLineNumFg = Color(0xFF6E7681)
 private val diffCodeDarkBg = Color(0xFF0D1117)
 
 @Composable
+private fun FileDiffSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search files",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                singleLine = true,
+                decorationBox = { innerTextField ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) {
+                            Text(
+                                text = "Filter files...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            )
+            if (query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Clear search",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun FileDiffView(
     activityBasedState: ActivityBasedStateEntity?,
+    filteredParsedFiles: List<ParsedFile>,
+    fileSearchQuery: String,
     fileTree: List<FileTreeNode>,
     fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
-    isFullScreen: Boolean
+    isFullScreen: Boolean,
+    onSearchQueryChange: (String) -> Unit
 ) {
     val expandedCards = remember { mutableStateMapOf<String, Boolean>() }
     val expandedFolders = remember { mutableStateMapOf<String, Boolean>() }
     val listState = rememberLazyListState()
     var selectedFilePath by remember { mutableStateOf<String?>(null) }
 
-    val parsedFiles = activityBasedState?.latestDiff?.parsedFilesMap?.values?.toList() ?: emptyList()
+    val allParsedFiles = activityBasedState?.latestDiff?.parsedFilesMap?.values?.toList() ?: emptyList()
 
-    if (parsedFiles.isEmpty()) {
+    if (allParsedFiles.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -1353,49 +1440,69 @@ private fun FileDiffView(
     LaunchedEffect(selectedFilePath) {
         val path = selectedFilePath ?: return@LaunchedEffect
         var targetIndex = 0
-        for (file in parsedFiles) {
+        for (file in filteredParsedFiles) {
             if (file.path == path) break
             targetIndex += 1
             if (expandedCards[file.path] == true) {
                 targetIndex += (fileDiffLinesMap[file.path]?.size ?: 0)
             }
         }
-        kotlinx.coroutines.yield()
+        yield()
         listState.animateScrollToItem(targetIndex)
     }
 
     Row(modifier = Modifier.fillMaxSize()) {
-        SelectionContainer(modifier = Modifier.weight(1f)) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                parsedFiles.forEach { file ->
-                    val isExpanded = expandedCards[file.path] ?: false
-                    val lines = fileDiffLinesMap[file.path] ?: emptyList()
+        Column(modifier = Modifier.weight(1f)) {
+            FileDiffSearchBar(
+                query = fileSearchQuery,
+                onQueryChange = onSearchQueryChange,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+            )
+            if (filteredParsedFiles.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No matching files found",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                SelectionContainer(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        filteredParsedFiles.forEach { file ->
+                            val isExpanded = expandedCards[file.path] ?: false
+                            val lines = fileDiffLinesMap[file.path] ?: emptyList()
 
-                    item(key = "header_${file.path}") {
-                        Box(modifier = Modifier.padding(top = 8.dp)) {
-                            FileDiffHeaderCard(
-                                file = file,
-                                isExpanded = isExpanded,
-                                onToggleExpand = { expandedCards[file.path] = !isExpanded }
-                            )
-                        }
-                    }
+                            item(key = "header_${file.path}") {
+                                Box(modifier = Modifier.padding(top = 8.dp)) {
+                                    FileDiffHeaderCard(
+                                        file = file,
+                                        isExpanded = isExpanded,
+                                        onToggleExpand = { expandedCards[file.path] = !isExpanded }
+                                    )
+                                }
+                            }
 
-                    if (isExpanded && lines.isNotEmpty()) {
-                        items(
-                            count = lines.size,
-                            key = { index -> "line_${file.path}_$index" }
-                        ) { index ->
-                            DiffLineRow(
-                                line = lines[index],
-                                isLast = index == lines.size - 1
-                            )
+                            if (isExpanded && lines.isNotEmpty()) {
+                                items(
+                                    count = lines.size,
+                                    key = { index -> "line_${file.path}_$index" }
+                                ) { index ->
+                                    DiffLineRow(
+                                        line = lines[index],
+                                        isLast = index == lines.size - 1
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1403,7 +1510,7 @@ private fun FileDiffView(
         }
 
         if (isFullScreen) {
-            val hasExpandedDiffs = parsedFiles.any { expandedCards[it.path] == true }
+            val hasExpandedDiffs = filteredParsedFiles.any { expandedCards[it.path] == true }
             Box(
                 modifier = Modifier
                     .width(260.dp)
@@ -1420,7 +1527,7 @@ private fun FileDiffView(
                     },
                     onToggleAllCards = {
                         val targetState = !hasExpandedDiffs
-                        parsedFiles.forEach { file ->
+                        filteredParsedFiles.forEach { file ->
                             expandedCards[file.path] = targetState
                         }
                     },

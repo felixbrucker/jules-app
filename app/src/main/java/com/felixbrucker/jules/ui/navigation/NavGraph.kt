@@ -38,7 +38,6 @@ sealed class Screen(val route: String) {
     object LogViewer : Screen("log_viewer")
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun JulesNavGraph(
     navController: NavHostController = rememberNavController(),

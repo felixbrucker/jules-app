@@ -13,10 +13,11 @@ import com.squareup.moshi.adapters.PolymorphicJsonAdapterFactory
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.time.Instant
 
+// CRITICAL: Types and their data class subtypes for which we are creating a JsonAdapter are
+// REQUIRED to be annotated with @JsonClass(generateAdapter = true). Exception: sealed classes.
 class Converters {
     private val moshi = Moshi.Builder()
         .add(InstantAdapter())
-        .addLast(KotlinJsonAdapterFactory())
         .build()
 
     private val chatElementAdapter: JsonAdapter<ChatElement> = Moshi.Builder()

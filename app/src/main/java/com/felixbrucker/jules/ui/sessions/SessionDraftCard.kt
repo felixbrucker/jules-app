@@ -193,7 +193,6 @@ private fun DraftActionDropdownMenu(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DraftCardFooter(draftWithSource: SessionDraftWithSource) {
     val context = LocalContext.current

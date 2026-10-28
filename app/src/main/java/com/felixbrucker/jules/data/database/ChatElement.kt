@@ -14,6 +14,7 @@ enum class AgentState {
     Idle
 }
 
+@JsonClass(generateAdapter = true)
 data class ComputedDiff(
     val fileDiffLinesMap: Map<String, List<ParsedDiffLine>>,
     val parsedFilesMap: Map<String, ParsedFile>,

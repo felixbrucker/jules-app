@@ -13,13 +13,7 @@ object WorkerScheduler {
         hasInProgress: Boolean
     ): WorkerScheduleDecision {
         val isValid = settings.periodicSyncEnabled && !settings.apiKey.isNullOrBlank()
-        val shouldEnqueue = if (!isValid) {
-            false
-        } else if (!settings.smartSyncEnabled) {
-            true
-        } else {
-            hasInProgress
-        }
+        val shouldEnqueue = isValid && (!settings.smartSyncEnabled || hasInProgress)
         return WorkerScheduleDecision(shouldEnqueue, settings.syncIntervalMinutes.toLong())
     }
 }

@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 enum class JulesPlan(val displayName: String, val dailyLimit: Int) {
@@ -80,9 +79,6 @@ class SettingsViewModel @Inject constructor(
 
     val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
-    val dailySessionLimit = appSettingsRepository.dailySessionLimitFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
 
     val selectedPlan = appSettingsRepository.dailySessionLimitFlow
         .map { JulesPlan.fromLimit(it) }
@@ -229,12 +225,6 @@ class SettingsViewModel @Inject constructor(
     fun selectPlan(plan: JulesPlan) {
         viewModelScope.launch {
             appSettingsRepository.setDailySessionLimit(plan.dailyLimit)
-        }
-    }
-
-    fun setDailySessionLimit(limit: Int) {
-        viewModelScope.launch {
-            appSettingsRepository.setDailySessionLimit(limit)
         }
     }
 

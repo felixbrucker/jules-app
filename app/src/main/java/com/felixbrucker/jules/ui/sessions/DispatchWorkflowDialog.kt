@@ -4,14 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,9 +71,7 @@ fun DispatchWorkflowDialog(
 
     val isFormValid = remember(selectedBranch, workflow.inputs, inputValues.toMap()) {
         selectedBranch.isNotBlank() && workflow.inputs.all { input ->
-            if (input.required) {
-                !inputValues[input.name].isNullOrBlank()
-            } else true
+            !input.required || !inputValues[input.name].isNullOrBlank()
         }
     }
 
@@ -160,7 +154,6 @@ private fun DialogContentBody(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BranchSelectionDropdown(
     options: List<String>,
@@ -228,14 +221,14 @@ private fun WorkflowInputField(
     currentValue: String,
     onValueChange: (String) -> Unit
 ) {
-    when {
-        input.type == "choice" && !input.options.isNullOrEmpty() -> {
+    when (input.type) {
+        "choice" if !input.options.isNullOrEmpty() -> {
             ChoiceInputField(input = input, currentValue = currentValue, onValueChange = onValueChange)
         }
-        input.type == "boolean" -> {
+        "boolean" -> {
             BooleanInputField(input = input, currentValue = currentValue, onValueChange = onValueChange)
         }
-        input.type == "number" -> {
+        "number" -> {
             NumberInputField(input = input, currentValue = currentValue, onValueChange = onValueChange)
         }
         else -> {
@@ -244,7 +237,6 @@ private fun WorkflowInputField(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NumberInputField(
     input: WorkflowInput,
@@ -284,7 +276,6 @@ private fun NumberInputField(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChoiceInputField(
     input: WorkflowInput,
@@ -350,7 +341,6 @@ private fun ChoiceInputField(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BooleanInputField(
     input: WorkflowInput,
@@ -381,7 +371,6 @@ private fun BooleanInputField(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TextInputField(
     input: WorkflowInput,

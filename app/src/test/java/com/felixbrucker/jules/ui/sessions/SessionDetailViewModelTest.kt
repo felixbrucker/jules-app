@@ -1,10 +1,15 @@
 package com.felixbrucker.jules.ui.sessions
 
 import androidx.lifecycle.SavedStateHandle
+import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
+import com.felixbrucker.jules.data.database.ComputedDiff
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.felixbrucker.jules.network.api.model.FileChangeType
+import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.SessionState
+import kotlinx.coroutines.launch
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -94,5 +99,19 @@ class SessionDetailViewModelTest {
         viewModel = vm
         vm.approvePlan()
         coVerify { repository.approvePlan("sess-123") }
+    }
+
+    @Test
+    fun testUpdateFileSearchQueryUpdatesState() = runTest(UnconfinedTestDispatcher()) {
+        val vm = SessionDetailViewModel(repository, savedStateHandle)
+        viewModel = vm
+
+        assertEquals("", vm.fileSearchQuery.value)
+
+        vm.updateFileSearchQuery("AppTest")
+        assertEquals("AppTest", vm.fileSearchQuery.value)
+
+        vm.updateFileSearchQuery("   ")
+        assertEquals("   ", vm.fileSearchQuery.value)
     }
 }

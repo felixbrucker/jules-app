@@ -59,12 +59,6 @@ class GitHubApi @Inject constructor(
         )
     }
 
-    suspend fun validateAuthToken() {
-        executeApiCall {
-            apiService.getUser()
-        }
-    }
-
     suspend fun validateAuthToken(token: String) {
         executeApiCall {
             apiService.getUser("Bearer $token")

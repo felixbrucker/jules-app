@@ -42,10 +42,6 @@ class JulesApi @Inject constructor(
         apiService.getSource(sourceId = sourceId)
     }
 
-    suspend fun getGitHubSource(owner: String, repo: String): Source = executeApiCall {
-        apiService.getGitHubSource(owner = owner, repo = repo)
-    }
-
     suspend fun getSessions(
         filter: Filter<SessionFilter>? = null,
         pageSize: Int? = null,

@@ -17,6 +17,7 @@ import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.util.periodicTickerFlow
+import com.squareup.moshi.JsonClass
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
@@ -63,6 +65,7 @@ enum class DiffLineType {
     DELETION
 }
 
+@JsonClass(generateAdapter = true)
 data class ParsedDiffLine(
     val oldLineNumber: Int?,
     val newLineNumber: Int?,
@@ -104,9 +107,30 @@ class SessionDetailViewModel @Inject constructor(
     val activityBasedStateFlow: StateFlow<ActivityBasedStateEntity?> = julesRepository.getActivityBasedStateFlow(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val fileTreeFlow: StateFlow<List<FileTreeNode>> = activityBasedStateFlow
-        .map { state ->
-            val parsedFiles = state?.latestDiff?.parsedFilesMap?.values?.toList() ?: emptyList()
+    private val _fileSearchQuery = MutableStateFlow("")
+    val fileSearchQuery: StateFlow<String> = _fileSearchQuery.asStateFlow()
+
+    fun updateFileSearchQuery(query: String) {
+        _fileSearchQuery.value = query
+    }
+
+    val filteredParsedFilesFlow: StateFlow<List<ParsedFile>> = combine(
+        activityBasedStateFlow,
+        _fileSearchQuery
+    ) { state, query ->
+        val parsedFiles = state?.latestDiff?.parsedFilesMap?.values?.toList() ?: emptyList()
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isEmpty()) {
+            parsedFiles
+        } else {
+            parsedFiles.filter { it.path.contains(trimmedQuery, ignoreCase = true) }
+        }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val fileTreeFlow: StateFlow<List<FileTreeNode>> = filteredParsedFilesFlow
+        .map { parsedFiles ->
             if (parsedFiles.isEmpty()) emptyList() else buildFileTree(parsedFiles)
         }
         .flowOn(Dispatchers.Default)

@@ -209,7 +209,7 @@ class SessionListViewModel @Inject constructor(
 
     fun openCreateDialog(draft: SessionDraftEntity? = null) {
         viewModelScope.launch {
-            val initialDraft = if (draft != null && draft.sourceId != null) {
+            val initialDraft = if (draft?.sourceId != null) {
                 draft
             } else {
                 val lastSourceId = appSettingsRepository.lastSelectedSourceIdFlow.first()

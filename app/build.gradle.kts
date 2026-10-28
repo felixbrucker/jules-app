@@ -83,6 +83,7 @@ dependencies {
     implementation(libs.moshi.kotlin)
     implementation(libs.moshi.adapters)
     implementation(libs.kaml)
+    ksp(libs.moshi.kotlin.codegen)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
