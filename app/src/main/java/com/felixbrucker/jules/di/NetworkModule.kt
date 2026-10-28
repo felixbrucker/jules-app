@@ -2,12 +2,13 @@ package com.felixbrucker.jules.di
 
 import com.felixbrucker.jules.network.api.JulesAuthInterceptor
 import com.felixbrucker.jules.network.api.GitHubApi
-import com.felixbrucker.jules.network.api.GitHubAuthInterceptor
-import com.felixbrucker.jules.network.api.LoggingInterceptor
-import com.felixbrucker.jules.network.api.UserAgentInterceptor
 import com.felixbrucker.jules.network.api.GitHubApiService
+import com.felixbrucker.jules.network.api.GitHubAuthInterceptor
+import com.felixbrucker.jules.network.api.GitHubApiVersionInterceptor
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.JulesApiService
+import com.felixbrucker.jules.network.api.LoggingInterceptor
+import com.felixbrucker.jules.network.api.UserAgentInterceptor
 import com.felixbrucker.jules.network.api.adapter.ActivityAdapter
 import com.felixbrucker.jules.network.api.adapter.InstantAdapter
 import com.felixbrucker.jules.network.api.model.ArtifactType
@@ -83,12 +84,14 @@ object NetworkModule {
     @GitHubClient
     fun provideGitHubOkHttpClient(
         gitHubAuthInterceptor: GitHubAuthInterceptor,
+        gitHubApiVersionInterceptor: GitHubApiVersionInterceptor,
         userAgentInterceptor: UserAgentInterceptor,
         loggingInterceptor: LoggingInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(userAgentInterceptor)
             .addInterceptor(gitHubAuthInterceptor)
+            .addInterceptor(gitHubApiVersionInterceptor)
             .addInterceptor(loggingInterceptor)
             .build()
     }

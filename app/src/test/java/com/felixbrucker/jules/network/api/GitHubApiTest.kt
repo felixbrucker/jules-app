@@ -29,8 +29,10 @@ class GitHubApiTest {
         val baseUrl = mockWebServer.url("/").toString()
 
         val userAgentInterceptor = UserAgentInterceptor()
+        val gitHubApiVersionInterceptor = GitHubApiVersionInterceptor()
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(userAgentInterceptor)
+            .addInterceptor(gitHubApiVersionInterceptor)
             .build()
         val moshi = NetworkModule.provideMoshi()
         val apiService = NetworkModule.provideGitHubApiService(
@@ -92,6 +94,7 @@ class GitHubApiTest {
             "User-Agent header missing or incorrect",
             recordedRequest.getHeader("User-Agent")?.startsWith("Jules/") == true
         )
+        assertEquals("2026-03-10", recordedRequest.getHeader("X-GitHub-Api-Version"))
         assertEquals(PullRequestState.OPEN, state)
     }
 
@@ -134,6 +137,7 @@ class GitHubApiTest {
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/user", recordedRequest.path)
         assertEquals("Bearer ghp_test123", recordedRequest.getHeader("Authorization"))
+        assertEquals("2026-03-10", recordedRequest.getHeader("X-GitHub-Api-Version"))
     }
 
     @Test
@@ -228,6 +232,7 @@ class GitHubApiTest {
         val body = recordedRequest.body.readUtf8()
         assertTrue(body.contains("\"ref\":\"main\""))
         assertTrue(body.contains("\"inputs\":{\"logLevel\":\"info\"}"))
+        assertEquals("2026-03-10", recordedRequest.getHeader("X-GitHub-Api-Version"))
     }
 
     @Test
