@@ -672,6 +672,7 @@ private fun SessionListContent(
                 onCardClickDraft = { viewModel.openCreateDialog(it.draft) },
                 onDeleteDraft = { viewModel.deleteDraft(it) },
                 onCardClickScheduledTask = { viewModel.openScheduledTaskDialog(it) },
+                onToggleScheduledTaskEnabled = { task, enabled -> viewModel.toggleScheduledTaskEnabled(task, enabled) },
                 onExecuteScheduledTaskNow = { viewModel.executeScheduledTaskNow(it) },
                 onDeleteScheduledTask = { viewModel.deleteScheduledTask(it) },
                 onDelete = { viewModel.deleteSession(it) },
@@ -829,6 +830,7 @@ private fun SessionLazyColumn(
     onCardClickDraft: (SessionDraftWithSource) -> Unit,
     onDeleteDraft: (String) -> Unit,
     onCardClickScheduledTask: (ScheduledTaskEntity) -> Unit,
+    onToggleScheduledTaskEnabled: (ScheduledTaskEntity, Boolean) -> Unit,
     onExecuteScheduledTaskNow: (String) -> Unit,
     onDeleteScheduledTask: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -864,6 +866,7 @@ private fun SessionLazyColumn(
                 task = taskItem,
                 sources = sources,
                 onCardClick = { onCardClickScheduledTask(taskItem) },
+                onToggleEnabled = { enabled -> onToggleScheduledTaskEnabled(taskItem, enabled) },
                 onExecuteNow = { onExecuteScheduledTaskNow(taskItem.id) },
                 onDeleteTask = { onDeleteScheduledTask(taskItem.id) }
             )

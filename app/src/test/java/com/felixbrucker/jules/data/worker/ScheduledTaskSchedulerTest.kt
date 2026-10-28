@@ -46,6 +46,28 @@ class ScheduledTaskSchedulerTest {
     }
 
     @Test
+    fun testCalculateNextRunMillisDailyEarlyAlarmHasRunToday() {
+        val now = Instant.parse("2026-03-30T08:58:00Z") // 8:58 AM (early alarm before 9:00 AM)
+        val lastRunAt = Instant.parse("2026-03-30T08:58:01Z") // Just executed today
+        val task = ScheduledTaskEntity(
+            scheduleType = ScheduleType.DAILY,
+            timeHour = 9,
+            timeMinute = 0,
+            lastRunAt = lastRunAt
+        )
+
+        val nextRunMillis = ScheduledTaskScheduler.calculateNextRunMillis(task, now)
+        assertNotNull(nextRunMillis)
+
+        val nextRunZoned = ZonedDateTime.ofInstant(Instant.ofEpochMilli(nextRunMillis!!), ZoneId.systemDefault())
+        // Should schedule for tomorrow (March 31st), not March 30th
+        val nowLocalDate = now.atZone(ZoneId.systemDefault()).toLocalDate()
+        assertEquals(nowLocalDate.plusDays(1), nextRunZoned.toLocalDate())
+        assertEquals(9, nextRunZoned.hour)
+        assertEquals(0, nextRunZoned.minute)
+    }
+
+    @Test
     fun testCalculateNextRunMillisOnceInFutureReturnsTimestamp() {
         val now = Instant.parse("2026-03-30T10:00:00Z")
         val task = ScheduledTaskEntity(

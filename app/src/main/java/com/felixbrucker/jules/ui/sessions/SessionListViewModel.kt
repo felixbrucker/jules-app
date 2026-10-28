@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.time.Instant
 import com.felixbrucker.jules.data.database.ScheduledTaskEntity
 import com.felixbrucker.jules.data.database.ScheduledTaskRepo
 import com.felixbrucker.jules.data.database.SessionDraftEntity
@@ -288,6 +289,18 @@ class SessionListViewModel @Inject constructor(
                 _scheduledTaskError.value = e.message ?: "Failed to save scheduled task"
             } finally {
                 _isSavingScheduledTask.value = false
+            }
+        }
+    }
+
+    fun toggleScheduledTaskEnabled(task: ScheduledTaskEntity, enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                val updated = task.copy(enabled = enabled, updatedAt = Instant.now())
+                julesRepository.saveScheduledTask(updated)
+                _userFeedback.value = if (enabled) "Scheduled task enabled" else "Scheduled task disabled"
+            } catch (e: Exception) {
+                _userFeedback.value = e.message ?: "Failed to update scheduled task"
             }
         }
     }

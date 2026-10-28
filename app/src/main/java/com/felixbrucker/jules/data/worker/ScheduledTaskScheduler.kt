@@ -108,9 +108,11 @@ class ScheduledTaskScheduler @Inject constructor(
             val nowZoned = ZonedDateTime.ofInstant(now, zoneId)
             val time = LocalTime.of(task.timeHour, task.timeMinute)
 
+            val lastRunDate = task.lastRunAt?.atZone(zoneId)?.toLocalDate()
+            val hasRunToday = lastRunDate != null && !lastRunDate.isBefore(nowZoned.toLocalDate())
+
             val nextDateTime: ZonedDateTime = when (task.scheduleType) {
                 ScheduleType.ONCE -> {
-                    if (task.lastRunAt != null) return null
                     val dateStr = task.date ?: return null
                     val localDate = try {
                         LocalDate.parse(dateStr)
@@ -118,11 +120,12 @@ class ScheduledTaskScheduler @Inject constructor(
                         return null
                     }
                     val targetZoned = ZonedDateTime.of(LocalDateTime.of(localDate, time), zoneId)
-                    if (targetZoned.isBefore(nowZoned)) return null
+                    if (!targetZoned.isAfter(nowZoned)) return null
                     targetZoned
                 }
                 ScheduleType.DAILY -> {
-                    var target = ZonedDateTime.of(LocalDateTime.of(nowZoned.toLocalDate(), time), zoneId)
+                    val startDate = if (hasRunToday) nowZoned.toLocalDate().plusDays(1) else nowZoned.toLocalDate()
+                    var target = ZonedDateTime.of(LocalDateTime.of(startDate, time), zoneId)
                     if (!target.isAfter(nowZoned)) {
                         target = target.plusDays(1)
                     }
@@ -130,7 +133,7 @@ class ScheduledTaskScheduler @Inject constructor(
                 }
                 ScheduleType.WEEKLY -> {
                     val targetDay = task.dayOfWeek?.let { DayOfWeek.of(it.coerceIn(1, 7)) } ?: DayOfWeek.MONDAY
-                    var targetDate = nowZoned.toLocalDate()
+                    var targetDate = if (hasRunToday) nowZoned.toLocalDate().plusDays(1) else nowZoned.toLocalDate()
                     var target = ZonedDateTime.of(LocalDateTime.of(targetDate, time), zoneId)
                     while (targetDate.dayOfWeek != targetDay || !target.isAfter(nowZoned)) {
                         targetDate = targetDate.plusDays(1)
@@ -140,7 +143,8 @@ class ScheduledTaskScheduler @Inject constructor(
                 }
                 ScheduleType.MONTHLY -> {
                     val targetDayNum = task.dayOfMonth ?: 1
-                    var targetYearMonth = nowZoned.toLocalDate().year to nowZoned.toLocalDate().monthValue
+                    val startDate = if (hasRunToday) nowZoned.toLocalDate().plusDays(1) else nowZoned.toLocalDate()
+                    val targetYearMonth = startDate.year to startDate.monthValue
 
                     fun getTargetDate(year: Int, month: Int): LocalDate {
                         val maxDays = LocalDate.of(year, month, 1).lengthOfMonth()
@@ -149,9 +153,13 @@ class ScheduledTaskScheduler @Inject constructor(
                     }
 
                     var targetDate = getTargetDate(targetYearMonth.first, targetYearMonth.second)
+                    if (targetDate.isBefore(startDate)) {
+                        val nextMonthDate = startDate.plusMonths(1)
+                        targetDate = getTargetDate(nextMonthDate.year, nextMonthDate.monthValue)
+                    }
                     var target = ZonedDateTime.of(LocalDateTime.of(targetDate, time), zoneId)
                     if (!target.isAfter(nowZoned)) {
-                        val nextMonthDate = nowZoned.toLocalDate().plusMonths(1)
+                        val nextMonthDate = targetDate.plusMonths(1)
                         targetDate = getTargetDate(nextMonthDate.year, nextMonthDate.monthValue)
                         target = ZonedDateTime.of(LocalDateTime.of(targetDate, time), zoneId)
                     }

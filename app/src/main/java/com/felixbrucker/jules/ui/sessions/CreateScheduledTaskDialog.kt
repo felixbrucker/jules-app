@@ -58,7 +58,11 @@ import com.felixbrucker.jules.ui.components.LoadingStateButton
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -316,6 +320,12 @@ private fun CreateScheduledTaskDialogBody(
                 isLoading = isSaving,
                 enabled = prompt.isNotBlank() && repos.isNotEmpty(),
                 onClick = {
+                    val isFutureOnceTask = scheduleType == ScheduleType.ONCE && try {
+                        val localDate = LocalDate.parse(dateStr)
+                        val localTime = LocalTime.of(timeHour, timeMinute)
+                        LocalDateTime.of(localDate, localTime).atZone(ZoneId.systemDefault()).isAfter(ZonedDateTime.now())
+                    } catch (_: Exception) { false }
+
                     val updatedTask = task.copy(
                         title = title.ifBlank { null },
                         prompt = prompt,
@@ -327,6 +337,7 @@ private fun CreateScheduledTaskDialogBody(
                         date = if (scheduleType == ScheduleType.ONCE) dateStr else null,
                         dayOfWeek = if (scheduleType == ScheduleType.WEEKLY) dayOfWeek else null,
                         dayOfMonth = if (scheduleType == ScheduleType.MONTHLY) dayOfMonth else null,
+                        enabled = if (isFutureOnceTask) true else task.enabled,
                         updatedAt = Instant.now()
                     )
                     onSaveTask(updatedTask)

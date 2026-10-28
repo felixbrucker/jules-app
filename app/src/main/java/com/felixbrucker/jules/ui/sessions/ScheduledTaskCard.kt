@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,6 +52,7 @@ fun ScheduledTaskCard(
     task: ScheduledTaskEntity,
     sources: List<SourceEntity>,
     onCardClick: () -> Unit,
+    onToggleEnabled: (Boolean) -> Unit,
     onExecuteNow: () -> Unit,
     onDeleteTask: () -> Unit
 ) {
@@ -76,7 +78,7 @@ fun ScheduledTaskCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            ScheduledTaskCardHeader(task = task)
+            ScheduledTaskCardHeader(task = task, onToggleEnabled = onToggleEnabled)
             Spacer(modifier = Modifier.height(8.dp))
             ScheduledTaskCardPromptRow(
                 prompt = task.prompt,
@@ -90,7 +92,10 @@ fun ScheduledTaskCard(
 }
 
 @Composable
-private fun ScheduledTaskCardHeader(task: ScheduledTaskEntity) {
+private fun ScheduledTaskCardHeader(
+    task: ScheduledTaskEntity,
+    onToggleEnabled: (Boolean) -> Unit
+) {
     val displayTitle = task.title.takeIf { !it.isNullOrBlank() }
         ?: task.prompt.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
         ?: "Untitled Scheduled Task"
@@ -113,6 +118,10 @@ private fun ScheduledTaskCardHeader(task: ScheduledTaskEntity) {
                 overflow = TextOverflow.Ellipsis
             )
         }
+        Switch(
+            checked = task.enabled,
+            onCheckedChange = onToggleEnabled
+        )
     }
 }
 
