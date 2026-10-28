@@ -16,6 +16,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material3.SmallFloatingActionButton
@@ -154,14 +155,14 @@ fun SessionListScreen(
     val isCreatingSession by viewModel.isCreatingSession.collectAsState()
     val createSessionError by viewModel.createSessionError.collectAsState()
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
-    val userError by viewModel.userError.collectAsState()
+    val userFeedback by viewModel.userFeedback.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(userError) {
-        userError?.let { message ->
+    LaunchedEffect(userFeedback) {
+        userFeedback?.let { message ->
             snackbarHostState.showSnackbar(message)
-            viewModel.clearUserError()
+            viewModel.clearUserFeedback()
         }
     }
 
@@ -219,10 +220,24 @@ fun SessionListScreen(
         label = "FabRotation"
     )
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (isFabExpanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        isFabExpanded = false
+                    }
+            )
+        }
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            topBar = {
             SessionTopBar(
                 isSearchActive = isSearchActive,
                 searchQuery = searchQuery,
@@ -338,6 +353,7 @@ fun SessionListScreen(
             onFabVisibilityChanged = { isFabVisible = it },
             onSessionClick = onSessionClick
         )
+    }
     }
 }
 

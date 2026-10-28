@@ -91,11 +91,11 @@ class SessionListViewModel @Inject constructor(
     private val _dispatchDialogState = MutableStateFlow<DispatchDialogState?>(null)
     val dispatchDialogState: StateFlow<DispatchDialogState?> = _dispatchDialogState.asStateFlow()
 
-    private val _userError = MutableStateFlow<String?>(null)
-    val userError: StateFlow<String?> = _userError.asStateFlow()
+    private val _userFeedback = MutableStateFlow<String?>(null)
+    val userFeedback: StateFlow<String?> = _userFeedback.asStateFlow()
 
-    fun clearUserError() {
-        _userError.value = null
+    fun clearUserFeedback() {
+        _userFeedback.value = null
     }
 
     val dailySessionCount = julesRepository.getDailySessionCountFlow()
@@ -297,7 +297,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.deleteScheduledTask(taskId)
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to delete scheduled task"
+                _userFeedback.value = e.message ?: "Failed to delete scheduled task"
             }
         }
     }
@@ -306,9 +306,9 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 julesRepository.executeScheduledTask(taskId)
-                _userError.value = "Scheduled task triggered successfully"
+                _userFeedback.value = "Scheduled task triggered successfully"
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to execute scheduled task"
+                _userFeedback.value = e.message ?: "Failed to execute scheduled task"
             }
         }
     }
@@ -354,7 +354,7 @@ class SessionListViewModel @Inject constructor(
                 julesRepository.saveDraft(draft)
                 dismissCreateDialog()
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to save draft"
+                _userFeedback.value = e.message ?: "Failed to save draft"
             }
         }
     }
@@ -364,7 +364,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.deleteDraft(draftId)
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to delete draft"
+                _userFeedback.value = e.message ?: "Failed to delete draft"
             }
         }
     }
@@ -391,7 +391,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.sync()
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to sync"
+                _userFeedback.value = e.message ?: "Failed to sync"
             } finally {
                 isRefreshing = false
             }
@@ -403,7 +403,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.deleteSession(sessionId)
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to delete session"
+                _userFeedback.value = e.message ?: "Failed to delete session"
             }
         }
     }
@@ -413,7 +413,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.archiveSession(sessionId)
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to archive session"
+                _userFeedback.value = e.message ?: "Failed to archive session"
             }
         }
     }
@@ -423,7 +423,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 julesRepository.unarchiveSession(sessionId)
             } catch (e: Exception) {
-                _userError.value = e.message ?: "Failed to unarchive session"
+                _userFeedback.value = e.message ?: "Failed to unarchive session"
             }
         }
     }
@@ -456,7 +456,7 @@ class SessionListViewModel @Inject constructor(
                     inputs = inputs
                 )
                 dismissDispatchDialog()
-                _userError.value = "Workflow '${workflow.name}' dispatched successfully"
+                _userFeedback.value = "Workflow '${workflow.name}' dispatched successfully"
             } catch (e: Exception) {
                 _dispatchDialogState.value = _dispatchDialogState.value?.copy(
                     isDispatching = false,
