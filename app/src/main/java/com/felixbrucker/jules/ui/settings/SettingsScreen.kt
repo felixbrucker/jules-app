@@ -531,7 +531,7 @@ private fun GitHubAuthTokenCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "Workflow Dispatching", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        text = "Allow dispatching GitHub Actions workflows from session views",
+                        text = "Enable dispatching GitHub Actions workflows from session views",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
