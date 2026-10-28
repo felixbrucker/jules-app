@@ -3,6 +3,7 @@ package com.felixbrucker.jules.network.api
 import com.felixbrucker.jules.di.NetworkModule
 import com.felixbrucker.jules.network.api.model.GitHubApiException
 import com.felixbrucker.jules.network.api.model.PullRequestState
+import com.felixbrucker.jules.network.api.model.WorkflowRunState
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -28,8 +29,10 @@ class GitHubApiTest {
         val baseUrl = mockWebServer.url("/").toString()
 
         val userAgentInterceptor = UserAgentInterceptor()
+        val gitHubApiVersionInterceptor = GitHubApiVersionInterceptor()
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(userAgentInterceptor)
+            .addInterceptor(gitHubApiVersionInterceptor)
             .build()
         val moshi = NetworkModule.provideMoshi()
         val apiService = NetworkModule.provideGitHubApiService(
@@ -91,6 +94,7 @@ class GitHubApiTest {
             "User-Agent header missing or incorrect",
             recordedRequest.getHeader("User-Agent")?.startsWith("Jules/") == true
         )
+        assertEquals("2026-03-10", recordedRequest.getHeader("X-GitHub-Api-Version"))
         assertEquals(PullRequestState.OPEN, state)
     }
 
@@ -133,6 +137,7 @@ class GitHubApiTest {
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/user", recordedRequest.path)
         assertEquals("Bearer ghp_test123", recordedRequest.getHeader("Authorization"))
+        assertEquals("2026-03-10", recordedRequest.getHeader("X-GitHub-Api-Version"))
     }
 
     @Test
@@ -205,9 +210,14 @@ class GitHubApiTest {
 
     @Test
     fun testDispatchWorkflow() = runBlocking {
-        mockWebServer.enqueue(MockResponse().setResponseCode(204))
+        val responseBody = """
+            {
+              "workflow_run_id": 98765
+            }
+        """.trimIndent()
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(responseBody))
 
-        gitHubApi.dispatchWorkflow(
+        val runId = gitHubApi.dispatchWorkflow(
             owner = "octocat",
             repo = "Hello-World",
             workflowId = "12345",
@@ -215,11 +225,30 @@ class GitHubApiTest {
             inputs = mapOf("logLevel" to "info")
         )
 
+        assertEquals(98765L, runId)
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/repos/octocat/Hello-World/actions/workflows/12345/dispatches", recordedRequest.path)
         assertEquals("POST", recordedRequest.method)
         val body = recordedRequest.body.readUtf8()
         assertTrue(body.contains("\"ref\":\"main\""))
         assertTrue(body.contains("\"inputs\":{\"logLevel\":\"info\"}"))
+        assertEquals("2026-03-10", recordedRequest.getHeader("X-GitHub-Api-Version"))
+    }
+
+    @Test
+    fun testGetWorkflowRun() = runBlocking {
+        val responseBody = """
+            {
+              "status": "completed",
+              "conclusion": "success"
+            }
+        """.trimIndent()
+
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(responseBody))
+
+        val runResponse = gitHubApi.getWorkflowRun("octocat", "Hello-World", 98765L)
+        assertEquals("completed", runResponse.status)
+        assertEquals("success", runResponse.conclusion)
+        assertEquals(WorkflowRunState.SUCCESS, WorkflowRunState.from(runResponse.status, runResponse.conclusion))
     }
 }

@@ -3,6 +3,7 @@ package com.felixbrucker.jules.network.api
 import com.felixbrucker.jules.network.api.model.GitHubApiException
 import com.felixbrucker.jules.network.api.model.GitHubWorkflow
 import com.felixbrucker.jules.network.api.model.GitHubWorkflowDispatchRequest
+import com.felixbrucker.jules.network.api.model.GitHubWorkflowRunResponse
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.parseGitHubError
 import com.squareup.moshi.Moshi
@@ -89,7 +90,7 @@ class GitHubApi @Inject constructor(
         workflowId: String,
         ref: String,
         inputs: Map<String, String>? = null
-    ) {
+    ): Long {
         val request = GitHubWorkflowDispatchRequest(
             ref = ref,
             inputs = inputs?.ifEmpty { null }
@@ -104,6 +105,18 @@ class GitHubApi @Inject constructor(
         }
         if (!response.isSuccessful) {
             throw HttpException(response)
+        }
+        val body = response.body() ?: throw IllegalStateException("Empty response body when dispatching workflow")
+        return body.workflowRunId
+    }
+
+    suspend fun getWorkflowRun(
+        owner: String,
+        repo: String,
+        runId: Long
+    ): GitHubWorkflowRunResponse {
+        return executeApiCall {
+            apiService.getWorkflowRun(owner = owner, repo = repo, runId = runId)
         }
     }
 

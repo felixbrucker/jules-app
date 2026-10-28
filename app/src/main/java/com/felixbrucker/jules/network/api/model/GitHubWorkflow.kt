@@ -30,3 +30,14 @@ data class GitHubWorkflowDispatchRequest(
     @Json(name = "ref") val ref: String,
     @Json(name = "inputs") val inputs: Map<String, String>? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class GitHubWorkflowDispatchResponse(
+    @Json(name = "workflow_run_id") val workflowRunId: Long
+)
+
+@JsonClass(generateAdapter = true)
+data class GitHubWorkflowRunResponse(
+    @Json(name = "status") val status: String? = null,
+    @Json(name = "conclusion") val conclusion: String? = null
+)

@@ -7,6 +7,7 @@ import com.felixbrucker.jules.data.database.AppDatabase
 import com.felixbrucker.jules.data.database.ChatElementDao
 import com.felixbrucker.jules.data.database.ChatStateDao
 import com.felixbrucker.jules.data.database.DispatchableWorkflowDao
+import com.felixbrucker.jules.data.database.DispatchedWorkflowRunDao
 import com.felixbrucker.jules.data.database.LogDao
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.SessionDao
@@ -93,5 +94,11 @@ object DatabaseModule {
     @Singleton
     fun provideActivityBasedStateDao(database: AppDatabase): ActivityBasedStateDao {
         return database.activityBasedStateDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDispatchedWorkflowRunDao(database: AppDatabase): DispatchedWorkflowRunDao {
+        return database.dispatchedWorkflowRunDao()
     }
 }

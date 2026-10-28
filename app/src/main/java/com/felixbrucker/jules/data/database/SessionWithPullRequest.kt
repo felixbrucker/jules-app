@@ -16,7 +16,12 @@ data class SessionWithPullRequest(
         parentColumn = "sourceId",
         entityColumn = "sourceId"
     )
-    val workflows: List<DispatchableWorkflowEntity> = emptyList()
+    val workflows: List<DispatchableWorkflowEntity> = emptyList(),
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "sessionId"
+    )
+    val dispatchedWorkflowRun: DispatchedWorkflowRunEntity? = null
 ) {
     val pullRequestState: PullRequestState?
         get() = pullRequestEntity?.state

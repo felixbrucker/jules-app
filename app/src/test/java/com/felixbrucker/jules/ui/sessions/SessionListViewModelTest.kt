@@ -115,20 +115,35 @@ class SessionListViewModelTest {
             inputs = emptyList()
         )
 
+        coEvery {
+            julesRepository.dispatchWorkflow(
+                sessionId = "sess-1",
+                owner = "owner",
+                repo = "repo",
+                workflowId = "123",
+                workflowName = "CI",
+                ref = "main",
+                inputs = mapOf("env" to "prod")
+            )
+        } returns 98765L
+
         viewModel.openDispatchDialog(session, workflow)
         viewModel.dispatchWorkflow(session, workflow, "main", mapOf("env" to "prod"))
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify {
             julesRepository.dispatchWorkflow(
+                sessionId = "sess-1",
                 owner = "owner",
                 repo = "repo",
                 workflowId = "123",
+                workflowName = "CI",
                 ref = "main",
                 inputs = mapOf("env" to "prod")
             )
         }
         assertNull(viewModel.dispatchDialogState.value)
+        assertEquals("Workflow 'CI' dispatched successfully", viewModel.userError.value)
     }
 
     @Test

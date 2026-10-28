@@ -5,6 +5,7 @@ import com.felixbrucker.jules.network.api.model.GitHubBranch
 import com.felixbrucker.jules.network.api.model.PullRequestState
 import com.felixbrucker.jules.network.api.model.SessionState
 import com.felixbrucker.jules.network.api.model.WorkflowInput
+import com.felixbrucker.jules.network.api.model.WorkflowRunState
 import com.felixbrucker.jules.network.api.adapter.InstantAdapter
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
@@ -42,6 +43,7 @@ class Converters {
 
     private val workflowInputListType = Types.newParameterizedType(List::class.java, WorkflowInput::class.java)
     private val workflowInputListAdapter: JsonAdapter<List<WorkflowInput>> = moshi.adapter(workflowInputListType)
+
     @TypeConverter
     fun fromSessionState(state: SessionState): String = state.name
 
@@ -53,6 +55,12 @@ class Converters {
 
     @TypeConverter
     fun toPullRequestState(value: String): PullRequestState = PullRequestState.valueOf(value)
+
+    @TypeConverter
+    fun fromWorkflowRunState(state: WorkflowRunState): String = state.name
+
+    @TypeConverter
+    fun toWorkflowRunState(value: String): WorkflowRunState = WorkflowRunState.valueOf(value)
 
     @TypeConverter
     fun fromInstant(instant: Instant?): Long? = instant?.toEpochMilli()
