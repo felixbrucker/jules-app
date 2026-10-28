@@ -48,11 +48,7 @@ class ScheduledTaskScheduler @Inject constructor(
         }
 
         val useExact = appSettingsRepository.useExactAlarmsFlow.first()
-        val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            alarmManager.canScheduleExactAlarms()
-        } else {
-            true
-        }
+        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
         if (useExact && canExact) {
             alarmManager.setExactAndAllowWhileIdle(

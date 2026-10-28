@@ -65,6 +65,7 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
 
 fun ScheduleType.displayName(): String = when (this) {
     ScheduleType.ONCE -> "Once"
@@ -115,8 +116,7 @@ private fun CreateScheduledTaskDialogBody(
     onSourceSelected: (SourceEntity) -> Unit
 ) {
     val initialRepos = remember(task.repos, sources) {
-        if (task.repos.isNotEmpty()) task.repos
-        else {
+        task.repos.ifEmpty {
             val firstSrc = sources.firstOrNull()
             if (firstSrc != null) {
                 val branch = firstSrc.githubRepo?.defaultBranchName
@@ -337,7 +337,7 @@ private fun CreateScheduledTaskDialogBody(
                         date = if (scheduleType == ScheduleType.ONCE) dateStr else null,
                         dayOfWeek = if (scheduleType == ScheduleType.WEEKLY) dayOfWeek else null,
                         dayOfMonth = if (scheduleType == ScheduleType.MONTHLY) dayOfMonth else null,
-                        enabled = if (isFutureOnceTask) true else task.enabled,
+                        enabled = isFutureOnceTask || task.enabled,
                         updatedAt = Instant.now()
                     )
                     onSaveTask(updatedTask)
@@ -444,7 +444,6 @@ private fun TimeSelectionField(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateSelectionField(
     selectedDateStr: String,
@@ -518,7 +517,7 @@ private fun DayOfWeekDropdown(
     var expanded by remember { mutableStateOf(false) }
     val days = (1..7).map { DayOfWeek.of(it) }
     val selectedDayName = DayOfWeek.of(selectedDay.coerceIn(1, 7))
-        .getDisplayName(TextStyle.FULL, Locale.getDefault())
+        .getDisplayName(TextStyle.FULL, LocalLocale.current.platformLocale)
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -540,7 +539,7 @@ private fun DayOfWeekDropdown(
         ) {
             days.forEach { day ->
                 DropdownMenuItem(
-                    text = { Text(day.getDisplayName(TextStyle.FULL, Locale.getDefault())) },
+                    text = { Text(day.getDisplayName(TextStyle.FULL, LocalLocale.current.platformLocale)) },
                     onClick = {
                         onDaySelected(day.value)
                         expanded = false

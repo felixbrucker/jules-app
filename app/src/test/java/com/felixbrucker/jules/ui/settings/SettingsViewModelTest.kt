@@ -2,6 +2,7 @@ package com.felixbrucker.jules.ui.settings
 
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
+import com.felixbrucker.jules.data.worker.ScheduledTaskScheduler
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -24,6 +25,7 @@ class SettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var julesRepository: JulesRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
+    private lateinit var scheduledTaskScheduler: ScheduledTaskScheduler
     private lateinit var viewModel: SettingsViewModel
 
     @Before
@@ -31,6 +33,7 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         julesRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
+        scheduledTaskScheduler = mockk(relaxed = true)
 
         coEvery { appSettingsRepository.periodicSyncEnabledFlow } returns flowOf(false)
         coEvery { appSettingsRepository.syncIntervalMinutesFlow } returns flowOf(15)
@@ -42,7 +45,7 @@ class SettingsViewModelTest {
         coEvery { appSettingsRepository.apiKeyFlow } returns flowOf("test-key")
         coEvery { appSettingsRepository.githubAuthTokenFlow } returns flowOf("test-token")
 
-        viewModel = SettingsViewModel(julesRepository, appSettingsRepository)
+        viewModel = SettingsViewModel(julesRepository, appSettingsRepository, scheduledTaskScheduler)
     }
 
     @After

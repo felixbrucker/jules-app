@@ -15,7 +15,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Alarm
@@ -63,6 +62,7 @@ import com.felixbrucker.jules.R
 import com.felixbrucker.jules.ui.components.ApiKeyTextField
 import com.felixbrucker.jules.ui.components.LoadingStateButton
 import com.felixbrucker.jules.ui.components.ObfuscatedTextField
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -273,7 +273,7 @@ private fun ExactAlarmsCard(
                         if (enabled && !canScheduleExactAlarms(context)) {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                 val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                    data = Uri.parse("package:${context.packageName}")
+                                    data = "package:${context.packageName}".toUri()
                                 }
                                 context.startActivity(intent)
                             }
@@ -308,7 +308,7 @@ private fun ExactAlarmsCard(
                             onClick = {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                     val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                        data = Uri.parse("package:${context.packageName}")
+                                        data = "package:${context.packageName}".toUri()
                                     }
                                     context.startActivity(intent)
                                 }

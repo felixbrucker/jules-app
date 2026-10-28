@@ -94,7 +94,7 @@ sealed interface FileTreeNode {
 @HiltViewModel
 class SessionDetailViewModel @Inject constructor(
     private val julesRepository: JulesRepository,
-    private val appSettingsRepository: AppSettingsRepository,
+    appSettingsRepository: AppSettingsRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 

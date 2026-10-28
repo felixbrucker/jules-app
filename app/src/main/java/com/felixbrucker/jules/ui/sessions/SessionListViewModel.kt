@@ -220,11 +220,6 @@ class SessionListViewModel @Inject constructor(
         }
     }
 
-    fun stopPeriodicSync() {
-        periodicSyncJob?.cancel()
-        periodicSyncJob = null
-    }
-
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
     }

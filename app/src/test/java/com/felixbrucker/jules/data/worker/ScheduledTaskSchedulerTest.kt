@@ -2,7 +2,6 @@ package com.felixbrucker.jules.data.worker
 
 import com.felixbrucker.jules.data.database.ScheduleType
 import com.felixbrucker.jules.data.database.ScheduledTaskEntity
-import com.felixbrucker.jules.data.database.ScheduledTaskRepo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

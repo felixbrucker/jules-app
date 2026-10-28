@@ -32,12 +32,6 @@ interface JulesApiService {
         @Path(value = "sourceId", encoded = true) sourceId: String
     ): Source
 
-    @GET("sources/github/{owner}/{repo}")
-    suspend fun getGitHubSource(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String
-    ): Source
-
     @GET("sessions")
     suspend fun getSessions(
         @Query("pageSize") pageSize: Int? = null,

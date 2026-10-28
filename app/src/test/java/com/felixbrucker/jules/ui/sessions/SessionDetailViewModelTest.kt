@@ -2,15 +2,11 @@ package com.felixbrucker.jules.ui.sessions
 
 import androidx.lifecycle.SavedStateHandle
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
-import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
-import com.felixbrucker.jules.data.database.ComputedDiff
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.Repo
-import com.felixbrucker.jules.network.api.model.FileChangeType
-import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.network.api.model.SessionState
 import kotlinx.coroutines.launch
 import io.mockk.coEvery

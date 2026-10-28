@@ -193,7 +193,7 @@ class JulesRepository @Inject constructor(
 
         val updatedTask = task.copy(
             lastRunAt = Instant.now(),
-            enabled = if (task.scheduleType == ScheduleType.ONCE) false else task.enabled,
+            enabled = task.scheduleType != ScheduleType.ONCE && task.enabled,
             updatedAt = Instant.now()
         )
         scheduledTaskDao.upsertTask(updatedTask)
@@ -1086,7 +1086,7 @@ class JulesRepository @Inject constructor(
     companion object {
         private const val TAG = "JulesRepository"
         private val DIFF_GIT_REGEX = Regex("^diff --git ", RegexOption.MULTILINE)
-        private val PATH_REGEX = Regex("""b/([^\s]+)""")
+        private val PATH_REGEX = Regex("""b/(\S+)""")
         private val HUNK_REGEX = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
     }
 }
