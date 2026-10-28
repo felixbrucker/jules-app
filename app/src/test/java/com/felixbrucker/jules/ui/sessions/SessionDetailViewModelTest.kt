@@ -6,6 +6,7 @@ import com.felixbrucker.jules.data.database.ActivityBasedStateEntity
 import com.felixbrucker.jules.data.database.ComputedDiff
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
+import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.Repo
 import com.felixbrucker.jules.network.api.model.FileChangeType
@@ -33,6 +34,7 @@ class SessionDetailViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var repository: JulesRepository
+    private lateinit var appSettingsRepository: AppSettingsRepository
     private lateinit var savedStateHandle: SavedStateHandle
     private var viewModel: SessionDetailViewModel? = null
 
@@ -40,7 +42,10 @@ class SessionDetailViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         repository = mockk(relaxed = true)
+        appSettingsRepository = mockk(relaxed = true)
         savedStateHandle = SavedStateHandle(mapOf("sessionId" to "sess-123"))
+
+        coEvery { appSettingsRepository.workflowDispatchingEnabledFlow } returns flowOf(true)
 
         coEvery { repository.getSessionFlow("sess-123") } returns flowOf(
             SessionWithPullRequest(
@@ -74,8 +79,17 @@ class SessionDetailViewModelTest {
     }
 
     @Test
+    fun testWorkflowDispatchingEnabledExposed() = runTest(UnconfinedTestDispatcher()) {
+        val vm = SessionDetailViewModel(repository, appSettingsRepository, savedStateHandle)
+        viewModel = vm
+        val collector = launch { vm.workflowDispatchingEnabled.collect {} }
+        assertEquals(true, vm.workflowDispatchingEnabled.value)
+        collector.cancel()
+    }
+
+    @Test
     fun testUpdateSplitRatioClampsValues() = runTest(UnconfinedTestDispatcher()) {
-        val vm = SessionDetailViewModel(repository, savedStateHandle)
+        val vm = SessionDetailViewModel(repository, appSettingsRepository, savedStateHandle)
         viewModel = vm
         vm.updateSplitRatio(0.02f)
         assertEquals(0.0f, vm.splitRatio.value, 0.001f)
@@ -89,7 +103,7 @@ class SessionDetailViewModelTest {
 
     @Test
     fun testSendMessageTriggersRepositoryMethod() = runTest(UnconfinedTestDispatcher()) {
-        val vm = SessionDetailViewModel(repository, savedStateHandle)
+        val vm = SessionDetailViewModel(repository, appSettingsRepository, savedStateHandle)
         viewModel = vm
         vm.sendMessage("Hello Jules")
         coVerify { repository.sendMessage("sess-123", "Hello Jules") }
@@ -97,7 +111,7 @@ class SessionDetailViewModelTest {
 
     @Test
     fun testApprovePlanTriggersRepositoryMethod() = runTest(UnconfinedTestDispatcher()) {
-        val vm = SessionDetailViewModel(repository, savedStateHandle)
+        val vm = SessionDetailViewModel(repository, appSettingsRepository, savedStateHandle)
         viewModel = vm
         vm.approvePlan()
         coVerify { repository.approvePlan("sess-123") }
@@ -105,7 +119,7 @@ class SessionDetailViewModelTest {
 
     @Test
     fun testUpdateFileSearchQueryUpdatesState() = runTest(UnconfinedTestDispatcher()) {
-        val vm = SessionDetailViewModel(repository, savedStateHandle)
+        val vm = SessionDetailViewModel(repository, appSettingsRepository, savedStateHandle)
         viewModel = vm
 
         assertEquals("", vm.fileSearchQuery.value)
@@ -119,7 +133,7 @@ class SessionDetailViewModelTest {
 
     @Test
     fun testDispatchWorkflowSuccess() = runTest(UnconfinedTestDispatcher()) {
-        val vm = SessionDetailViewModel(repository, savedStateHandle)
+        val vm = SessionDetailViewModel(repository, appSettingsRepository, savedStateHandle)
         viewModel = vm
 
         val session = SessionEntity(

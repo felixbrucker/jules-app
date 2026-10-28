@@ -80,6 +80,9 @@ class SettingsViewModel @Inject constructor(
     val completionNotificationsEnabled = appSettingsRepository.completionNotificationsEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val workflowDispatchingEnabled = appSettingsRepository.workflowDispatchingEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val selectedPlan = appSettingsRepository.dailySessionLimitFlow
         .map { JulesPlan.fromLimit(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), JulesPlan.FREE)
@@ -219,6 +222,12 @@ class SettingsViewModel @Inject constructor(
     fun setCompletionNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             appSettingsRepository.setCompletionNotificationsEnabled(enabled)
+        }
+    }
+
+    fun setWorkflowDispatchingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsRepository.setWorkflowDispatchingEnabled(enabled)
         }
     }
 

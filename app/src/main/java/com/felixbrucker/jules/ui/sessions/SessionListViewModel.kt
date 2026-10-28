@@ -91,6 +91,13 @@ class SessionListViewModel @Inject constructor(
     val dailySessionLimit = appSettingsRepository.dailySessionLimitFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
 
+    val workflowDispatchingEnabled: StateFlow<Boolean> = appSettingsRepository.workflowDispatchingEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     var isRefreshing by mutableStateOf(false)
         private set
 

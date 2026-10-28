@@ -147,6 +147,7 @@ fun SessionDetailScreen(
     val isSendingMessage by viewModel.isSendingMessage.collectAsState()
     val isApprovingPlan by viewModel.isApprovingPlan.collectAsState()
     val dispatchState by viewModel.dispatchDialogState.collectAsState()
+    val workflowDispatchingEnabled by viewModel.workflowDispatchingEnabled.collectAsState()
     val errorEvent by viewModel.errorEvents.collectAsState(initial = null)
 
     val density = LocalDensity.current
@@ -193,6 +194,7 @@ fun SessionDetailScreen(
                 SessionDetailTopBar(
                     sessionWithPr = sessionWithPr!!,
                     activityBasedState = activityBasedState,
+                    workflowDispatchingEnabled = workflowDispatchingEnabled,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                     isPhone = isPhone,
@@ -245,6 +247,7 @@ fun SessionDetailScreen(
 private fun SessionDetailTopBar(
     sessionWithPr: SessionWithPullRequest,
     activityBasedState: ActivityBasedStateEntity?,
+    workflowDispatchingEnabled: Boolean,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     isPhone: Boolean,
@@ -362,14 +365,16 @@ private fun SessionDetailTopBar(
                 }
             }
 
-            WorkflowCiButton(
-                sessionId = session.id,
-                dispatchedWorkflowRun = sessionWithPr.dispatchedWorkflowRun,
-                workflows = sessionWithPr.workflows,
-                onWorkflowSelected = onSelectWorkflow,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope
-            )
+            if (workflowDispatchingEnabled) {
+                WorkflowCiButton(
+                    sessionId = session.id,
+                    dispatchedWorkflowRun = sessionWithPr.dispatchedWorkflowRun,
+                    workflows = sessionWithPr.workflows,
+                    onWorkflowSelected = onSelectWorkflow,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
+            }
 
             if (totalAdditions > 0 || totalDeletions > 0) {
                 Box(

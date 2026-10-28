@@ -14,6 +14,7 @@ import com.felixbrucker.jules.data.database.ChatStateEntity
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
+import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.network.api.model.ParsedFile
 import com.felixbrucker.jules.util.periodicTickerFlow
@@ -93,10 +94,18 @@ sealed interface FileTreeNode {
 @HiltViewModel
 class SessionDetailViewModel @Inject constructor(
     private val julesRepository: JulesRepository,
+    private val appSettingsRepository: AppSettingsRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     val sessionId: String = checkNotNull(savedStateHandle["sessionId"])
+
+    val workflowDispatchingEnabled: StateFlow<Boolean> = appSettingsRepository.workflowDispatchingEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
 
     val sessionWithPullRequestFlow: Flow<SessionWithPullRequest?> =
         julesRepository.getSessionFlow(sessionId)
