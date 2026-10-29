@@ -18,8 +18,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.imePadding
+import android.view.WindowManager
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -70,13 +73,15 @@ fun CreateSessionDialog(
     onSourceSelected: (SourceEntity) -> Unit
 ) {
     BasicAlertDialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(decorFitsSystemWindows = false)
+        onDismissRequest = onDismiss
     ) {
+        val view = LocalView.current
+        SideEffect {
+            (view.parent as? DialogWindowProvider)?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
+        }
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .imePadding()
                 .padding(16.dp),
             shape = RoundedCornerShape(16.dp)
         ) {
