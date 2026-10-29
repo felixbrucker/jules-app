@@ -17,9 +17,11 @@ import java.time.Instant
 // CRITICAL: Types and their data class subtypes for which we are creating a JsonAdapter are
 // REQUIRED to be annotated with @JsonClass(generateAdapter = true). Exception: sealed classes.
 class Converters {
-    // Reuse a single Moshi instance across adapters to eliminate redundant builder and reflection allocations.
-    private val moshi: Moshi = Moshi.Builder()
+    private val moshi = Moshi.Builder()
         .add(InstantAdapter())
+        .build()
+
+    private val chatElementAdapter: JsonAdapter<ChatElement> = Moshi.Builder()
         .add(
             PolymorphicJsonAdapterFactory.of(ChatElement::class.java, "type")
                 .withSubtype(ChatElement.UserMessageElement::class.java, "UserMessage")
@@ -33,8 +35,8 @@ class Converters {
         )
         .addLast(KotlinJsonAdapterFactory())
         .build()
+        .adapter(ChatElement::class.java)
 
-    private val chatElementAdapter: JsonAdapter<ChatElement> = moshi.adapter(ChatElement::class.java)
     private val computedDiffAdapter: JsonAdapter<ComputedDiff> = moshi.adapter(ComputedDiff::class.java)
     private val branchListType = Types.newParameterizedType(List::class.java, GitHubBranch::class.java)
     private val branchListAdapter: JsonAdapter<List<GitHubBranch>> = moshi.adapter(branchListType)
