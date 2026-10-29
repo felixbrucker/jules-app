@@ -671,6 +671,26 @@ private fun ChatWindowView(
                     contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item(key = "initial_sync_loading_indicator") {
+                        AnimatedVisibility(
+                            visible = isInitialSyncing,
+                            enter = slideInVertically(initialOffsetY = { it }) + expandVertically() + fadeIn(),
+                            exit = slideOutVertically(targetOffsetY = { it }) + shrinkVertically() + fadeOut()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+
                     if (chatState?.agentState == AgentState.Thinking) {
                         item(key = "agent_thinking_indicator") {
                             AgentStatusBubble(label = "Thinking")
@@ -758,29 +778,6 @@ private fun ChatWindowView(
             }
         }
 
-        if (isInitialSyncing) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background.copy(alpha = 0.85f)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CircularProgressIndicator()
-                        Text(
-                            text = "Loading session activities...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
