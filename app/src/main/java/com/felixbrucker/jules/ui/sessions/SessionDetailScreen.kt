@@ -367,6 +367,7 @@ private fun SessionDetailTopBar(
             if (workflowDispatchingEnabled) {
                 WorkflowCiButton(
                     sessionId = session.id,
+                    repo = session.repo,
                     dispatchedWorkflowRun = sessionWithPr.dispatchedWorkflowRun,
                     workflows = sessionWithPr.workflows,
                     onWorkflowSelected = onSelectWorkflow,
