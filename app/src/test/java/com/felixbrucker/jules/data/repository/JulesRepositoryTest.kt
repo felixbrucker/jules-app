@@ -43,6 +43,7 @@ import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import com.felixbrucker.jules.ui.sessions.DiffLineType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -439,19 +440,19 @@ class JulesRepositoryTest {
 
         val mainActivityLines = result["MainActivity.kt"]!!
         assertEquals(4, mainActivityLines.size)
-        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.CONTEXT, mainActivityLines[0].type)
+        assertEquals(DiffLineType.CONTEXT, mainActivityLines[0].type)
         assertEquals(10, mainActivityLines[0].oldLineNumber)
         assertEquals(10, mainActivityLines[0].newLineNumber)
 
-        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.DELETION, mainActivityLines[1].type)
+        assertEquals(DiffLineType.DELETION, mainActivityLines[1].type)
         assertEquals(11, mainActivityLines[1].oldLineNumber)
         assertEquals(null, mainActivityLines[1].newLineNumber)
 
-        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.ADDITION, mainActivityLines[2].type)
+        assertEquals(DiffLineType.ADDITION, mainActivityLines[2].type)
         assertEquals(null, mainActivityLines[2].oldLineNumber)
         assertEquals(11, mainActivityLines[2].newLineNumber)
 
-        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.ADDITION, mainActivityLines[3].type)
+        assertEquals(DiffLineType.ADDITION, mainActivityLines[3].type)
         assertEquals(null, mainActivityLines[3].oldLineNumber)
         assertEquals(12, mainActivityLines[3].newLineNumber)
     }
