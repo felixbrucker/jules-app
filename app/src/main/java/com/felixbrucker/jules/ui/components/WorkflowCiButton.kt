@@ -32,17 +32,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.Intent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.felixbrucker.jules.data.database.DispatchableWorkflowEntity
 import com.felixbrucker.jules.data.database.DispatchedWorkflowRunEntity
+import com.felixbrucker.jules.network.api.model.Repo
 import com.felixbrucker.jules.network.api.model.WorkflowRunState
 
 @Composable
 fun WorkflowCiButton(
     sessionId: String,
+    repo: Repo?,
     dispatchedWorkflowRun: DispatchedWorkflowRunEntity?,
     workflows: List<DispatchableWorkflowEntity>,
     onWorkflowSelected: (DispatchableWorkflowEntity) -> Unit,
@@ -53,8 +58,14 @@ fun WorkflowCiButton(
         return
     }
 
+    val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
     val labelText = dispatchedWorkflowRun?.workflowName ?: "CI"
+    val workflowRunUrl = if (repo != null && dispatchedWorkflowRun != null) {
+        "https://github.com/${repo.owner}/${repo.name}/actions/runs/${dispatchedWorkflowRun.workflowRunId}"
+    } else {
+        null
+    }
 
     Box(
         modifier = with(sharedTransitionScope) {
@@ -79,7 +90,11 @@ fun WorkflowCiButton(
                 Row(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .clickable(enabled = workflows.isNotEmpty()) { menuExpanded = true }
+                        .clickable(enabled = workflowRunUrl != null) {
+                            workflowRunUrl?.let { url ->
+                                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                            }
+                        }
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)

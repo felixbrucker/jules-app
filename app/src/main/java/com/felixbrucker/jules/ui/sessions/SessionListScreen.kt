@@ -1215,6 +1215,7 @@ private fun SessionCardFooter(
             if (workflowDispatchingEnabled) {
                 WorkflowCiButton(
                     sessionId = session.id,
+                    repo = session.repo,
                     dispatchedWorkflowRun = sessionWithPullRequest.dispatchedWorkflowRun,
                     workflows = workflows,
                     onWorkflowSelected = onSelectWorkflow,
