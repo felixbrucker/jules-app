@@ -32,6 +32,7 @@ class JulesSyncWorker @AssistedInject constructor(
     private val julesRepository: JulesRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val sessionDao: SessionDao,
+    private val workerScheduler: WorkerScheduler,
     private val appState: AppState
 ) : CoroutineWorker(appContext, workerParams) {
 
@@ -49,12 +50,7 @@ class JulesSyncWorker @AssistedInject constructor(
 
             julesRepository.sync(isBackground = true)
 
-            val hasInProgress = sessionDao.hasActiveInProgressSessionsFlow().first()
-            val decision = WorkerScheduler.evaluate(settings, hasInProgress)
-
-            if (decision.shouldEnqueue) {
-                enqueueSyncWork(applicationContext, decision.intervalMinutes, isSelfEnqueue = true)
-            }
+            workerScheduler.enqueueIfNeeded(isSelfEnqueue = true)
 
             Timber.tag(TAG).d("Finished sync in worker")
             Result.success()

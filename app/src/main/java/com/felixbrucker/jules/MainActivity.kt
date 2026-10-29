@@ -40,6 +40,9 @@ class MainActivity : ComponentActivity() {
     lateinit var sessionDao: SessionDao
 
     @Inject
+    lateinit var workerScheduler: WorkerScheduler
+
+    @Inject
     lateinit var appState: AppState
 
     override fun onStart() {
@@ -71,7 +74,7 @@ class MainActivity : ComponentActivity() {
                 appSettingsRepository.appSettingsFlow,
                 sessionDao.hasActiveInProgressSessionsFlow()
             ) { settings, hasInProgress ->
-                WorkerScheduler.evaluate(settings, hasInProgress)
+                workerScheduler.evaluate(settings, hasInProgress)
             }
                 .distinctUntilChanged()
                 .collect { decision ->

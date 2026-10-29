@@ -34,6 +34,7 @@ import com.felixbrucker.jules.data.database.toEntity
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.datastore.SyncMetadataRepository
 import com.felixbrucker.jules.data.worker.ScheduledTaskScheduler
+import com.felixbrucker.jules.data.worker.WorkerScheduler
 import com.felixbrucker.jules.network.api.GitHubApi
 import com.felixbrucker.jules.network.api.JulesApi
 import com.felixbrucker.jules.network.api.filter.ActivityFilter
@@ -90,6 +91,7 @@ class JulesRepository @Inject constructor(
     private val syncMetadataRepository: SyncMetadataRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val notificationManager: JulesNotificationManager,
+    private val workerScheduler: WorkerScheduler,
     private val julesApi: JulesApi,
     private val gitHubApi: GitHubApi
 ) {
@@ -198,6 +200,7 @@ class JulesRepository @Inject constructor(
         )
         scheduledTaskDao.upsertTask(updatedTask)
         scheduledTaskScheduler.scheduleTask(updatedTask)
+        workerScheduler.enqueueIfNeeded()
     }
 
     suspend fun saveDraft(draft: SessionDraftEntity) = withContext(Dispatchers.IO) {
