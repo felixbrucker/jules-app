@@ -1014,82 +1014,119 @@ class JulesRepository @Inject constructor(
         }.map { it.path }
     }
 
-    private fun extractAllFileDiffLines(unidiffPatch: String): Map<String, List<ParsedDiffLine>> {
+    // Single-pass streaming line traversal avoids regex block splitting and line list allocations.
+    internal fun extractAllFileDiffLines(unidiffPatch: String): Map<String, List<ParsedDiffLine>> {
         if (unidiffPatch.isBlank()) return emptyMap()
-        val blocks = unidiffPatch.split(DIFF_GIT_REGEX)
-        val resultMap = mutableMapOf<String, List<ParsedDiffLine>>()
 
-        for (block in blocks) {
-            if (block.isBlank()) continue
-            val lines = block.lines()
-            val headerLine = lines.firstOrNull() ?: continue
-            val match = PATH_REGEX.find(headerLine)
-            val path = match?.groupValues?.get(1) ?: continue
+        val fileMap = mutableMapOf<String, MutableList<ParsedDiffLine>>()
+        var currentFile: String? = null
+        var fromPath: String? = null
+        var toPath: String? = null
+        var oldLine = 1
+        var newLine = 1
+        var inHunk = false
+        var hasBlock = false
 
-            val fileLines = mutableListOf<ParsedDiffLine>()
-            var oldLine = 1
-            var newLine = 1
-            var inHunk = false
+        fun flushBlock() {
+            if (!hasBlock) return
+            fromPath = null
+            toPath = null
+            currentFile = null
+            inHunk = false
+            hasBlock = false
+        }
 
-            for (line in lines) {
-                if (line.startsWith("@@ ")) {
-                    inHunk = true
-                    val hunkMatch = HUNK_REGEX.find(line)
-                    if (hunkMatch != null) {
-                        oldLine = hunkMatch.groupValues[1].toInt()
-                        newLine = hunkMatch.groupValues[2].toInt()
-                    }
-                    continue
-                }
+        fun parseHunkHeader(line: String) {
+            val startIdx = line.indexOf("@@")
+            if (startIdx == -1) return
+            val endIdx = line.indexOf("@@", startIdx + 2)
+            if (endIdx == -1) return
 
-                if (!inHunk) continue
+            val header = line.substring(startIdx + 2, endIdx).trim()
+            val spaceIdx = header.indexOf(' ')
+            if (spaceIdx == -1) return
 
-                when {
-                    line.startsWith("+") && !line.startsWith("+++") -> {
-                        fileLines.add(
-                            ParsedDiffLine(
-                                oldLineNumber = null,
-                                newLineNumber = newLine,
-                                content = line,
-                                type = DiffLineType.ADDITION
+            val oldPart = header.substring(0, spaceIdx).removePrefix("-")
+            val newPart = header.substring(spaceIdx + 1).removePrefix("+")
+
+            val oldCommaIdx = oldPart.indexOf(',')
+            val oldStr = if (oldCommaIdx != -1) oldPart.substring(0, oldCommaIdx) else oldPart
+
+            val newCommaIdx = newPart.indexOf(',')
+            val newStr = if (newCommaIdx != -1) newPart.substring(0, newCommaIdx) else newPart
+
+            oldLine = oldStr.toIntOrNull() ?: 1
+            newLine = newStr.toIntOrNull() ?: 1
+            inHunk = true
+        }
+
+        fun cleanDiffPath(path: String): String? {
+            if (path == "/dev/null") return null
+            var p = path
+            if (p.startsWith("a/")) p = p.substring(2)
+            if (p.startsWith("b/")) p = p.substring(2)
+            return p
+        }
+
+        for (line in unidiffPatch.lineSequence()) {
+            if (line.startsWith("diff --git ")) {
+                flushBlock()
+                hasBlock = true
+            } else if (hasBlock) {
+                if (line.startsWith("--- ")) {
+                    fromPath = cleanDiffPath(line.substring(4).trim())
+                    currentFile = toPath ?: fromPath
+                } else if (line.startsWith("+++ ")) {
+                    toPath = cleanDiffPath(line.substring(4).trim())
+                    currentFile = toPath ?: fromPath
+                } else if (line.startsWith("@@ ")) {
+                    parseHunkHeader(line)
+                } else if (inHunk && currentFile != null) {
+                    when {
+                        line.startsWith("+") && !line.startsWith("+++") -> {
+                            fileMap.getOrPut(currentFile!!) { mutableListOf() }.add(
+                                ParsedDiffLine(
+                                    oldLineNumber = null,
+                                    newLineNumber = newLine,
+                                    content = line,
+                                    type = DiffLineType.ADDITION
+                                )
                             )
-                        )
-                        newLine++
-                    }
-                    line.startsWith("-") && !line.startsWith("---") -> {
-                        fileLines.add(
-                            ParsedDiffLine(
-                                oldLineNumber = oldLine,
-                                newLineNumber = null,
-                                content = line,
-                                type = DiffLineType.DELETION
+                            newLine++
+                        }
+                        line.startsWith("-") && !line.startsWith("---") -> {
+                            fileMap.getOrPut(currentFile!!) { mutableListOf() }.add(
+                                ParsedDiffLine(
+                                    oldLineNumber = oldLine,
+                                    newLineNumber = null,
+                                    content = line,
+                                    type = DiffLineType.DELETION
+                                )
                             )
-                        )
-                        oldLine++
-                    }
-                    line.startsWith(" ") || line.isEmpty() -> {
-                        fileLines.add(
-                            ParsedDiffLine(
-                                oldLineNumber = oldLine,
-                                newLineNumber = newLine,
-                                content = line,
-                                type = DiffLineType.CONTEXT
+                            oldLine++
+                        }
+                        line.startsWith(" ") || line.isEmpty() -> {
+                            fileMap.getOrPut(currentFile!!) { mutableListOf() }.add(
+                                ParsedDiffLine(
+                                    oldLineNumber = oldLine,
+                                    newLineNumber = newLine,
+                                    content = line,
+                                    type = DiffLineType.CONTEXT
+                                )
                             )
-                        )
-                        oldLine++
-                        newLine++
+                            oldLine++
+                            newLine++
+                        }
                     }
                 }
             }
-            resultMap[path] = fileLines
         }
-        return resultMap
+        flushBlock()
+
+        return fileMap
     }
 
     companion object {
         private const val TAG = "JulesRepository"
-        private val DIFF_GIT_REGEX = Regex("^diff --git ", RegexOption.MULTILINE)
-        private val PATH_REGEX = Regex("""b/(\S+)""")
-        private val HUNK_REGEX = Regex("""@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
     }
 }
