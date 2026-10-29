@@ -852,7 +852,7 @@ private fun SessionLazyColumn(
     ) {
         items(
             items = drafts,
-            key = { "draft_${it.draft.id}" }
+            key = { it.draft.id }
         ) { draftItem ->
             SessionDraftCard(
                 modifier = Modifier.animateItem(),
@@ -863,7 +863,7 @@ private fun SessionLazyColumn(
         }
         items(
             items = scheduledTasks,
-            key = { "scheduled_${it.id}" }
+            key = { it.id }
         ) { taskItem ->
             ScheduledTaskCard(
                 modifier = Modifier.animateItem(),
