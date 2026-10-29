@@ -44,6 +44,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
@@ -402,5 +403,62 @@ class JulesRepositoryTest {
                 match { it.sessionId == "sess-1" && it.state == WorkflowRunState.SUCCESS }
             )
         }
+    }
+
+    @Test
+    fun testExtractAllFileDiffLines() {
+        val patch = """
+            diff --git a/MainActivity.kt b/MainActivity.kt
+            --- a/MainActivity.kt
+            +++ b/MainActivity.kt
+            @@ -10,3 +10,4 @@
+             package com.example
+            -val x = 1
+            +val x = 2
+            +val y = 3
+            diff --git a/DeletedFile.kt b/DeletedFile.kt
+            --- a/DeletedFile.kt
+            +++ /dev/null
+            @@ -1,2 +0,0 @@
+            -class Deleted
+            -
+            diff --git a/NewFile.kt b/NewFile.kt
+            --- /dev/null
+            +++ b/NewFile.kt
+            @@ -0,0 +1,2 @@
+            +class NewFile {
+            +}
+        """.trimIndent()
+
+        val result = repository.extractAllFileDiffLines(patch)
+
+        assertEquals(3, result.size)
+        assertTrue(result.containsKey("MainActivity.kt"))
+        assertTrue(result.containsKey("DeletedFile.kt"))
+        assertTrue(result.containsKey("NewFile.kt"))
+
+        val mainActivityLines = result["MainActivity.kt"]!!
+        assertEquals(4, mainActivityLines.size)
+        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.CONTEXT, mainActivityLines[0].type)
+        assertEquals(10, mainActivityLines[0].oldLineNumber)
+        assertEquals(10, mainActivityLines[0].newLineNumber)
+
+        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.DELETION, mainActivityLines[1].type)
+        assertEquals(11, mainActivityLines[1].oldLineNumber)
+        assertEquals(null, mainActivityLines[1].newLineNumber)
+
+        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.ADDITION, mainActivityLines[2].type)
+        assertEquals(null, mainActivityLines[2].oldLineNumber)
+        assertEquals(11, mainActivityLines[2].newLineNumber)
+
+        assertEquals(com.felixbrucker.jules.ui.sessions.DiffLineType.ADDITION, mainActivityLines[3].type)
+        assertEquals(null, mainActivityLines[3].oldLineNumber)
+        assertEquals(12, mainActivityLines[3].newLineNumber)
+    }
+
+    @Test
+    fun testExtractAllFileDiffLinesEmptyOrBlank() {
+        assertTrue(repository.extractAllFileDiffLines("").isEmpty())
+        assertTrue(repository.extractAllFileDiffLines("   ").isEmpty())
     }
 }
