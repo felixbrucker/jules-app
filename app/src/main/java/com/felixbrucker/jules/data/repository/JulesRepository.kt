@@ -155,7 +155,7 @@ class JulesRepository @Inject constructor(
         scheduledTaskDao.deleteTask(taskId)
     }
 
-    suspend fun executeScheduledTask(taskId: String) = withContext(Dispatchers.IO) {
+    suspend fun executeScheduledTask(taskId: String, isManual: Boolean = false) = withContext(Dispatchers.IO) {
         val task = scheduledTaskDao.getTaskById(taskId) ?: return@withContext
         val repos = task.repos
         if (repos.isEmpty()) return@withContext
@@ -193,13 +193,15 @@ class JulesRepository @Inject constructor(
             }
         }
 
-        val updatedTask = task.copy(
-            lastRunAt = Instant.now(),
-            enabled = task.scheduleType != ScheduleType.ONCE && task.enabled,
-            updatedAt = Instant.now()
-        )
-        scheduledTaskDao.upsertTask(updatedTask)
-        scheduledTaskScheduler.scheduleTask(updatedTask)
+        if (!isManual) {
+            val updatedTask = task.copy(
+                lastRunAt = Instant.now(),
+                enabled = task.scheduleType != ScheduleType.ONCE && task.enabled,
+                updatedAt = Instant.now()
+            )
+            scheduledTaskDao.upsertTask(updatedTask)
+            scheduledTaskScheduler.scheduleTask(updatedTask)
+        }
         workerScheduler.enqueueIfNeeded()
     }
 

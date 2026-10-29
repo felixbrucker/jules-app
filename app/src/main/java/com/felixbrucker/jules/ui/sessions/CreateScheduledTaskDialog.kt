@@ -328,18 +328,31 @@ private fun CreateScheduledTaskDialogBody(
                         LocalDateTime.of(localDate, localTime).atZone(ZoneId.systemDefault()).isAfter(ZonedDateTime.now())
                     } catch (_: Exception) { false }
 
+                    val newScheduleType = scheduleType
+                    val newDate = if (scheduleType == ScheduleType.ONCE) dateStr else null
+                    val newDayOfWeek = if (scheduleType == ScheduleType.WEEKLY) dayOfWeek else null
+                    val newDayOfMonth = if (scheduleType == ScheduleType.MONTHLY) dayOfMonth else null
+
+                    val isScheduleChanged = task.scheduleType != newScheduleType ||
+                        task.timeHour != timeHour ||
+                        task.timeMinute != timeMinute ||
+                        task.date != newDate ||
+                        task.dayOfWeek != newDayOfWeek ||
+                        task.dayOfMonth != newDayOfMonth
+
                     val updatedTask = task.copy(
                         title = title.ifBlank { null },
                         prompt = prompt,
                         repos = repos,
                         requirePlanApproval = requirePlanApproval,
-                        scheduleType = scheduleType,
+                        scheduleType = newScheduleType,
                         timeHour = timeHour,
                         timeMinute = timeMinute,
-                        date = if (scheduleType == ScheduleType.ONCE) dateStr else null,
-                        dayOfWeek = if (scheduleType == ScheduleType.WEEKLY) dayOfWeek else null,
-                        dayOfMonth = if (scheduleType == ScheduleType.MONTHLY) dayOfMonth else null,
+                        date = newDate,
+                        dayOfWeek = newDayOfWeek,
+                        dayOfMonth = newDayOfMonth,
                         enabled = isFutureOnceTask || task.enabled,
+                        lastRunAt = if (isScheduleChanged) null else task.lastRunAt,
                         updatedAt = Instant.now()
                     )
                     onSaveTask(updatedTask)

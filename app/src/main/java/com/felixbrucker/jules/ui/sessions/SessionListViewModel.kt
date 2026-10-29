@@ -337,7 +337,7 @@ class SessionListViewModel @Inject constructor(
     fun executeScheduledTaskNow(taskId: String) {
         viewModelScope.launch {
             try {
-                julesRepository.executeScheduledTask(taskId)
+                julesRepository.executeScheduledTask(taskId, isManual = true)
                 _userFeedback.value = "Scheduled task triggered successfully"
             } catch (e: Exception) {
                 _userFeedback.value = e.message ?: "Failed to execute scheduled task"

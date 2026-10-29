@@ -195,9 +195,63 @@ class JulesRepositoryTest {
         coVerify {
             julesApi.createSession(any())
             julesApi.getSession("sess-1")
-            scheduledTaskDao.upsertTask(any())
+            scheduledTaskDao.upsertTask(match { it.lastRunAt != null })
             scheduledTaskScheduler.scheduleTask(any())
             workerScheduler.enqueueIfNeeded()
+        }
+    }
+
+    @Test
+    fun testExecuteScheduledTaskManualDoesNotSetLastRunAt() = runBlocking {
+        val lastRun = Instant.parse("2026-03-30T08:00:00Z")
+        val task = ScheduledTaskEntity(
+            id = "task-1",
+            title = "Scheduled Task",
+            prompt = "Do work",
+            lastRunAt = lastRun,
+            repos = listOf(ScheduledTaskRepo(sourceId = "github/owner/repo", branch = "main"))
+        )
+
+        val apiSession = Session(
+            name = "sessions/sess-1",
+            id = "sess-1",
+            title = "Scheduled Task",
+            prompt = "Do work",
+            state = SessionState.PLANNING,
+            createTime = Instant.now(),
+            sourceContext = SourceContext(sourceName = "sources/github/owner/repo")
+        )
+
+        coEvery { scheduledTaskDao.getTaskById("task-1") } returns task
+        coEvery { julesApi.createSession(any()) } returns apiSession
+        coEvery { julesApi.getSession("sess-1") } returns apiSession
+
+        repository.executeScheduledTask("task-1", isManual = true)
+
+        coVerify {
+            julesApi.createSession(any())
+            julesApi.getSession("sess-1")
+            workerScheduler.enqueueIfNeeded()
+        }
+        coVerify(exactly = 0) {
+            scheduledTaskDao.upsertTask(any())
+        }
+    }
+
+    @Test
+    fun testSaveScheduledTaskSavesAndSchedulesTask() = runBlocking {
+        val task = ScheduledTaskEntity(
+            id = "task-1",
+            timeHour = 10,
+            timeMinute = 30,
+            lastRunAt = null
+        )
+
+        repository.saveScheduledTask(task)
+
+        coVerify {
+            scheduledTaskDao.upsertTask(task)
+            scheduledTaskScheduler.scheduleTask(task)
         }
     }
 
