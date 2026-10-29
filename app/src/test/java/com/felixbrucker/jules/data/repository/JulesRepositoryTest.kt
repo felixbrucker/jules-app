@@ -9,9 +9,12 @@ import com.felixbrucker.jules.data.database.DispatchedWorkflowRunEntity
 import com.felixbrucker.jules.data.database.EmbeddedPullRequest
 import com.felixbrucker.jules.data.database.PullRequestDao
 import com.felixbrucker.jules.data.database.ScheduledTaskDao
+import com.felixbrucker.jules.data.database.ScheduledTaskEntity
+import com.felixbrucker.jules.data.database.ScheduledTaskRepo
 import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.database.SessionDraftDao
 import com.felixbrucker.jules.data.worker.ScheduledTaskScheduler
+import com.felixbrucker.jules.data.worker.WorkerScheduler
 import com.felixbrucker.jules.data.database.SessionDraftEntity
 import com.felixbrucker.jules.data.database.SessionEntity
 import com.felixbrucker.jules.data.database.SessionWithPullRequest
@@ -62,6 +65,7 @@ class JulesRepositoryTest {
     private lateinit var syncMetadataRepository: SyncMetadataRepository
     private lateinit var appSettingsRepository: AppSettingsRepository
     private lateinit var notificationManager: JulesNotificationManager
+    private lateinit var workerScheduler: WorkerScheduler
     private lateinit var julesApi: JulesApi
     private lateinit var gitHubApi: GitHubApi
     private lateinit var repository: JulesRepository
@@ -83,6 +87,7 @@ class JulesRepositoryTest {
         syncMetadataRepository = mockk(relaxed = true)
         appSettingsRepository = mockk(relaxed = true)
         notificationManager = mockk(relaxed = true)
+        workerScheduler = mockk(relaxed = true)
         julesApi = mockk(relaxed = true)
         gitHubApi = mockk(relaxed = true)
 
@@ -109,6 +114,7 @@ class JulesRepositoryTest {
             syncMetadataRepository = syncMetadataRepository,
             appSettingsRepository = appSettingsRepository,
             notificationManager = notificationManager,
+            workerScheduler = workerScheduler,
             julesApi = julesApi,
             gitHubApi = gitHubApi
         )
@@ -156,6 +162,40 @@ class JulesRepositoryTest {
             julesApi.getSession("sess-100")
             sessionDao.insertSessions(any())
             sessionDraftDao.deleteDraft("draft-10")
+        }
+    }
+
+    @Test
+    fun testExecuteScheduledTaskCreatesSessionsAndEnqueuesSyncWorker() = runBlocking {
+        val task = ScheduledTaskEntity(
+            id = "task-1",
+            title = "Scheduled Task",
+            prompt = "Do work",
+            repos = listOf(ScheduledTaskRepo(sourceId = "github/owner/repo", branch = "main"))
+        )
+
+        val apiSession = Session(
+            name = "sessions/sess-1",
+            id = "sess-1",
+            title = "Scheduled Task",
+            prompt = "Do work",
+            state = SessionState.PLANNING,
+            createTime = Instant.now(),
+            sourceContext = SourceContext(sourceName = "sources/github/owner/repo")
+        )
+
+        coEvery { scheduledTaskDao.getTaskById("task-1") } returns task
+        coEvery { julesApi.createSession(any()) } returns apiSession
+        coEvery { julesApi.getSession("sess-1") } returns apiSession
+
+        repository.executeScheduledTask("task-1")
+
+        coVerify {
+            julesApi.createSession(any())
+            julesApi.getSession("sess-1")
+            scheduledTaskDao.upsertTask(any())
+            scheduledTaskScheduler.scheduleTask(any())
+            workerScheduler.enqueueIfNeeded()
         }
     }
 
