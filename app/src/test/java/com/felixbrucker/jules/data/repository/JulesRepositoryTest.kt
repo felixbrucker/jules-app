@@ -239,25 +239,19 @@ class JulesRepositoryTest {
     }
 
     @Test
-    fun testSaveScheduledTaskResetsLastRunAtWhenScheduleChanges() = runBlocking {
-        val existingTask = ScheduledTaskEntity(
+    fun testSaveScheduledTaskSavesAndSchedulesTask() = runBlocking {
+        val task = ScheduledTaskEntity(
             id = "task-1",
-            timeHour = 9,
-            timeMinute = 0,
-            lastRunAt = Instant.now()
-        )
-        val updatedTask = existingTask.copy(
             timeHour = 10,
-            timeMinute = 30
+            timeMinute = 30,
+            lastRunAt = null
         )
 
-        coEvery { scheduledTaskDao.getTaskById("task-1") } returns existingTask
-
-        repository.saveScheduledTask(updatedTask)
+        repository.saveScheduledTask(task)
 
         coVerify {
-            scheduledTaskDao.upsertTask(match { it.lastRunAt == null && it.timeHour == 10 && it.timeMinute == 30 })
-            scheduledTaskScheduler.scheduleTask(match { it.lastRunAt == null })
+            scheduledTaskDao.upsertTask(task)
+            scheduledTaskScheduler.scheduleTask(task)
         }
     }
 

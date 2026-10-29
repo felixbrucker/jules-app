@@ -146,22 +146,8 @@ class JulesRepository @Inject constructor(
     }
 
     suspend fun saveScheduledTask(task: ScheduledTaskEntity) = withContext(Dispatchers.IO) {
-        val existing = scheduledTaskDao.getTaskById(task.id)
-        val taskToSave = if (existing != null && (
-                existing.scheduleType != task.scheduleType ||
-                existing.timeHour != task.timeHour ||
-                existing.timeMinute != task.timeMinute ||
-                existing.date != task.date ||
-                existing.dayOfWeek != task.dayOfWeek ||
-                existing.dayOfMonth != task.dayOfMonth
-            )
-        ) {
-            task.copy(lastRunAt = null)
-        } else {
-            task
-        }
-        scheduledTaskDao.upsertTask(taskToSave)
-        scheduledTaskScheduler.scheduleTask(taskToSave)
+        scheduledTaskDao.upsertTask(task)
+        scheduledTaskScheduler.scheduleTask(task)
     }
 
     suspend fun deleteScheduledTask(taskId: String) = withContext(Dispatchers.IO) {
