@@ -146,8 +146,22 @@ class JulesRepository @Inject constructor(
     }
 
     suspend fun saveScheduledTask(task: ScheduledTaskEntity) = withContext(Dispatchers.IO) {
-        scheduledTaskDao.upsertTask(task)
-        scheduledTaskScheduler.scheduleTask(task)
+        val existing = scheduledTaskDao.getTaskById(task.id)
+        val taskToSave = if (existing != null && (
+                existing.scheduleType != task.scheduleType ||
+                existing.timeHour != task.timeHour ||
+                existing.timeMinute != task.timeMinute ||
+                existing.date != task.date ||
+                existing.dayOfWeek != task.dayOfWeek ||
+                existing.dayOfMonth != task.dayOfMonth
+            )
+        ) {
+            task.copy(lastRunAt = null)
+        } else {
+            task
+        }
+        scheduledTaskDao.upsertTask(taskToSave)
+        scheduledTaskScheduler.scheduleTask(taskToSave)
     }
 
     suspend fun deleteScheduledTask(taskId: String) = withContext(Dispatchers.IO) {
@@ -155,7 +169,7 @@ class JulesRepository @Inject constructor(
         scheduledTaskDao.deleteTask(taskId)
     }
 
-    suspend fun executeScheduledTask(taskId: String) = withContext(Dispatchers.IO) {
+    suspend fun executeScheduledTask(taskId: String, isManual: Boolean = false) = withContext(Dispatchers.IO) {
         val task = scheduledTaskDao.getTaskById(taskId) ?: return@withContext
         val repos = task.repos
         if (repos.isEmpty()) return@withContext
@@ -193,13 +207,15 @@ class JulesRepository @Inject constructor(
             }
         }
 
-        val updatedTask = task.copy(
-            lastRunAt = Instant.now(),
-            enabled = task.scheduleType != ScheduleType.ONCE && task.enabled,
-            updatedAt = Instant.now()
-        )
-        scheduledTaskDao.upsertTask(updatedTask)
-        scheduledTaskScheduler.scheduleTask(updatedTask)
+        if (!isManual) {
+            val updatedTask = task.copy(
+                lastRunAt = Instant.now(),
+                enabled = task.scheduleType != ScheduleType.ONCE && task.enabled,
+                updatedAt = Instant.now()
+            )
+            scheduledTaskDao.upsertTask(updatedTask)
+            scheduledTaskScheduler.scheduleTask(updatedTask)
+        }
         workerScheduler.enqueueIfNeeded()
     }
 
