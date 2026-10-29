@@ -5,33 +5,57 @@ import com.felixbrucker.jules.network.api.model.ParsedFile
 
 object UnidiffParser {
 
-    private val diffGitRegex = Regex("^diff --git ", RegexOption.MULTILINE)
-
+    // Single-pass streaming line traversal avoids regex block splitting and line list allocations.
     fun parse(patch: String?): List<ParsedFile> {
         if (patch.isNullOrBlank()) return emptyList()
 
-        val rawBlocks = patch.split(diffGitRegex)
         val parsedFiles = mutableListOf<ParsedFile>()
+        var fromPath: String? = null
+        var toPath: String? = null
+        var additions = 0
+        var deletions = 0
+        var inHunk = false
+        var hasBlock = false
 
-        for (block in rawBlocks) {
-            if (block.isBlank()) continue
+        fun flushBlock() {
+            if (!hasBlock) return
+            val finalPath = toPath ?: fromPath
+            if (finalPath != null) {
+                val changeType = when {
+                    fromPath == null -> FileChangeType.CREATED
+                    toPath == null -> FileChangeType.DELETED
+                    else -> FileChangeType.MODIFIED
+                }
+                parsedFiles.add(
+                    ParsedFile(
+                        path = finalPath,
+                        changeType = changeType,
+                        additions = additions,
+                        deletions = deletions
+                    )
+                )
+            }
+            fromPath = null
+            toPath = null
+            additions = 0
+            deletions = 0
+            inHunk = false
+            hasBlock = false
+        }
 
-            val lines = block.lines()
-            var fromPath: String? = null
-            var toPath: String? = null
-            var additions = 0
-            var deletions = 0
-            var inHunk = false
-
-            for (line in lines) {
+        for (line in patch.lineSequence()) {
+            if (line.startsWith("diff --git ")) {
+                flushBlock()
+                hasBlock = true
+            } else if (hasBlock) {
                 when {
                     line.startsWith("--- ") -> {
-                        val path = line.removePrefix("--- ").trim()
-                        fromPath = if (path == "/dev/null") null else path.removePrefix("a/").removePrefix("b/")
+                        val path = line.substring(4).trim()
+                        fromPath = cleanPath(path)
                     }
                     line.startsWith("+++ ") -> {
-                        val path = line.removePrefix("+++ ").trim()
-                        toPath = if (path == "/dev/null") null else path.removePrefix("a/").removePrefix("b/")
+                        val path = line.substring(4).trim()
+                        toPath = cleanPath(path)
                     }
                     line.startsWith("@@ ") -> {
                         inHunk = true
@@ -45,24 +69,17 @@ object UnidiffParser {
                     }
                 }
             }
-
-            val finalPath = toPath ?: fromPath ?: continue
-            val changeType = when {
-                fromPath == null -> FileChangeType.CREATED
-                toPath == null -> FileChangeType.DELETED
-                else -> FileChangeType.MODIFIED
-            }
-
-            parsedFiles.add(
-                ParsedFile(
-                    path = finalPath,
-                    changeType = changeType,
-                    additions = additions,
-                    deletions = deletions
-                )
-            )
         }
+        flushBlock()
 
         return parsedFiles
+    }
+
+    private fun cleanPath(path: String): String? {
+        if (path == "/dev/null") return null
+        var p = path
+        if (p.startsWith("a/")) p = p.substring(2)
+        if (p.startsWith("b/")) p = p.substring(2)
+        return p
     }
 }
