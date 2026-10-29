@@ -139,7 +139,6 @@ private fun CreateSessionDialogBody(
         modifier = Modifier
             .fillMaxWidth()
             .padding(20.dp)
-            .verticalScroll(rememberScrollState())
     ) {
         Text(
             text = if (isPersistedDraft) "Edit Session Draft" else "Create Session",
