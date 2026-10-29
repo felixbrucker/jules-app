@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -69,7 +69,8 @@ fun CreateSessionDialog(
     onSourceSelected: (SourceEntity) -> Unit
 ) {
     BasicAlertDialog(
-        onDismissRequest = onDismiss
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(decorFitsSystemWindows = false)
     ) {
         Card(
             modifier = Modifier
@@ -444,21 +445,15 @@ fun PromptInputField(
     prompt: String,
     onPromptChange: (String) -> Unit
 ) {
-    Box(
+    OutlinedTextField(
+        value = prompt,
+        onValueChange = onPromptChange,
+        label = { Text("Prompt") },
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 120.dp, max = 240.dp)
-    ) {
-        OutlinedTextField(
-            value = prompt,
-            onValueChange = onPromptChange,
-            label = { Text("Prompt") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(),
-            minLines = 4
-        )
-    }
+            .heightIn(min = 120.dp, max = 240.dp),
+        minLines = 4
+    )
 }
 
 @Composable

@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.felixbrucker.jules.data.database.ScheduleType
 import com.felixbrucker.jules.data.database.ScheduledTaskEntity
 import com.felixbrucker.jules.data.database.ScheduledTaskRepo
@@ -85,7 +86,10 @@ fun CreateScheduledTaskDialog(
     onSaveTask: (ScheduledTaskEntity) -> Unit,
     onSourceSelected: (SourceEntity) -> Unit
 ) {
-    BasicAlertDialog(onDismissRequest = onDismiss) {
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(decorFitsSystemWindows = false)
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
