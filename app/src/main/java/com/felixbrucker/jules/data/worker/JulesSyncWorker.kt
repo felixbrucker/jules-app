@@ -9,7 +9,6 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.felixbrucker.jules.data.database.SessionDao
 import com.felixbrucker.jules.data.datastore.AppSettingsRepository
 import com.felixbrucker.jules.data.repository.JulesRepository
 import com.felixbrucker.jules.util.AppState
@@ -31,7 +30,6 @@ class JulesSyncWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val julesRepository: JulesRepository,
     private val appSettingsRepository: AppSettingsRepository,
-    private val sessionDao: SessionDao,
     private val workerScheduler: WorkerScheduler,
     private val appState: AppState
 ) : CoroutineWorker(appContext, workerParams) {
